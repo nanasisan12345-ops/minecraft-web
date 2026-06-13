@@ -6,7 +6,7 @@
 <title>3D マインクラフト風</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #87ceeb;
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #cfe7f5;
     font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; user-select: none; }
   canvas { display: block; }
 
@@ -66,14 +66,17 @@
   import * as THREE from 'three';
 
   /* ============== 基本セットアップ ============== */
+  const HORIZON = 0xcfe7f5;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x9ad0ec);
-  scene.fog = new THREE.Fog(0x9ad0ec, 45, 105);
+  scene.background = new THREE.Color(HORIZON);
+  scene.fog = new THREE.Fog(HORIZON, 38, 115);
 
-  const camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.05, 1000);
+  const camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.05, 1200);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
   const canvas = renderer.domElement;
   addEventListener('resize', () => {
@@ -81,6 +84,37 @@
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
   });
+
+  /* ============== ライト（太陽＋空のフィル光） ============== */
+  const hemi = new THREE.HemisphereLight(0xcfe7f5, 0x55503f, 0.85);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff4e0, 1.15);
+  const SUN_OFFSET = new THREE.Vector3(48, 90, 32);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 20;
+  sun.shadow.camera.far = 240;
+  const SD = 34;
+  sun.shadow.camera.left = -SD; sun.shadow.camera.right = SD;
+  sun.shadow.camera.top = SD; sun.shadow.camera.bottom = -SD;
+  sun.shadow.bias = -0.0006;
+  scene.add(sun);
+  scene.add(sun.target);
+
+  /* ============== 空ドーム（グラデーション） ============== */
+  const skyGeo = new THREE.SphereGeometry(600, 32, 16);
+  {
+    const pos = skyGeo.attributes.position, colors = [];
+    const cTop = new THREE.Color(0x3f86d8), cBot = new THREE.Color(0xdceff7);
+    for (let i = 0; i < pos.count; i++) {
+      const yn = pos.getY(i) / 600;
+      const c = cBot.clone().lerp(cTop, THREE.MathUtils.clamp((yn + 0.05) / 0.55, 0, 1));
+      colors.push(c.r, c.g, c.b);
+    }
+    skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  }
+  const sky = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true, fog: false, depthWrite: false }));
+  scene.add(sky);
 
   /* ============== テクスチャ生成（16x16 ドット絵） ============== */
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -99,103 +133,115 @@
     t.magFilter = THREE.NearestFilter;
     t.minFilter = THREE.NearestMipmapNearestFilter;
     t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
     return t;
   }
   function noise(g, hex, lo, hi) {
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-      g.fillStyle = tint(hex, rnd(lo, hi));
-      g.fillRect(x, y, 1, 1);
-    }
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { g.fillStyle = tint(hex, rnd(lo, hi)); g.fillRect(x, y, 1, 1); }
   }
   function dots(g, hex, n, f) {
     for (let i = 0; i < n; i++) { g.fillStyle = tint(hex, f); g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 1); }
   }
-
   const TX = {
-    dirt:  makeTex(g => { noise(g, 0x8a5a2b, 0.78, 1.12); dots(g, 0x8a5a2b, 14, 0.6); }),
-    grassTop: makeTex(g => { noise(g, 0x6ab04c, 0.82, 1.12); dots(g, 0x6ab04c, 16, 0.7); }),
+    dirt: makeTex(g => { noise(g, 0x8a5a2b, 0.78, 1.12); dots(g, 0x8a5a2b, 14, 0.6); }),
+    grassTop: makeTex(g => { noise(g, 0x6ab04c, 0.82, 1.12); dots(g, 0x4f8f38, 16, 0.85); }),
     grassSide: makeTex(g => {
       noise(g, 0x8a5a2b, 0.78, 1.12);
-      for (let x = 0; x < 16; x++) {
-        const h = 3 + (Math.random() < 0.4 ? 1 : 0);
-        for (let y = 0; y < h; y++) { g.fillStyle = tint(0x6ab04c, rnd(0.82, 1.12)); g.fillRect(x, y, 1, 1); }
-      }
+      for (let x = 0; x < 16; x++) { const h = 3 + (Math.random() < 0.4 ? 1 : 0); for (let y = 0; y < h; y++) { g.fillStyle = tint(0x6ab04c, rnd(0.82, 1.12)); g.fillRect(x, y, 1, 1); } }
     }),
-    stone: makeTex(g => { noise(g, 0x8b9094, 0.86, 1.08); dots(g, 0x8b9094, 18, 0.72); }),
-    bark:  makeTex(g => {
+    stone: makeTex(g => { noise(g, 0x8b9094, 0.86, 1.08); dots(g, 0x6f757a, 18, 0.85); }),
+    snow: makeTex(g => { noise(g, 0xf2f7ff, 0.93, 1.0); dots(g, 0xdfeaf8, 12, 0.97); }),
+    bark: makeTex(g => {
       for (let x = 0; x < 16; x++) { const c = rnd(0.8, 1.1); for (let y = 0; y < 16; y++) { g.fillStyle = tint(0x6d4c1b, c * rnd(0.95, 1.05)); g.fillRect(x, y, 1, 1); } }
       for (let i = 0; i < 4; i++) { const x = Math.random() * 16 | 0; for (let y = 0; y < 16; y++) { g.fillStyle = tint(0x6d4c1b, 0.7); g.fillRect(x, y, 1, 1); } }
     }),
     logTop: makeTex(g => {
       noise(g, 0xb5894e, 0.92, 1.05);
-      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-        const d = Math.hypot(x - 7.5, y - 7.5) | 0;
-        if (d % 2 === 0) { g.fillStyle = tint(0x6d4c1b, 0.85); g.fillRect(x, y, 1, 1); }
-      }
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 7.5, y - 7.5) | 0; if (d % 2 === 0) { g.fillStyle = tint(0x6d4c1b, 0.85); g.fillRect(x, y, 1, 1); } }
     }),
-    leaves: makeTex(g => { noise(g, 0x3f8a2e, 0.68, 1.18); dots(g, 0x2c5e20, 26, 0.8); }),
-    sand:  makeTex(g => { noise(g, 0xe6da9c, 0.93, 1.05); dots(g, 0xe6da9c, 12, 0.85); }),
+    leaves: makeTex(g => { noise(g, 0x3f8a2e, 0.66, 1.2); dots(g, 0x2c5e20, 28, 0.8); }),
+    sand: makeTex(g => { noise(g, 0xe6da9c, 0.93, 1.05); dots(g, 0xcdbf83, 12, 0.9); }),
     planks: makeTex(g => {
       noise(g, 0xb5824a, 0.93, 1.05);
       for (let y = 0; y < 16; y += 4) { g.fillStyle = tint(0x6d4c1b, 0.75); g.fillRect(0, y, 16, 1); }
       for (let y = 0; y < 16; y += 4) { const sx = (y / 4) % 2 ? 8 : 0; g.fillStyle = tint(0x6d4c1b, 0.8); g.fillRect(sx, y, 1, 4); }
     }),
     brick: makeTex(g => {
-      noise(g, 0xa83a2a, 0.9, 1.08);
-      g.fillStyle = '#cdbfa8';
+      noise(g, 0xa83a2a, 0.9, 1.08); g.fillStyle = '#cdbfa8';
       for (let y = 3; y < 16; y += 4) g.fillRect(0, y, 16, 1);
       for (let y = 0; y < 16; y += 4) { const off = ((y / 4) % 2) ? 2 : 6; for (let x = off; x < 16; x += 8) g.fillRect(x, y, 1, 4); }
     }),
     glass: makeTex(g => {
-      g.clearRect(0, 0, 16, 16);
-      g.fillStyle = 'rgba(180,232,255,0.22)'; g.fillRect(0, 0, 16, 16);
-      g.fillStyle = 'rgba(225,247,255,0.85)';
-      g.fillRect(0, 0, 16, 1); g.fillRect(0, 15, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16);
+      g.clearRect(0, 0, 16, 16); g.fillStyle = 'rgba(180,232,255,0.22)'; g.fillRect(0, 0, 16, 16);
+      g.fillStyle = 'rgba(225,247,255,0.85)'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 15, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16);
       g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(3, 2, 1, 6); g.fillRect(4, 2, 1, 3);
     }),
-    water: makeTex(g => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { g.fillStyle = `rgba(${48 + (Math.random() * 20 | 0)},${120 + (Math.random() * 20 | 0)},${216},0.72)`; g.fillRect(x, y, 1, 1); } }),
+    water: makeTex(g => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { g.fillStyle = `rgba(${44 + (Math.random() * 18 | 0)},${118 + (Math.random() * 18 | 0)},${210},0.78)`; g.fillRect(x, y, 1, 1); } }),
   };
 
-  /* ============== ブロック種別（面ごとの明るさ＝MC風シェーディング） ============== */
-  const FACE_B = [0.62, 0.62, 1.0, 0.5, 0.8, 0.8]; // +X,-X,+Y(上),-Y(下),+Z,-Z
-  function faceMats(tex, opt = {}) {
-    return FACE_B.map((b, i) => new THREE.MeshBasicMaterial({
-      map: Array.isArray(tex) ? tex[i] : tex,
-      color: new THREE.Color(b, b, b),
-      transparent: !!opt.transparent,
-      opacity: opt.opacity ?? 1,
-      depthWrite: opt.depthWrite ?? true,
-      side: THREE.FrontSide,
-    }));
-  }
+  /* ============== ブロック種別（光を受けるマテリアル） ============== */
   const T = TX;
+  function mkMat(map, opt) {
+    return new THREE.MeshPhongMaterial({
+      map, color: 0xffffff, shininess: opt.shininess ?? 3, specular: new THREE.Color(opt.specular ?? 0x0c0c0c),
+      transparent: !!opt.transparent, opacity: opt.opacity ?? 1, depthWrite: opt.depthWrite ?? true,
+    });
+  }
+  function faceMats(tex, opt = {}) { return Array.isArray(tex) ? tex.map(t => mkMat(t, opt)) : mkMat(tex, opt); }
+
   const TYPES = [
-    { name: '草',     color: 0x6ab04c, icon: T.grassSide, mats: faceMats([T.grassSide, T.grassSide, T.grassTop, T.dirt, T.grassSide, T.grassSide]) },
-    { name: '土',     color: 0x8a5a2b, icon: T.dirt,      mats: faceMats(T.dirt) },
-    { name: '石',     color: 0x8b9094, icon: T.stone,     mats: faceMats(T.stone) },
-    { name: '丸太',   color: 0x6d4c1b, icon: T.bark,      mats: faceMats([T.bark, T.bark, T.logTop, T.logTop, T.bark, T.bark]) },
-    { name: '葉',     color: 0x3f8a2e, icon: T.leaves,    mats: faceMats(T.leaves) },
-    { name: '砂',     color: 0xe6da9c, icon: T.sand,      mats: faceMats(T.sand) },
-    { name: '板材',   color: 0xb5824a, icon: T.planks,    mats: faceMats(T.planks) },
-    { name: 'レンガ', color: 0xa83a2a, icon: T.brick,     mats: faceMats(T.brick) },
-    { name: 'ガラス', color: 0xbfe9ff, icon: T.glass,     mats: faceMats(T.glass, { transparent: true, depthWrite: false }) },
-    { name: '水',     color: 0x3a78d8, icon: T.water,     mats: faceMats(T.water, { transparent: true, depthWrite: false }), solid: false },
+    { name: '草',     color: 0x6ab04c, icon: T.grassSide, mats: faceMats([T.grassSide, T.grassSide, T.grassTop, T.dirt, T.grassSide, T.grassSide]) }, // 0
+    { name: '土',     color: 0x8a5a2b, icon: T.dirt,      mats: faceMats(T.dirt) },   // 1
+    { name: '石',     color: 0x8b9094, icon: T.stone,     mats: faceMats(T.stone) },  // 2
+    { name: '丸太',   color: 0x6d4c1b, icon: T.bark,      mats: faceMats([T.bark, T.bark, T.logTop, T.logTop, T.bark, T.bark]) }, // 3
+    { name: '葉',     color: 0x3f8a2e, icon: T.leaves,    mats: faceMats(T.leaves) }, // 4
+    { name: '砂',     color: 0xe6da9c, icon: T.sand,      mats: faceMats(T.sand) },   // 5
+    { name: '板材',   color: 0xb5824a, icon: T.planks,    mats: faceMats(T.planks) }, // 6
+    { name: 'レンガ', color: 0xa83a2a, icon: T.brick,     mats: faceMats(T.brick) },  // 7
+    { name: 'ガラス', color: 0xbfe9ff, icon: T.glass,     mats: faceMats(T.glass, { transparent: true, depthWrite: false }), transparent: true }, // 8
+    { name: '水',     color: 0x3a78d8, icon: T.water,     mats: faceMats(T.water, { transparent: true, depthWrite: false, shininess: 80, specular: 0x335577 }), transparent: true, solid: false }, // 9
+    { name: '雪',     color: 0xf2f7ff, icon: T.snow,      mats: faceMats(T.snow) },   // 10
   ];
-  const WATER = 9;
-  const HOTBAR = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  const GRASS = 0, DIRT = 1, STONE = 2, SAND = 5, WATER = 9, SNOW = 10;
+  const HOTBAR = [0, 1, 2, 10, 5, 3, 4, 6, 8]; // 草 土 石 雪 砂 丸太 葉 板材 ガラス
 
   /* ============== インスタンスメッシュ ============== */
   const GEO = new THREE.BoxGeometry(1, 1, 1);
-  const MAX = 70000;
+  const MAX = 90000;
   const meshes = [];
   const coordsByType = [];
-  for (const t of TYPES) {
-    const mesh = new THREE.InstancedMesh(GEO, t.mats, MAX);
+  for (const ty of TYPES) {
+    const mesh = new THREE.InstancedMesh(GEO, ty.mats, MAX);
     mesh.count = 0;
     mesh.frustumCulled = false;
+    if (!ty.transparent) { mesh.castShadow = true; mesh.receiveShadow = true; }
     scene.add(mesh);
     meshes.push(mesh);
     coordsByType.push([]);
+  }
+
+  /* ============== Perlinノイズ ============== */
+  const perm = new Uint8Array(512);
+  (() => {
+    const p = new Uint8Array(256); for (let i = 0; i < 256; i++) p[i] = i;
+    let s = 1337; const rng = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    for (let i = 255; i > 0; i--) { const j = (rng() * (i + 1)) | 0; const t = p[i]; p[i] = p[j]; p[j] = t; }
+    for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+  })();
+  const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  function grad(h, x, y) { const u = (h & 1) ? -x : x, v = (h & 2) ? -y : y; return u + v; }
+  function perlin2(x, y) {
+    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255;
+    x -= Math.floor(x); y -= Math.floor(y);
+    const u = fade(x), v = fade(y);
+    const aa = perm[perm[X] + Y], ab = perm[perm[X] + Y + 1], ba = perm[perm[X + 1] + Y], bb = perm[perm[X + 1] + Y + 1];
+    return lerp(lerp(grad(aa, x, y), grad(ba, x - 1, y), u), lerp(grad(ab, x, y - 1), grad(bb, x - 1, y - 1), u), v);
+  }
+  function fbm(x, y, oct, gain) {
+    let amp = 1, freq = 1, sum = 0, norm = 0;
+    for (let i = 0; i < oct; i++) { sum += amp * perlin2(x * freq, y * freq); norm += amp; amp *= gain; freq *= 2; }
+    return sum / norm;
   }
 
   /* ============== ワールドデータ ============== */
@@ -204,25 +250,33 @@
   const isSolid = (x, y, z) => { const t = world.get(key(x, y, z)); return t !== undefined && TYPES[t].solid !== false; };
   function setBlock(x, y, z, type) { if (type == null) world.delete(key(x, y, z)); else world.set(key(x, y, z), type); }
 
+  const SEA = 8, SNOW_LINE = 30, ROCK_LINE = 23;
   function heightAt(x, z) {
-    const n = Math.sin(x * 0.18) * Math.cos(z * 0.18) * 2.2
-            + Math.sin(x * 0.06 + z * 0.09) * 3.0
-            + Math.cos(z * 0.13 - x * 0.07) * 1.6;
-    return Math.round(7 + n);
+    let e = (fbm(x * 0.0125, z * 0.0125, 5, 0.5) + 1) / 2;
+    e = Math.pow(THREE.MathUtils.clamp(e, 0, 1), 1.7);
+    const ridge = fbm(x * 0.045 + 100, z * 0.045 + 100, 3, 0.5) * 0.5;
+    return Math.round(e * 36 + ridge * 5 + 3);
+  }
+  function topTypeAt(x, z, h) {
+    if (h <= SEA + 1) return SAND;
+    if (h >= SNOW_LINE) return SNOW;
+    const slope = Math.max(Math.abs(h - heightAt(x + 1, z)), Math.abs(h - heightAt(x - 1, z)), Math.abs(h - heightAt(x, z + 1)), Math.abs(h - heightAt(x, z - 1)));
+    if (slope >= 3 || h >= ROCK_LINE) return STONE;
+    return GRASS;
   }
 
-  const R = 24, SEA = 5;
+  const R = 32;
   for (let x = -R; x <= R; x++) {
     for (let z = -R; z <= R; z++) {
-      const h = heightAt(x, z);
+      const h = heightAt(x, z), top = topTypeAt(x, z, h);
       for (let y = 0; y <= h; y++) {
         let type;
-        if (y === h) type = (h <= SEA ? 5 : 0);     // 海面以下は砂、それ以上は草
-        else if (y >= h - 3) type = 1;               // 土
-        else type = 2;                               // 石
+        if (y === h) type = top;
+        else if ((top === GRASS || top === SAND) && y >= h - 3) type = DIRT;
+        else type = STONE;
         setBlock(x, y, z, type);
       }
-      for (let y = h + 1; y <= SEA; y++) setBlock(x, y, z, WATER);  // 水を満たす
+      for (let y = h + 1; y <= SEA; y++) setBlock(x, y, z, WATER);
     }
   }
   function plantTree(x, z) {
@@ -234,15 +288,27 @@
     }
     setBlock(x, top + 1, z, 4);
   }
-  for (let i = 0; i < 28; i++) {
+  for (let i = 0; i < 60; i++) {
     const x = (Math.random() * 2 * R - R) | 0, z = (Math.random() * 2 * R - R) | 0;
-    if (heightAt(x, z) > SEA) plantTree(x, z);
+    const h = heightAt(x, z);
+    if (topTypeAt(x, z, h) === GRASS) plantTree(x, z);
   }
 
+  /* ============== 面カリング付き再構築 ============== */
+  function occludes(x, y, z, self) {
+    const nt = world.get(key(x, y, z));
+    if (nt === undefined) return false;          // 空気 → 隠さない
+    if (!TYPES[nt].transparent) return true;      // 不透明 → 隠す
+    return nt === self;                           // 同じ半透明同士 → 内部面は隠す
+  }
+  function visible(x, y, z, t) {
+    return !occludes(x + 1, y, z, t) || !occludes(x - 1, y, z, t) || !occludes(x, y + 1, z, t)
+        || !occludes(x, y - 1, z, t) || !occludes(x, y, z + 1, t) || !occludes(x, y, z - 1, t);
+  }
   const _m = new THREE.Matrix4();
   function rebuild() {
     for (const a of coordsByType) a.length = 0;
-    for (const [k, t] of world) { const c = k.split(','); coordsByType[t].push([+c[0], +c[1], +c[2]]); }
+    for (const [k, t] of world) { const c = k.split(','); const x = +c[0], y = +c[1], z = +c[2]; if (visible(x, y, z, t)) coordsByType[t].push([x, y, z]); }
     for (let t = 0; t < meshes.length; t++) {
       const arr = coordsByType[t], mesh = meshes[t];
       for (let i = 0; i < arr.length; i++) { _m.makeTranslation(arr[i][0] + 0.5, arr[i][1] + 0.5, arr[i][2] + 0.5); mesh.setMatrixAt(i, _m); }
@@ -252,33 +318,29 @@
   }
   rebuild();
 
-  /* ============== 空・雲 ============== */
+  /* ============== 雲 ============== */
   const cloudTex = (() => {
     const N = 32, c = document.createElement('canvas'); c.width = c.height = N;
-    const g = c.getContext('2d'); g.clearRect(0, 0, N, N); g.fillStyle = 'rgba(255,255,255,0.92)';
+    const g = c.getContext('2d'); g.clearRect(0, 0, N, N); g.fillStyle = 'rgba(255,255,255,0.95)';
     for (let i = 0; i < 16; i++) g.fillRect(Math.random() * N | 0, Math.random() * N | 0, 2 + (Math.random() * 6 | 0), 2 + (Math.random() * 5 | 0));
     const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter;
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(6, 6); t.colorSpace = THREE.SRGBColorSpace; return t;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(7, 7); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
-  const clouds = new THREE.Mesh(new THREE.PlaneGeometry(600, 600),
-    new THREE.MeshBasicMaterial({ map: cloudTex, transparent: true, opacity: 0.8, depthWrite: false, fog: false }));
-  clouds.rotation.x = Math.PI / 2;
-  clouds.position.y = 42;
-  scene.add(clouds);
+  const clouds = new THREE.Mesh(new THREE.PlaneGeometry(700, 700),
+    new THREE.MeshBasicMaterial({ map: cloudTex, transparent: true, opacity: 0.75, depthWrite: false, fog: false }));
+  clouds.rotation.x = Math.PI / 2; clouds.position.y = 72; scene.add(clouds);
 
   /* ============== ターゲット枠 ============== */
-  const highlight = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.BoxGeometry(1.003, 1.003, 1.003)),
-    new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55 }));
-  highlight.visible = false;
-  scene.add(highlight);
+  const highlight = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.003, 1.003, 1.003)),
+    new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 }));
+  highlight.visible = false; scene.add(highlight);
 
   /* ============== 破壊パーティクル ============== */
   const pGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16);
   const pPool = [];
   for (let i = 0; i < 80; i++) {
-    const m = new THREE.Mesh(pGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    m.visible = false; scene.add(m);
+    const m = new THREE.Mesh(pGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }));
+    m.visible = false; m.castShadow = false; scene.add(m);
     pPool.push({ mesh: m, vel: new THREE.Vector3(), life: 0 });
   }
   let pIdx = 0;
@@ -289,8 +351,7 @@
       p.mesh.position.set(x + 0.5 + rnd(-0.3, 0.3), y + 0.5 + rnd(-0.3, 0.3), z + 0.5 + rnd(-0.3, 0.3));
       p.vel.set(rnd(-2.5, 2.5), rnd(1.5, 4.5), rnd(-2.5, 2.5));
       p.mesh.scale.setScalar(rnd(0.5, 1.3));
-      p.life = 0.45 + Math.random() * 0.3;
-      p.mesh.visible = true;
+      p.life = 0.45 + Math.random() * 0.3; p.mesh.visible = true;
     }
   }
 
@@ -306,31 +367,31 @@
   }
 
   /* ============== プレイヤー & 物理 ============== */
-  const player = { pos: new THREE.Vector3(0.5, heightAt(0, 0) + 4, 0.5), vel: new THREE.Vector3(), onGround: false };
+  const spawnY = Math.max(heightAt(0, 0), SEA) + 4;
+  const player = { pos: new THREE.Vector3(0.5, spawnY, 0.5), vel: new THREE.Vector3(), onGround: false };
   let yaw = 0, pitch = 0;
-  const EYE = 1.6, HALF = 0.3, TOP = 0.2;
+  const EYE = 1.6, HALF = 0.3, TOP_H = 0.2;
   const WALK = 4.6, SPRINT = 6.3, GRAVITY = 30, JUMP = 9, REACH = 6;
 
   function bodyCollides(px, py, pz) {
     const x0 = Math.floor(px - HALF), x1 = Math.floor(px + HALF);
-    const y0 = Math.floor(py - EYE), y1 = Math.floor(py + TOP);
+    const y0 = Math.floor(py - EYE), y1 = Math.floor(py + TOP_H);
     const z0 = Math.floor(pz - HALF), z1 = Math.floor(pz + HALF);
     for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) if (isSolid(x, y, z)) return true;
     return false;
   }
   function moveAxis(axis, d) {
     if (d === 0) return false;
-    const old = player.pos[axis];
-    player.pos[axis] += d;
+    const old = player.pos[axis]; player.pos[axis] += d;
     if (bodyCollides(player.pos.x, player.pos.y, player.pos.z)) { player.pos[axis] = old; return true; }
     return false;
   }
   function overlapsPlayer(x, y, z) {
     const p = player.pos;
-    return (x + 1 > p.x - HALF && x < p.x + HALF && z + 1 > p.z - HALF && z < p.z + HALF && y + 1 > p.y - EYE && y < p.y + TOP);
+    return (x + 1 > p.x - HALF && x < p.x + HALF && z + 1 > p.z - HALF && z < p.z + HALF && y + 1 > p.y - EYE && y < p.y + TOP_H);
   }
 
-  /* ============== ボクセルレイキャスト (Amanatides & Woo) ============== */
+  /* ============== ボクセルレイキャスト ============== */
   const mod = (a, n) => ((a % n) + n) % n;
   function intbound(s, ds) { if (ds < 0) return intbound(-s, -ds); return (1 - mod(s, 1)) / ds; }
   function pickTarget() {
@@ -364,7 +425,6 @@
   const keys = {};
   let selected = 0, started = false;
   const overlay = document.getElementById('overlay');
-
   function startGame() {
     if (started) return;
     started = true; overlay.style.display = 'none'; initAudio();
@@ -376,13 +436,9 @@
     started = false; overlay.style.display = 'flex';
     if (document.pointerLockElement === canvas) document.exitPointerLock();
   }
-  window.__startGame = startGame; // デバッグ用
-
+  window.__startGame = startGame;
   overlay.addEventListener('click', startGame);
-  canvas.addEventListener('mousedown', e => {
-    if (!started) { startGame(); return; }
-    if (e.button === 0) breakBlock(); else if (e.button === 2) placeBlock();
-  });
+  canvas.addEventListener('mousedown', e => { if (!started) { startGame(); return; } if (e.button === 0) breakBlock(); else if (e.button === 2) placeBlock(); });
   addEventListener('contextmenu', e => e.preventDefault());
   document.addEventListener('mousemove', e => {
     if (!started) return;
@@ -430,27 +486,26 @@
       moveAxis('x', player.vel.x * dt); moveAxis('z', player.vel.z * dt);
       player.onGround = false;
       if (moveAxis('y', player.vel.y * dt)) { if (player.vel.y < 0) player.onGround = true; player.vel.y = 0; }
-      if (player.pos.y < -30) { player.pos.set(0.5, heightAt(0, 0) + 4, 0.5); player.vel.set(0, 0, 0); }
+      if (player.pos.y < -40) { player.pos.set(0.5, spawnY, 0.5); player.vel.set(0, 0, 0); }
     }
 
     camera.position.copy(player.pos);
     camera.quaternion.setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
 
-    // ターゲット枠
+    // 太陽と影をプレイヤーに追従
+    sun.target.position.copy(player.pos);
+    sun.position.copy(player.pos).add(SUN_OFFSET);
+    sky.position.copy(camera.position);
+
     const tg = started ? pickTarget() : null;
-    if (tg) { highlight.position.set(tg.block[0] + 0.5, tg.block[1] + 0.5, tg.block[2] + 0.5); highlight.visible = true; }
-    else highlight.visible = false;
+    if (tg) { highlight.position.set(tg.block[0] + 0.5, tg.block[1] + 0.5, tg.block[2] + 0.5); highlight.visible = true; } else highlight.visible = false;
 
-    // パーティクル
-    for (const p of pPool) {
-      if (p.life > 0) { p.life -= dt; p.vel.y -= 20 * dt; p.mesh.position.addScaledVector(p.vel, dt); if (p.life <= 0) p.mesh.visible = false; }
-    }
+    for (const p of pPool) { if (p.life > 0) { p.life -= dt; p.vel.y -= 20 * dt; p.mesh.position.addScaledVector(p.vel, dt); if (p.life <= 0) p.mesh.visible = false; } }
 
-    // 雲を流す（プレイヤー上空に追従）
     cloudTex.offset.x += dt * 0.004;
     clouds.position.x = camera.position.x; clouds.position.z = camera.position.z;
 
-    stats.textContent = `XYZ ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}　　選択: ${TYPES[HOTBAR[selected]].name}　　ブロック: ${world.size}`;
+    stats.textContent = `XYZ ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}　　選択: ${TYPES[HOTBAR[selected]].name}　　描画ブロック: ${coordsByType.reduce((a, c) => a + c.length, 0)}`;
     renderer.render(scene, camera);
   }
   animate();
