@@ -116,7 +116,8 @@
   const sky = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true, fog: false, depthWrite: false }));
   scene.add(sky);
 
-  /* ============== テクスチャ生成（16x16 ドット絵） ============== */
+  /* ============== テクスチャ生成（32x32 ドット絵） ============== */
+  const TEX_S = 32;
   const rnd = (a, b) => a + Math.random() * (b - a);
   function tint(hex, f) {
     const r = Math.min(255, ((hex >> 16) & 255) * f) | 0;
@@ -125,7 +126,7 @@
     return `rgb(${r},${g},${b})`;
   }
   function makeTex(draw) {
-    const S = 16, c = document.createElement('canvas');
+    const S = TEX_S, c = document.createElement('canvas');
     c.width = c.height = S;
     const g = c.getContext('2d');
     draw(g, S);
@@ -136,56 +137,83 @@
     t.anisotropy = 4;
     return t;
   }
-  function noise(g, hex, lo, hi) {
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { g.fillStyle = tint(hex, rnd(lo, hi)); g.fillRect(x, y, 1, 1); }
+  function noise(g, S, hex, lo, hi) {
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { g.fillStyle = tint(hex, rnd(lo, hi)); g.fillRect(x, y, 1, 1); }
   }
-  function dots(g, hex, n, f) {
-    for (let i = 0; i < n; i++) { g.fillStyle = tint(hex, f); g.fillRect(Math.random() * 16 | 0, Math.random() * 16 | 0, 1, 1); }
+  function dots(g, S, hex, dens, f) {
+    const n = Math.round(S * S * dens);
+    for (let i = 0; i < n; i++) { g.fillStyle = tint(hex, f); g.fillRect(Math.random() * S | 0, Math.random() * S | 0, 1, 1); }
+  }
+  // 明度差から法線マップを生成し、表面の凹凸を光で表現する
+  function normalFromCanvas(canvas, strength) {
+    const S = canvas.width, src = canvas.getContext('2d').getImageData(0, 0, S, S).data;
+    const lum = (x, y) => { const i = ((((y % S) + S) % S) * S + (((x % S) + S) % S)) * 4; return (src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114) / 255; };
+    const out = document.createElement('canvas'); out.width = out.height = S;
+    const og = out.getContext('2d'), img = og.createImageData(S, S);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      let nx = (lum(x - 1, y) - lum(x + 1, y)) * strength, ny = (lum(x, y - 1) - lum(x, y + 1)) * strength, nz = 1;
+      const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+      const i = (y * S + x) * 4;
+      img.data[i] = (nx * 0.5 + 0.5) * 255; img.data[i + 1] = (ny * 0.5 + 0.5) * 255; img.data[i + 2] = (nz * 0.5 + 0.5) * 255; img.data[i + 3] = 255;
+    }
+    og.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(out); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestMipmapNearestFilter; return t;
   }
   const TX = {
-    dirt: makeTex(g => { noise(g, 0x8a5a2b, 0.78, 1.12); dots(g, 0x8a5a2b, 14, 0.6); }),
-    grassTop: makeTex(g => { noise(g, 0x6ab04c, 0.82, 1.12); dots(g, 0x4f8f38, 16, 0.85); }),
-    grassSide: makeTex(g => {
-      noise(g, 0x8a5a2b, 0.78, 1.12);
-      for (let x = 0; x < 16; x++) { const h = 3 + (Math.random() < 0.4 ? 1 : 0); for (let y = 0; y < h; y++) { g.fillStyle = tint(0x6ab04c, rnd(0.82, 1.12)); g.fillRect(x, y, 1, 1); } }
+    dirt: makeTex((g, S) => { noise(g, S, 0x8a5a2b, 0.78, 1.12); dots(g, S, 0x5f4020, 0.06, 0.7); for (let i = 0; i < 5; i++) { g.fillStyle = tint(0x9aa0a4, rnd(0.8, 1)); g.fillRect(Math.random() * S | 0, Math.random() * S | 0, 2, 2); } }),
+    grassTop: makeTex((g, S) => { noise(g, S, 0x6ab04c, 0.8, 1.14); dots(g, S, 0x4f8f38, 0.05, 0.85); dots(g, S, 0x83c95f, 0.04, 1.1); }),
+    grassSide: makeTex((g, S) => {
+      noise(g, S, 0x8a5a2b, 0.78, 1.12);
+      const base = (S * 0.28) | 0;
+      for (let x = 0; x < S; x++) { const h = base + (Math.random() * (S * 0.18) | 0); for (let y = 0; y < h; y++) { g.fillStyle = tint(0x6ab04c, rnd(0.8, 1.14)); g.fillRect(x, y, 1, 1); } }
     }),
-    stone: makeTex(g => { noise(g, 0x8b9094, 0.86, 1.08); dots(g, 0x6f757a, 18, 0.85); }),
-    snow: makeTex(g => { noise(g, 0xf2f7ff, 0.93, 1.0); dots(g, 0xdfeaf8, 12, 0.97); }),
-    bark: makeTex(g => {
-      for (let x = 0; x < 16; x++) { const c = rnd(0.8, 1.1); for (let y = 0; y < 16; y++) { g.fillStyle = tint(0x6d4c1b, c * rnd(0.95, 1.05)); g.fillRect(x, y, 1, 1); } }
-      for (let i = 0; i < 4; i++) { const x = Math.random() * 16 | 0; for (let y = 0; y < 16; y++) { g.fillStyle = tint(0x6d4c1b, 0.7); g.fillRect(x, y, 1, 1); } }
+    stone: makeTex((g, S) => {
+      noise(g, S, 0x8b9094, 0.86, 1.08); dots(g, S, 0x6f757a, 0.06, 0.85); dots(g, S, 0xa8adb2, 0.03, 1.05);
+      g.strokeStyle = 'rgba(70,74,78,0.7)'; g.lineWidth = 1;
+      for (let i = 0; i < 3; i++) { g.beginPath(); let px = Math.random() * S, py = Math.random() * S; g.moveTo(px, py); for (let s = 0; s < 4; s++) { px += rnd(-6, 6); py += rnd(-6, 6); g.lineTo(px, py); } g.stroke(); }
     }),
-    logTop: makeTex(g => {
-      noise(g, 0xb5894e, 0.92, 1.05);
-      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 7.5, y - 7.5) | 0; if (d % 2 === 0) { g.fillStyle = tint(0x6d4c1b, 0.85); g.fillRect(x, y, 1, 1); } }
+    snow: makeTex((g, S) => { noise(g, S, 0xf2f7ff, 0.94, 1.0); dots(g, S, 0xdfeaf8, 0.05, 0.97); for (let i = 0; i < 6; i++) { g.fillStyle = '#ffffff'; g.fillRect(Math.random() * S | 0, Math.random() * S | 0, 2, 2); } }),
+    bark: makeTex((g, S) => {
+      for (let x = 0; x < S; x++) { const c = rnd(0.78, 1.12); for (let y = 0; y < S; y++) { g.fillStyle = tint(0x6d4c1b, c * rnd(0.95, 1.06)); g.fillRect(x, y, 1, 1); } }
+      for (let i = 0; i < 6; i++) { const x = Math.random() * S | 0; for (let y = 0; y < S; y++) { g.fillStyle = tint(0x4f3712, rnd(0.85, 1)); g.fillRect(x, y, 1, 1); } }
     }),
-    leaves: makeTex(g => { noise(g, 0x3f8a2e, 0.66, 1.2); dots(g, 0x2c5e20, 28, 0.8); }),
-    sand: makeTex(g => { noise(g, 0xe6da9c, 0.93, 1.05); dots(g, 0xcdbf83, 12, 0.9); }),
-    planks: makeTex(g => {
-      noise(g, 0xb5824a, 0.93, 1.05);
-      for (let y = 0; y < 16; y += 4) { g.fillStyle = tint(0x6d4c1b, 0.75); g.fillRect(0, y, 16, 1); }
-      for (let y = 0; y < 16; y += 4) { const sx = (y / 4) % 2 ? 8 : 0; g.fillStyle = tint(0x6d4c1b, 0.8); g.fillRect(sx, y, 1, 4); }
+    logTop: makeTex((g, S) => { noise(g, S, 0xb5894e, 0.92, 1.05); const c = S / 2; for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const d = Math.hypot(x - c + 0.5, y - c + 0.5) | 0; if (d % 3 === 0) { g.fillStyle = tint(0x6d4c1b, 0.82); g.fillRect(x, y, 1, 1); } } }),
+    leaves: makeTex((g, S) => { noise(g, S, 0x3f8a2e, 0.64, 1.22); dots(g, S, 0x2c5e20, 0.1, 0.8); dots(g, S, 0x5fb04a, 0.05, 1.15); }),
+    sand: makeTex((g, S) => { noise(g, S, 0xe6da9c, 0.93, 1.05); dots(g, S, 0xcdbf83, 0.05, 0.9); g.fillStyle = 'rgba(255,255,255,0.16)'; for (let y = 4; y < S; y += 7) g.fillRect(0, y + (Math.random() * 2 | 0), S, 1); }),
+    planks: makeTex((g, S) => {
+      noise(g, S, 0xb5824a, 0.93, 1.05); const step = S / 4;
+      for (let y = 0; y < S; y += step) { g.fillStyle = tint(0x6d4c1b, 0.72); g.fillRect(0, y, S, 1); }
+      for (let row = 0; row * step < S; row++) { const y = row * step, sx = (row % 2) ? S / 2 : 0; g.fillStyle = tint(0x6d4c1b, 0.78); g.fillRect(sx, y, 1, step); }
     }),
-    brick: makeTex(g => {
-      noise(g, 0xa83a2a, 0.9, 1.08); g.fillStyle = '#cdbfa8';
-      for (let y = 3; y < 16; y += 4) g.fillRect(0, y, 16, 1);
-      for (let y = 0; y < 16; y += 4) { const off = ((y / 4) % 2) ? 2 : 6; for (let x = off; x < 16; x += 8) g.fillRect(x, y, 1, 4); }
+    brick: makeTex((g, S) => {
+      noise(g, S, 0xa83a2a, 0.9, 1.08); g.fillStyle = '#cdbfa8'; const r = S / 4;
+      for (let row = 0; row * r < S; row++) {
+        const y = row * r; g.fillRect(0, y, S, 2);
+        const off = (row % 2) ? S / 2 : 0;
+        for (let x = off; x < S; x += S / 2) g.fillRect(x, y, 2, r);
+      }
     }),
-    glass: makeTex(g => {
-      g.clearRect(0, 0, 16, 16); g.fillStyle = 'rgba(180,232,255,0.22)'; g.fillRect(0, 0, 16, 16);
-      g.fillStyle = 'rgba(225,247,255,0.85)'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 15, 16, 1); g.fillRect(0, 0, 1, 16); g.fillRect(15, 0, 1, 16);
-      g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(3, 2, 1, 6); g.fillRect(4, 2, 1, 3);
+    glass: makeTex((g, S) => {
+      g.clearRect(0, 0, S, S); g.fillStyle = 'rgba(180,232,255,0.2)'; g.fillRect(0, 0, S, S);
+      g.fillStyle = 'rgba(225,247,255,0.85)'; g.fillRect(0, 0, S, 2); g.fillRect(0, S - 2, S, 2); g.fillRect(0, 0, 2, S); g.fillRect(S - 2, 0, 2, S);
+      g.fillStyle = 'rgba(255,255,255,0.4)'; g.fillRect(6, 4, 2, 12); g.fillRect(8, 4, 2, 6);
     }),
-    water: makeTex(g => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { g.fillStyle = `rgba(${44 + (Math.random() * 18 | 0)},${118 + (Math.random() * 18 | 0)},${210},0.78)`; g.fillRect(x, y, 1, 1); } }),
+    water: makeTex((g, S) => { for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { g.fillStyle = `rgba(${44 + (Math.random() * 18 | 0)},${118 + (Math.random() * 18 | 0)},${210},0.8)`; g.fillRect(x, y, 1, 1); } g.fillStyle = 'rgba(255,255,255,0.12)'; for (let y = 3; y < S; y += 6) g.fillRect(0, y, S, 1); }),
   };
+  TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
+  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick'])
+    TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);
 
   /* ============== ブロック種別（光を受けるマテリアル） ============== */
   const T = TX;
   function mkMat(map, opt) {
-    return new THREE.MeshPhongMaterial({
+    const nm = (map.userData && map.userData.normalMap) || null;
+    const m = new THREE.MeshPhongMaterial({
       map, color: 0xffffff, shininess: opt.shininess ?? 3, specular: new THREE.Color(opt.specular ?? 0x0c0c0c),
       transparent: !!opt.transparent, opacity: opt.opacity ?? 1, depthWrite: opt.depthWrite ?? true,
     });
+    if (nm) { m.normalMap = nm; m.normalScale = new THREE.Vector2(0.6, 0.6); }
+    return m;
   }
   function faceMats(tex, opt = {}) { return Array.isArray(tex) ? tex.map(t => mkMat(t, opt)) : mkMat(tex, opt); }
 
@@ -199,7 +227,7 @@
     { name: '板材',   color: 0xb5824a, icon: T.planks,    mats: faceMats(T.planks) }, // 6
     { name: 'レンガ', color: 0xa83a2a, icon: T.brick,     mats: faceMats(T.brick) },  // 7
     { name: 'ガラス', color: 0xbfe9ff, icon: T.glass,     mats: faceMats(T.glass, { transparent: true, depthWrite: false }), transparent: true }, // 8
-    { name: '水',     color: 0x3a78d8, icon: T.water,     mats: faceMats(T.water, { transparent: true, depthWrite: false, shininess: 80, specular: 0x335577 }), transparent: true, solid: false }, // 9
+    { name: '水',     color: 0x3a78d8, icon: T.water,     mats: faceMats(T.water, { transparent: true, depthWrite: false, opacity: 0.72, shininess: 90, specular: 0x335577 }), transparent: true, solid: false }, // 9
     { name: '雪',     color: 0xf2f7ff, icon: T.snow,      mats: faceMats(T.snow) },   // 10
   ];
   const GRASS = 0, DIRT = 1, STONE = 2, SAND = 5, WATER = 9, SNOW = 10;
@@ -504,6 +532,7 @@
 
     cloudTex.offset.x += dt * 0.004;
     clouds.position.x = camera.position.x; clouds.position.z = camera.position.z;
+    TX.water.offset.x += dt * 0.02; TX.water.offset.y -= dt * 0.03; // 水面の流れ
 
     stats.textContent = `XYZ ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}　　選択: ${TYPES[HOTBAR[selected]].name}　　描画ブロック: ${coordsByType.reduce((a, c) => a + c.length, 0)}`;
     renderer.render(scene, camera);
