@@ -2,7 +2,7 @@
 
 HTML + CSS + JavaScript（[Three.js](https://threejs.org/) / WebGL）だけで作った、ブラウザで動く3Dボクセルゲームです。ビルド不要、`index.html` を開くだけで動きます。
 
-<!-- PLAY_URL -->
+▶ **今すぐ遊ぶ:** https://nanasisan12345-ops.github.io/minecraft-web/
 
 ## 操作方法
 
