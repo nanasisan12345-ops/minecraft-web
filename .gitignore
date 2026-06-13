@@ -1,0 +1,6 @@
+# Claude Code / ローカル開発用設定
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
