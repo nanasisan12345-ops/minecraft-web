@@ -54,6 +54,7 @@
       <div><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> 移動　<span class="key">Shift</span> ダッシュ　<span class="key">Space</span> ジャンプ</div>
       <div>マウス 視点　<span class="key">左</span>クリック 壊す　<span class="key">右</span>クリック 置く</div>
       <div><span class="key">1</span>〜<span class="key">9</span> / ホイール ブロック選択　<span class="key">Esc</span> 一時停止</div>
+      <div><span class="key">R</span> 🔊 レイブモード（クラブを召喚！）</div>
     </div>
     <div class="go">クリックして開始</div>
   </div>
@@ -541,6 +542,7 @@
   addEventListener('keydown', e => {
     keys[e.code] = true;
     if (e.code === 'Escape') pause();
+    if (e.code === 'KeyR') raveToggle();
     if (e.code.startsWith('Digit')) { const n = +e.code.slice(5); if (n >= 1 && n <= 9) selectSlot(n - 1); }
     if (['Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) e.preventDefault();
   });
@@ -559,6 +561,249 @@
   function selectSlot(i) { selected = i; [...hotbar.children].forEach((s, idx) => s.classList.toggle('on', idx === selected)); }
   selectSlot(0);
   const stats = document.getElementById('stats');
+
+  /* ============== レイブモード (hallucinate) ============== */
+  const RAVE = {
+    on: false, group: null, built: false,
+    lights: [], spots: [], lasers: [], tiles: [], dancers: [], mirror: null, strobe: null,
+    bpm: 128, audioStart: 0, nextNote: 0, step: 0, master: null, noiseBuf: null,
+    saved: {}, beat: 0,
+  };
+  const SIXTEENTH = () => 60 / RAVE.bpm / 4;
+
+  // --- シンセ音源（WebAudio） ---
+  function raveNoise() {
+    if (RAVE.noiseBuf) return RAVE.noiseBuf;
+    const len = actx.sampleRate, b = actx.createBuffer(1, len, actx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return RAVE.noiseBuf = b;
+  }
+  function vKick(t) {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.12);
+    g.gain.setValueAtTime(1.0, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    o.connect(g).connect(RAVE.master); o.start(t); o.stop(t + 0.22);
+  }
+  function vHat(t, open) {
+    const s = actx.createBufferSource(); s.buffer = raveNoise();
+    const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7000;
+    const g = actx.createGain(); const dur = open ? 0.14 : 0.035;
+    g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    s.connect(hp).connect(g).connect(RAVE.master); s.start(t); s.stop(t + dur + 0.02);
+  }
+  function vClap(t) {
+    for (let k = 0; k < 3; k++) {
+      const s = actx.createBufferSource(); s.buffer = raveNoise();
+      const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600; bp.Q.value = 1.2;
+      const g = actx.createGain(); const tt = t + k * 0.012;
+      g.gain.setValueAtTime(0.0, tt); g.gain.linearRampToValueAtTime(0.5, tt + 0.002); g.gain.exponentialRampToValueAtTime(0.001, tt + 0.12);
+      s.connect(bp).connect(g).connect(RAVE.master); s.start(tt); s.stop(tt + 0.14);
+    }
+  }
+  function vBass(t, f) {
+    const o = actx.createOscillator(), lp = actx.createBiquadFilter(), g = actx.createGain();
+    o.type = 'sawtooth'; o.frequency.value = f;
+    lp.type = 'lowpass'; lp.frequency.value = 420; lp.Q.value = 6;
+    g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.28, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    o.connect(lp).connect(g).connect(RAVE.master); o.start(t); o.stop(t + 0.22);
+  }
+  function vStab(t, freqs) {
+    const lp = actx.createBiquadFilter(), g = actx.createGain();
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(2600, t); lp.frequency.exponentialRampToValueAtTime(700, t + 0.14); lp.Q.value = 4;
+    g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.13, t + 0.006); g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    lp.connect(g).connect(RAVE.master);
+    for (const f of freqs) { const o = actx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = (Math.random() * 12 - 6); o.connect(lp); o.start(t); o.stop(t + 0.18); }
+  }
+  // 1小節16ステップのパターン
+  const PK = [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0];
+  const PC = [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0];
+  const PH = [0,0,2,0, 0,0,1,0, 0,0,2,0, 0,0,1,2]; // 1=closed,2=open
+  const PB = [55,null,null,55, null,null,82.41,null, 65.41,null,null,65.41, null,null,49,null];
+  const Am = [220, 261.63, 329.63], F = [174.61, 220, 261.63];
+  function scheduleStep(s, t) {
+    if (PK[s]) vKick(t);
+    if (PC[s]) vClap(t);
+    if (PH[s]) vHat(t, PH[s] === 2);
+    if (PB[s] != null) vBass(t, PB[s]);
+    if (s === 0 || s === 10) vStab(t, Am);
+    if (s === 6) vStab(t, F);
+    if (s % 2 === 1 && s > 3 && Math.random() < 0.4) vStab(t, [Am[(s >> 1) % 3] * 2]);
+  }
+
+  // --- 会場の構築（一度だけ） ---
+  function emissiveMat(hex) { return new THREE.MeshBasicMaterial({ color: hex, fog: true }); }
+  function makeDancer(hue) {
+    const g = new THREE.Group();
+    const shirt = new THREE.Color().setHSL(hue, 0.75, 0.55);
+    const pants = new THREE.Color().setHSL((hue + 0.5) % 1, 0.6, 0.4);
+    const skin = new THREE.Color(0xf0c8a0);
+    const mat = c => new THREE.MeshPhongMaterial({ color: c, emissive: c.clone().multiplyScalar(0.18), shininess: 8 });
+    const box = (w, h, d, c, y, x = 0, z = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); g.add(m); return m; };
+    box(0.18, 0.7, 0.18, pants, 0.35, -0.12); box(0.18, 0.7, 0.18, pants, 0.35, 0.12); // legs
+    box(0.5, 0.7, 0.28, shirt, 1.05);          // torso
+    box(0.32, 0.32, 0.32, skin, 1.55);         // head
+    const arm = (sx) => { const a = new THREE.Group(); a.position.set(sx * 0.32, 1.32, 0); const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.6, 0.14), mat(skin)); m.position.y = -0.28; a.add(m); g.add(a); return a; };
+    g.userData.armL = arm(-1); g.userData.armR = arm(1);
+    g.userData.phase = Math.random() * Math.PI * 2;
+    g.userData.spin = (Math.random() - 0.5) * 1.2;
+    return g;
+  }
+  function buildVenue() {
+    const grp = new THREE.Group();
+    // ダンスフロア（光るチェッカー）
+    const TILE = 1.5, N = 8, span = TILE * N, off = -span / 2 + TILE / 2;
+    const tileGeo = new THREE.PlaneGeometry(TILE * 0.96, TILE * 0.96);
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const m = new THREE.Mesh(tileGeo, emissiveMat(0x111111));
+      m.rotation.x = -Math.PI / 2; m.position.set(off + i * TILE, 0.02, off + j * TILE);
+      m.userData.ij = i + j; grp.add(m); RAVE.tiles.push(m);
+    }
+    // 周囲の床縁
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(span + 1, 0.1, span + 1), new THREE.MeshPhongMaterial({ color: 0x101015 }));
+    rim.position.y = -0.06; grp.add(rim);
+    // トラス支柱
+    const postMat = new THREE.MeshPhongMaterial({ color: 0x222228 });
+    for (const [sx, sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.25, 6, 0.25), postMat);
+      p.position.set(sx * span / 2, 3, sz * span / 2); grp.add(p);
+    }
+    for (const z of [-span/2, span/2]) { const b = new THREE.Mesh(new THREE.BoxGeometry(span, 0.25, 0.25), postMat); b.position.set(0, 6, z); grp.add(b); }
+    // ディスコライト（脈動するポイントライト）
+    for (let i = 0; i < 4; i++) {
+      const L = new THREE.PointLight(0xffffff, 1, 26, 1.6); L.position.set(0, 5.4, 0); grp.add(L);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), emissiveMat(0xffffff)); L.add(bulb);
+      RAVE.lights.push(L);
+    }
+    // スイープするスポットライト
+    for (let i = 0; i < 2; i++) {
+      const S = new THREE.SpotLight(0xffffff, 2, 30, 0.34, 0.6, 1.2);
+      S.position.set((i ? 1 : -1) * span / 3, 5.8, 0); grp.add(S); grp.add(S.target);
+      RAVE.spots.push(S);
+    }
+    // ストロボ
+    RAVE.strobe = new THREE.PointLight(0xffffff, 0, 40, 1); RAVE.strobe.position.set(0, 5, 0); grp.add(RAVE.strobe);
+    // レーザー（加算合成の細いビーム）
+    const laserGeo = new THREE.BoxGeometry(0.05, 0.05, span * 1.5);
+    for (let i = 0; i < 5; i++) {
+      const m = new THREE.Mesh(laserGeo, new THREE.MeshBasicMaterial({ color: 0xff0066, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+      m.position.set(0, 5.6, 0); grp.add(m); RAVE.lasers.push(m);
+    }
+    // ミラーボール
+    RAVE.mirror = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 1), new THREE.MeshPhongMaterial({ color: 0x99a0b0, emissive: 0x222233, shininess: 110, flatShading: true }));
+    RAVE.mirror.position.set(0, 4.6, 0); grp.add(RAVE.mirror);
+    // DJブース
+    const booth = new THREE.Mesh(new THREE.BoxGeometry(3, 1.1, 1.2), new THREE.MeshPhongMaterial({ color: 0x15151c }));
+    booth.position.set(0, 0.55, -span / 2 + 0.8); grp.add(booth);
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.7), emissiveMat(0x00ddff));
+    panel.position.set(0, 0.7, -span / 2 + 0.8 + 0.61); grp.add(panel); RAVE.tiles.push(panel); panel.userData.ij = 99;
+    // DJ（踊る）
+    const dj = makeDancer(0.55); dj.position.set(0, 1.1, -span / 2 + 0.8); grp.add(dj); RAVE.dancers.push(dj);
+    // スピーカー
+    for (const sx of [-1, 1]) {
+      const sp = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.2, 0.9), new THREE.MeshPhongMaterial({ color: 0x0c0c10 }));
+      sp.position.set(sx * (span / 2 - 0.7), 1.1, -span / 2 + 0.8); grp.add(sp);
+      const cone = new THREE.Mesh(new THREE.CircleGeometry(0.28, 12), emissiveMat(0x331111));
+      cone.position.set(sx * (span / 2 - 0.7), 1.4, -span / 2 + 0.8 + 0.46); grp.add(cone); RAVE.tiles.push(cone); cone.userData.ij = 50;
+    }
+    // 群衆
+    for (let i = 0; i < 14; i++) {
+      const d = makeDancer(Math.random());
+      const a = Math.random() * Math.PI * 2, r = 1.2 + Math.random() * (span / 2 - 1.5);
+      d.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); d.rotation.y = -a + Math.PI;
+      grp.add(d); RAVE.dancers.push(d);
+    }
+    RAVE.group = grp; RAVE.built = true;
+  }
+
+  function raveToggle() {
+    initAudio();
+    RAVE.on = !RAVE.on;
+    if (RAVE.on) {
+      if (!RAVE.built) buildVenue();
+      const fx = Math.round(player.pos.x), fz = Math.round(player.pos.z), fy = Math.floor(player.pos.y - EYE);
+      RAVE.group.position.set(fx, fy, fz);
+      scene.add(RAVE.group);
+      // 夜のクラブ風に環境を退避＆変更
+      RAVE.saved = { sun: sun.intensity, hemi: hemi.intensity, fog: scene.fog, bg: scene.background.clone(), sky: sky.visible, clouds: clouds.visible };
+      sun.intensity = 0.18; hemi.intensity = 0.22;
+      scene.fog = new THREE.Fog(0x0a0612, 8, 38); scene.background = new THREE.Color(0x07050f);
+      sky.visible = false; clouds.visible = false;
+      // 音楽開始
+      if (actx) {
+        if (actx.state === 'suspended') actx.resume();
+        RAVE.master = actx.createGain(); RAVE.master.gain.value = 0.5; RAVE.master.connect(actx.destination);
+        RAVE.audioStart = actx.currentTime + 0.08; RAVE.nextNote = RAVE.audioStart; RAVE.step = 0;
+      }
+      raveInd.style.display = 'block';
+    } else {
+      scene.remove(RAVE.group);
+      const s = RAVE.saved;
+      sun.intensity = s.sun; hemi.intensity = s.hemi; scene.fog = s.fog; scene.background = s.bg; sky.visible = s.sky; clouds.visible = s.clouds;
+      if (RAVE.master) { try { RAVE.master.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.15); } catch (e) {} }
+      raveInd.style.display = 'none';
+    }
+  }
+
+  function raveUpdate(dt) {
+    if (!RAVE.on || !actx) return;
+    // 先読みスケジューリング
+    while (RAVE.nextNote < actx.currentTime + 0.12) {
+      scheduleStep(RAVE.step % 16, RAVE.nextNote);
+      RAVE.nextNote += SIXTEENTH(); RAVE.step++;
+    }
+    // 連続ビート（音に同期）
+    const beat = (actx.currentTime - RAVE.audioStart) / (60 / RAVE.bpm);
+    const ph = beat - Math.floor(beat);
+    const env = Math.pow(1 - ph, 2.2);              // 拍頭で1、減衰
+    const t = performance.now() / 1000;
+    // ポイントライト：色相回転＋脈動＋円運動
+    RAVE.lights.forEach((L, i) => {
+      const hue = (beat * 0.07 + i / 4) % 1;
+      L.color.setHSL(hue, 1, 0.5); L.children[0].material.color.copy(L.color);
+      L.intensity = 6 + env * 22;
+      const a = beat * 0.5 + i * Math.PI / 2; L.position.set(Math.cos(a) * 4, 5.4, Math.sin(a) * 4);
+    });
+    // スポットライト：スイープ
+    RAVE.spots.forEach((S, i) => {
+      S.color.setHSL((beat * 0.11 + i * 0.5) % 1, 1, 0.55); S.intensity = 8 + env * 14;
+      const sw = Math.sin(beat * 0.7 + i * Math.PI) * 4.5;
+      S.target.position.set(sw, 0, Math.cos(beat * 0.5 + i) * 4.5);
+    });
+    // ストロボ：拍頭で短く白
+    RAVE.strobe.intensity = ph < 0.06 && (Math.floor(beat) % 2 === 0) ? 60 : 0;
+    // 床タイル：色相ウェーブ＋脈動
+    for (const m of RAVE.tiles) {
+      const hue = ((m.userData.ij) * 0.06 + beat * 0.12) % 1;
+      m.material.color.setHSL(hue, 0.95, 0.18 + 0.42 * env);
+    }
+    // レーザー：回転＋色
+    RAVE.lasers.forEach((m, i) => {
+      m.material.color.setHSL((beat * 0.2 + i * 0.18) % 1, 1, 0.55);
+      m.rotation.y = beat * 0.6 + i * (Math.PI * 2 / 5);
+      m.rotation.z = Math.sin(beat * 0.9 + i) * 0.5;
+      m.material.opacity = 0.25 + env * 0.55;
+    });
+    // ミラーボール
+    if (RAVE.mirror) RAVE.mirror.rotation.y += dt * 1.5;
+    // ダンサー：ビートに合わせて踊る
+    for (const d of RAVE.dancers) {
+      const p = d.userData.phase;
+      const bob = Math.abs(Math.sin(beat * Math.PI + p));
+      d.position.y = (d === RAVE.dancers[0] ? 1.1 : 0) + bob * 0.18;
+      d.rotation.z = Math.sin(beat * Math.PI * 0.5 + p) * 0.12;
+      if (d !== RAVE.dancers[0]) d.rotation.y += dt * d.userData.spin * 0.5;
+      const raise = 2.1 + Math.sin(beat * Math.PI * 2 + p) * 0.55;
+      const wave = Math.sin(beat * Math.PI * 2 + p + 1) * 0.4;
+      d.userData.armL.rotation.z = raise; d.userData.armL.rotation.x = wave;
+      d.userData.armR.rotation.z = -raise; d.userData.armR.rotation.x = -wave;
+    }
+  }
+
+  // 画面右上のレイブ表示
+  const raveInd = document.createElement('div');
+  raveInd.textContent = '🔊 RAVE ON';
+  raveInd.style.cssText = 'position:fixed;right:12px;top:12px;z-index:10;color:#fff;font-weight:700;font-size:14px;padding:6px 12px;border-radius:8px;background:linear-gradient(90deg,#ff0066,#7a00ff);box-shadow:0 0 16px rgba(255,0,120,.7);display:none;pointer-events:none;';
+  document.body.appendChild(raveInd);
 
   /* ============== メインループ ============== */
   let prev = performance.now();
@@ -597,6 +842,8 @@
     if (tg) { highlight.position.set(tg.block[0] + 0.5, tg.block[1] + 0.5, tg.block[2] + 0.5); highlight.visible = true; } else highlight.visible = false;
 
     for (const p of pPool) { if (p.life > 0) { p.life -= dt; p.vel.y -= 20 * dt; p.mesh.position.addScaledVector(p.vel, dt); if (p.life <= 0) p.mesh.visible = false; } }
+
+    raveUpdate(dt);
 
     cloudTex.offset.x += dt * 0.004;
     clouds.position.x = camera.position.x; clouds.position.z = camera.position.z;
