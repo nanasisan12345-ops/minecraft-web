@@ -460,8 +460,23 @@
   }
 
   /* ============== プレイヤー & 物理 ============== */
-  const spawnY = Math.max(heightAt(0, 0), SEA) + 4;
-  const player = { pos: new THREE.Vector3(0.5, spawnY, 0.5), vel: new THREE.Vector3(), onGround: false };
+  // 木や水を避けた安全なスポーン地点を原点付近から探す（原点は必ず幹になるため）
+  function spawnClear(x, z) {
+    if (topTypeAt(x, z, heightAt(x, z)) !== GRASS) return false; // 草地のみ（水・砂浜・急斜面・雪は除外）
+    for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) if (isTrunk(x + dx, z + dz)) return false; // 木の幹・葉を回避
+    return true;
+  }
+  function findSpawn() {
+    for (let r = 0; r < 96; r++) for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+      if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; // 外周リングのみ走査して原点に近い順に探す
+      if (spawnClear(dx, dz)) return { x: dx, z: dz };
+    }
+    return { x: 0, z: 0 };
+  }
+  const spawnPt = findSpawn();
+  const spawnX = spawnPt.x + 0.5, spawnZ = spawnPt.z + 0.5;
+  const spawnY = heightAt(spawnPt.x, spawnPt.z) + 3;
+  const player = { pos: new THREE.Vector3(spawnX, spawnY, spawnZ), vel: new THREE.Vector3(), onGround: false };
   let yaw = 0, pitch = 0;
   const EYE = 1.6, HALF = 0.3, TOP_H = 0.2;
   const WALK = 4.6, SPRINT = 6.3, GRAVITY = 30, JUMP = 9, REACH = 6;
@@ -570,12 +585,20 @@
     on: false, kind: '', group: null,
     lights: [], spots: [], lasers: [], tiles: [], dancers: [], rings: [], pulses: [], mirror: null, strobe: null,
     bpm: 128, audioStart: 0, nextNote: 0, step: 0, master: null, noiseBuf: null, saved: {}, radius: 6,
+    reverb: null, delay: null, duck: null, duckDepth: 0.4, kickBus: null,
   };
   const RAVE_VENUES = {
     classic: { label: 'WAREHOUSE RAVE', bpm: 132, hue: 0.60, w: 9,  d: 7,  tile: 1.35, shape: 'square', dancers: 13, lasers: 8, lights: 3, spots: 2 },
     neon:    { label: 'EUROBEAT ROAD',  bpm: 156, hue: 0.03, w: 7,  d: 13, tile: 1.08, shape: 'runway', dancers: 12, lasers: 2, lights: 5, spots: 4 },
     forest:  { label: 'TRANCE DOME',    bpm: 138, hue: 0.53, w: 11, d: 11, tile: 1.08, shape: 'circle', dancers: 8,  lasers: 6, lights: 6, spots: 3 },
-    laser:   { label: 'DANCE FLOOR',    bpm: 120, hue: 0.12, w: 8,  d: 8,  tile: 1.3,  shape: 'checker', dancers: 16, lasers: 1, lights: 8, spots: 2 },
+    laser:   { label: 'DANCE FLOOR',    bpm: 124, hue: 0.12, w: 8,  d: 8,  tile: 1.3,  shape: 'checker', dancers: 16, lasers: 1, lights: 8, spots: 2 },
+  };
+  // 会場ごとのFX設定（リバーブ・ディレイ・サイドチェインの深さ）
+  const RAVE_FX = {
+    classic: { revLen: 2.6, revDecay: 2.2, revAmt: 0.9, dlyMul: 0.75, dlyFb: 0.28, duck: 0.55 },
+    neon:    { revLen: 1.4, revDecay: 2.8, revAmt: 0.6, dlyMul: 0.75, dlyFb: 0.32, duck: 0.32 },
+    forest:  { revLen: 3.4, revDecay: 1.8, revAmt: 1.1, dlyMul: 0.75, dlyFb: 0.42, duck: 0.6 },
+    laser:   { revLen: 1.8, revDecay: 2.4, revAmt: 0.7, dlyMul: 0.5,  dlyFb: 0.22, duck: 0.28 },
   };
   const SIXTEENTH = () => 60 / RAVE.bpm / 4;
 
@@ -588,48 +611,111 @@
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     return RAVE.noiseBuf = b;
   }
-  function vKick(t, low = 48, gain = 0.9) {
+  // 疑似コンボリューションリバーブ用の減衰ノイズIR
+  function makeReverbIR(seconds, decay) {
+    const rate = actx.sampleRate, len = Math.max(1, Math.floor(rate * seconds));
+    const buf = actx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+    return buf;
+  }
+  // ソフトサチュレーション（キックに迫力を出す）
+  function makeShaper(k) {
+    const n = 1024, c = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; c[i] = (1 + k) * x / (1 + k * Math.abs(x)); }
+    const ws = actx.createWaveShaper(); ws.curve = c; ws.oversample = '2x'; return ws;
+  }
+  // リバーブ/ディレイへ送る
+  function sendTo(node, target, amt) {
+    if (!target || !amt) return;
+    const g = actx.createGain(); g.gain.value = amt; node.connect(g).connect(target);
+  }
+  // サイドチェイン：キックでベース/パッドを瞬間的に沈め、ポンプ感を出す
+  function duckTrigger(t, amt) {
+    if (!RAVE.duck) return;
+    const d = Math.min(0.95, RAVE.duckDepth * amt), beatLen = 60 / RAVE.bpm;
+    RAVE.duck.gain.cancelScheduledValues(t);
+    RAVE.duck.gain.setValueAtTime(1 - d, t + 0.004);
+    RAVE.duck.gain.linearRampToValueAtTime(1, t + beatLen * 0.45);
+  }
+  function vKick(t, base = 46, gain = 1.0, dur = 0.32) {
     const o = actx.createOscillator(), g = actx.createGain();
-    o.frequency.setValueAtTime(low * 3.1, t); o.frequency.exponentialRampToValueAtTime(low, t + 0.12);
-    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-    o.connect(g).connect(RAVE.master); o.start(t); o.stop(t + 0.22);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(base * 4.4, t); o.frequency.exponentialRampToValueAtTime(base, t + 0.07);
+    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(RAVE.kickBus); o.start(t); o.stop(t + dur + 0.02);
+    const c = actx.createOscillator(), cg = actx.createGain();
+    c.type = 'triangle'; c.frequency.setValueAtTime(1500, t); c.frequency.exponentialRampToValueAtTime(320, t + 0.02);
+    cg.gain.setValueAtTime(gain * 0.55, t); cg.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+    c.connect(cg).connect(RAVE.kickBus); c.start(t); c.stop(t + 0.04);
+    duckTrigger(t, gain);
   }
   function vHat(t, open, bright = 7000, gain = 0.3) {
     const s = actx.createBufferSource(); s.buffer = raveNoise();
     const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = bright;
-    const g = actx.createGain(); const dur = open ? 0.14 : 0.035;
+    const g = actx.createGain(); const dur = open ? 0.16 : 0.035;
     g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     s.connect(hp).connect(g).connect(RAVE.master); s.start(t); s.stop(t + dur + 0.02);
   }
-  function vClap(t, gainBase = 0.45, band = 1600) {
+  function vClap(t, gainBase = 0.45, band = 1600, rev = 0.12) {
+    const g = actx.createGain(); g.connect(RAVE.master); sendTo(g, RAVE.reverb, rev);
     for (let k = 0; k < 3; k++) {
       const s = actx.createBufferSource(); s.buffer = raveNoise();
       const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = band; bp.Q.value = 1.2;
-      const g = actx.createGain(); const tt = t + k * 0.012;
-      g.gain.setValueAtTime(0.0, tt); g.gain.linearRampToValueAtTime(gainBase, tt + 0.002); g.gain.exponentialRampToValueAtTime(0.001, tt + 0.12);
-      s.connect(bp).connect(g).connect(RAVE.master); s.start(tt); s.stop(tt + 0.14);
+      const eg = actx.createGain(); const tt = t + k * 0.012;
+      eg.gain.setValueAtTime(0.0, tt); eg.gain.linearRampToValueAtTime(gainBase, tt + 0.002); eg.gain.exponentialRampToValueAtTime(0.001, tt + 0.12);
+      s.connect(bp).connect(eg).connect(g); s.start(tt); s.stop(tt + 0.14);
     }
   }
-  function vBass(t, f, wave = 'sawtooth', cutoff = 420, gainBase = 0.24, dur = 0.2) {
-    const o = actx.createOscillator(), lp = actx.createBiquadFilter(), g = actx.createGain();
-    o.type = wave; o.frequency.value = f;
-    lp.type = 'lowpass'; lp.frequency.value = cutoff; lp.Q.value = 6;
-    g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(gainBase, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(lp).connect(g).connect(RAVE.master); o.start(t); o.stop(t + dur + 0.02);
+  function vSnare(t, gain = 0.4, rev = 0.18) {
+    const tn = actx.createOscillator(), tg = actx.createGain();
+    tn.type = 'triangle'; tn.frequency.setValueAtTime(330, t); tn.frequency.exponentialRampToValueAtTime(180, t + 0.08);
+    tg.gain.setValueAtTime(gain * 0.6, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    tn.connect(tg).connect(RAVE.master); tn.start(t); tn.stop(t + 0.13);
+    const s = actx.createBufferSource(); s.buffer = raveNoise();
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 0.8;
+    const g = actx.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+    s.connect(bp).connect(g).connect(RAVE.master); sendTo(g, RAVE.reverb, rev); s.start(t); s.stop(t + 0.16);
   }
-  function vStab(t, freqs) {
+  function vBass(t, f, opt = {}) {
+    const wave = opt.wave || 'sawtooth', cut = opt.cut || 500, dur = opt.dur || 0.2, gain = opt.gain || 0.26, q = opt.q || 6;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = q;
+    if (opt.env) { lp.frequency.setValueAtTime(cut * opt.env, t); lp.frequency.exponentialRampToValueAtTime(cut, t + dur * 0.6); }
+    else lp.frequency.value = cut;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + 0.012);
+    g.gain.setValueAtTime(gain, t + dur * 0.6); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    lp.connect(g).connect(RAVE.duck);
+    const o = actx.createOscillator(); o.type = wave; o.frequency.value = f; o.connect(lp); o.start(t); o.stop(t + dur + 0.03);
+    if (opt.detune) { const o2 = actx.createOscillator(); o2.type = wave; o2.frequency.value = f; o2.detune.value = opt.detune; o2.connect(lp); o2.start(t); o2.stop(t + dur + 0.03); }
+    if (opt.sub !== false) {
+      const s = actx.createOscillator(), sg = actx.createGain(); s.type = 'sine'; s.frequency.value = f;
+      sg.gain.setValueAtTime(0, t); sg.gain.linearRampToValueAtTime(gain * 0.85, t + 0.012); sg.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      s.connect(sg).connect(RAVE.duck); s.start(t); s.stop(t + dur + 0.03);
+    }
+  }
+  function vSuper(t, f, opt = {}) {
+    const n = opt.voices || 5, det = opt.detune || 14, dur = opt.dur || 0.4, gain = opt.gain || 0.05, type = opt.type || 'sawtooth';
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = opt.q || 1;
+    lp.frequency.setValueAtTime(opt.cutStart || opt.cut || 3000, t);
+    if (opt.cutEnd) lp.frequency.exponentialRampToValueAtTime(opt.cutEnd, t + dur * 0.55);
+    const g = actx.createGain(); const atk = opt.atk || 0.02;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + atk);
+    g.gain.setValueAtTime(gain, t + Math.max(atk, dur * 0.55)); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    const dest = opt.duck === false ? RAVE.master : RAVE.duck;
+    lp.connect(g).connect(dest);
+    sendTo(g, RAVE.reverb, opt.rev || 0); sendTo(g, RAVE.delay, opt.dly || 0);
+    for (let i = 0; i < n; i++) { const o = actx.createOscillator(); o.type = type; o.frequency.value = f; o.detune.value = (i - (n - 1) / 2) * det + rnd(-3, 3); o.connect(lp); o.start(t); o.stop(t + dur + 0.04); }
+  }
+  function vChord(t, freqs, opt = {}) { for (const f of freqs) vSuper(t, f, opt); }
+  function vStab(t, freqs, rev = 0.2) {
     const lp = actx.createBiquadFilter(), g = actx.createGain();
-    lp.type = 'lowpass'; lp.frequency.setValueAtTime(2400, t); lp.frequency.exponentialRampToValueAtTime(700, t + 0.14); lp.Q.value = 4;
-    g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.12, t + 0.006); g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-    lp.connect(g).connect(RAVE.master);
-    for (const f of freqs) { const o = actx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = rnd(-6, 6); o.connect(lp); o.start(t); o.stop(t + 0.18); }
-  }
-  function vTone(t, f, wave = 'triangle', dur = 0.12, gainBase = 0.07, cutoff = 1800) {
-    const o = actx.createOscillator(), lp = actx.createBiquadFilter(), g = actx.createGain();
-    o.type = wave; o.frequency.value = f; o.detune.value = rnd(-5, 5);
-    lp.type = 'lowpass'; lp.frequency.value = cutoff; lp.Q.value = 2;
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gainBase, t + 0.006); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(lp).connect(g).connect(RAVE.master); o.start(t); o.stop(t + dur + 0.02);
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(3200, t); lp.frequency.exponentialRampToValueAtTime(700, t + 0.14); lp.Q.value = 5;
+    g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.13, t + 0.006); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    lp.connect(g).connect(RAVE.duck); sendTo(g, RAVE.reverb, rev);
+    for (const f of freqs) { const o = actx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = rnd(-8, 8); o.connect(lp); o.start(t); o.stop(t + 0.2); }
   }
   function vTom(t, f = 150, gainBase = 0.2) {
     const o = actx.createOscillator(), g = actx.createGain();
@@ -637,58 +723,94 @@
     g.gain.setValueAtTime(gainBase, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
     o.connect(g).connect(RAVE.master); o.start(t); o.stop(t + 0.17);
   }
-  function vPad(t, freqs, dur = 0.7, gainBase = 0.045) {
-    const lp = actx.createBiquadFilter(), g = actx.createGain();
-    lp.type = 'lowpass'; lp.frequency.setValueAtTime(1000, t); lp.frequency.linearRampToValueAtTime(2200, t + dur * 0.45); lp.Q.value = 1.4;
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gainBase, t + 0.08); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    lp.connect(g).connect(RAVE.master);
-    for (const f of freqs) {
-      const o = actx.createOscillator(); o.type = 'triangle'; o.frequency.value = f; o.detune.value = rnd(-9, 9);
-      o.connect(lp); o.start(t); o.stop(t + dur + 0.04);
-    }
-  }
-  function vNoiseHit(t, tone = 900, gainBase = 0.16, dur = 0.08) {
+  function vNoiseHit(t, tone = 900, gainBase = 0.16, dur = 0.08, rev = 0.25) {
     const s = actx.createBufferSource(); s.buffer = raveNoise();
     const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = tone; bp.Q.value = 5;
     const g = actx.createGain(); g.gain.setValueAtTime(gainBase, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    s.connect(bp).connect(g).connect(RAVE.master); s.start(t); s.stop(t + dur + 0.02);
+    s.connect(bp).connect(g).connect(RAVE.master); sendTo(g, RAVE.reverb, rev); s.start(t); s.stop(t + dur + 0.02);
   }
-  const Am = [220, 261.63, 329.63], F = [174.61, 220, 261.63], Em = [164.81, 196, 246.94], Dm = [146.83, 174.61, 220];
-  const G = [196, 246.94, 293.66], C = [261.63, 329.63, 392], D = [293.66, 369.99, 440], Bm = [246.94, 293.66, 369.99];
-  const RAVE_TRACKS = {
-    classic: {
-      style: 'rave', kick: [1,0,0,0, 1,0,0,0, 1,0,0,1, 1,0,0,0], clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-      hat:  [0,0,2,0, 0,1,0,0, 0,0,2,0, 0,1,0,2], bass: [55,null,null,55, null,null,82.41,null, 65.41,null,null,65.41, null,null,49,null],
-      stabs: { 0: Am, 10: F }, lead: {}, noise: { 7: 700, 15: 1300 }
-    },
-    neon: {
-      style: 'eurobeat', kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0], clap: [0,0,1,0, 1,0,1,0, 0,0,1,0, 1,0,1,0],
-      hat:  [1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,2,1], bass: [null,55,null,82.41, null,55,null,73.42, null,65.41,null,98, null,73.42,82.41,98],
-      stabs: { 0: C, 4: G, 8: Am, 12: F }, lead: { 1: 659.25, 3: 783.99, 5: 880, 7: 783.99, 9: 659.25, 11: 987.77, 13: 880, 15: 1174.66 }, wave: 'sawtooth', cutoff: 3200
-    },
-    forest: {
-      style: 'trance', kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0], clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-      hat:  [0,2,0,1, 0,2,0,1, 0,2,0,1, 0,2,0,1], bass: [null,49,null,73.42, null,49,null,73.42, null,55,null,82.41, null,55,null,82.41],
-      stabs: {}, pads: { 0: Em, 8: Bm }, lead: { 2: 659.25, 4: 739.99, 6: 880, 10: 987.77, 12: 880, 14: 739.99 }, wave: 'triangle', cutoff: 2500
-    },
-    laser: {
-      style: 'dance', kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0], clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-      hat:  [0,1,0,2, 0,1,0,1, 0,1,0,2, 0,1,0,1], bass: [65.41,null,98,null, 87.31,null,98,110, 73.42,null,110,null, 98,87.31,73.42,null],
-      stabs: { 0: F, 6: C, 10: G, 14: C }, lead: { 3: 392, 7: 440, 11: 493.88, 15: 523.25 }, wave: 'square', cutoff: 1800
-    },
+  function vRiser(t, dur) {
+    const s = actx.createBufferSource(); s.buffer = raveNoise(); s.loop = true;
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.4;
+    bp.frequency.setValueAtTime(400, t); bp.frequency.exponentialRampToValueAtTime(6000, t + dur);
+    const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.05);
+    s.connect(bp).connect(g).connect(RAVE.master); sendTo(g, RAVE.reverb, 0.3); s.start(t); s.stop(t + dur + 0.08);
+  }
+  // 音名テーブル（Hz）
+  const Am = [220, 261.63, 329.63], F = [174.61, 220, 261.63], C = [261.63, 329.63, 392], G = [196, 246.94, 293.66];
+  const Cmaj7 = [261.63, 329.63, 392, 493.88], Am7 = [220, 261.63, 329.63, 392], Dm7 = [146.83, 174.61, 220, 261.63], G7 = [196, 246.94, 293.66, 349.23];
+  // 4小節のコード進行（n: コード構成音, r: ベース基音Hz）
+  const PROG = {
+    neon:   [ { n: Am, r: 55 }, { n: F, r: 43.65 }, { n: C, r: 65.41 }, { n: G, r: 49 } ],
+    forest: [ { n: Am, r: 55 }, { n: F, r: 43.65 }, { n: C, r: 65.41 }, { n: G, r: 49 } ],
+    laser:  [ { n: Cmaj7, r: 65.41 }, { n: Am7, r: 55 }, { n: Dm7, r: 73.42 }, { n: G7, r: 49 } ],
   };
-  function scheduleStep(s, t) {
-    const tr = RAVE_TRACKS[RAVE.kind] || RAVE_TRACKS.classic;
-    const style = tr.style;
-    if (tr.kick[s]) vKick(t, style === 'dance' ? 55 : style === 'trance' ? 45 : style === 'eurobeat' ? 50 : 46, style === 'trance' ? 0.8 : 0.92);
-    if (tr.clap[s]) vClap(t, style === 'eurobeat' ? 0.35 : style === 'dance' ? 0.38 : 0.45, style === 'eurobeat' ? 2400 : 1600);
-    if (tr.hat[s]) vHat(t, tr.hat[s] === 2, style === 'trance' ? 9000 : style === 'dance' ? 6200 : style === 'eurobeat' ? 7800 : 7000, style === 'dance' ? 0.22 : 0.28);
-    if (tr.bass[s] != null) vBass(t, tr.bass[s], style === 'eurobeat' ? 'sawtooth' : style === 'trance' ? 'triangle' : style === 'dance' ? 'square' : 'sawtooth', tr.cutoff || 500, style === 'dance' ? 0.18 : 0.24, style === 'trance' ? 0.16 : 0.2);
-    if (tr.stabs[s]) vStab(t, tr.stabs[s]);
-    if (tr.pads && tr.pads[s]) vPad(t, tr.pads[s], 1.15, 0.04);
-    if (tr.noise && tr.noise[s]) vNoiseHit(t, tr.noise[s], 0.14, 0.09);
-    if (tr.toms && tr.toms[s]) vTom(t, tr.toms[s], 0.18);
-    if (tr.lead[s]) vTone(t, tr.lead[s], tr.wave || 'triangle', style === 'eurobeat' ? 0.1 : style === 'trance' ? 0.22 : 0.12, style === 'trance' ? 0.04 : 0.07, tr.cutoff || 1800);
+  // ユーロビートのリードメロディ（小節ごと・16分音符, 0=休み）
+  const EUMEL = [
+    [880, 0, 659.25, 0, 783.99, 0, 659.25, 0, 587.33, 0, 523.25, 0, 659.25, 0, 587.33, 0],
+    [783.99, 0, 659.25, 0, 523.25, 0, 587.33, 0, 659.25, 0, 587.33, 0, 523.25, 0, 440, 0],
+    [659.25, 0, 783.99, 0, 880, 0, 783.99, 0, 1046.5, 0, 880, 0, 783.99, 0, 659.25, 0],
+    [587.33, 0, 659.25, 0, 783.99, 0, 880, 0, 987.77, 0, 880, 0, 659.25, 0, 587.33, 0],
+  ];
+  // ディスコのファンキーベース／スタブ（1=基音, 2=オクターブ上, 0=休み）
+  const DISCO_BASS = [1, 0, 2, 0, 1, 1, 0, 2, 1, 0, 2, 0, 1, 2, 1, 0];
+  const DISCO_STAB = [0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0];
+
+  // ── ダークテクノ（重いキック＋うねるオフビートのサブ＋暗いスタブ）
+  function stepTechno(s, bar, t) {
+    if (s % 4 === 0) vKick(t, 42, 1.05, 0.34);
+    else if (s === 14) vKick(t, 42, 0.55, 0.18);
+    if (s === 4 || s === 12) vClap(t, 0.4, 1500, 0.18);
+    if (s % 4 === 2) vHat(t, true, 7800, 0.22);
+    if (s % 2 === 1) vHat(t, false, 9000, 0.12);
+    if (s % 4 === 2) vBass(t, 55, { wave: 'sawtooth', cut: 240, q: 7, dur: 0.22, gain: 0.3, env: 1.8 });
+    else if (s % 2 === 1) vBass(t, 55, { wave: 'sawtooth', cut: 180, dur: 0.12, gain: 0.18, sub: false });
+    if (s === 0) vStab(t, bar % 4 < 2 ? Am : F, 0.35);
+    if (s === 6 || s === 11) vNoiseHit(t, s === 6 ? 1500 : 3200, 0.12, 0.07, 0.3);
+    if (bar % 4 === 3 && s === 8) vRiser(t, 60 / RAVE.bpm * 2);
+  }
+  // ── ユーロビート（16分オクターブ走りベース＋スーパーソウのリード）
+  function stepEurobeat(s, bar, t) {
+    const ch = PROG.neon[bar % 4];
+    if (s % 4 === 0) vKick(t, 50, 1.0, 0.26);
+    if (s === 4 || s === 12) vClap(t, 0.34, 2300, 0.1);
+    vHat(t, s % 4 === 2, 8200, s % 4 === 2 ? 0.26 : 0.16);
+    vBass(t, s % 2 ? ch.r * 2 : ch.r, { wave: 'sawtooth', cut: 1400, q: 4, dur: 0.12, gain: 0.24, sub: s % 2 === 0 });
+    if (s % 4 === 2) vStab(t, ch.n, 0.16);
+    const mel = EUMEL[bar % 4][s];
+    if (mel) vSuper(t, mel, { voices: 6, detune: 16, dur: 0.16, gain: 0.06, cut: 4200, dly: 0.18, rev: 0.1, duck: false });
+    if (bar % 8 === 7 && s >= 8 && s % 2 === 0) vSnare(t, 0.3, 0.15);
+  }
+  // ── アップリフティングトランス（オフビートのゲートベース＋巨大パッド＋アルペジオ）
+  function stepTrance(s, bar, t) {
+    const ch = PROG.forest[bar % 4];
+    if (s % 4 === 0) vKick(t, 46, 0.9, 0.3);
+    if (s === 4 || s === 12) vSnare(t, 0.26, 0.3);
+    if (s % 4 === 2) vHat(t, true, 9500, 0.2);
+    if (s % 4 === 2) vBass(t, ch.r, { wave: 'sawtooth', cut: 320, q: 6, dur: 0.16, gain: 0.28, env: 1.5 });
+    if (s === 0) vChord(t, ch.n, { voices: 7, detune: 18, dur: 60 / RAVE.bpm * 4, gain: 0.04, cutStart: 600, cutEnd: 2600, atk: 0.12, rev: 0.4 });
+    const an = ch.n[s % ch.n.length] * (s % (ch.n.length * 2) >= ch.n.length ? 2 : 1);
+    if (s % 2 === 0) vSuper(t, an, { voices: 4, detune: 12, dur: 0.18, gain: 0.045, cut: 3800, dly: 0.28, rev: 0.25, duck: false });
+    if (bar % 8 === 7) vRiser(t, 60 / RAVE.bpm / 4);
+  }
+  // ── ディスコハウス（ファンキーベース＋7thコードのスタブ）
+  function stepDisco(s, bar, t) {
+    const ch = PROG.laser[bar % 4];
+    if (s % 4 === 0) vKick(t, 52, 0.95, 0.28);
+    if (s === 4 || s === 12) vClap(t, 0.36, 1700, 0.14);
+    if (s % 4 === 2) vHat(t, true, 6500, 0.2);
+    if (s % 2 === 1) vHat(t, false, 8000, 0.12);
+    const b = DISCO_BASS[s];
+    if (b) vBass(t, b === 2 ? ch.r * 2 : ch.r, { wave: 'sawtooth', cut: 700, q: 5, dur: 0.16, gain: 0.26, env: 2.2 });
+    if (DISCO_STAB[s]) vChord(t, ch.n, { voices: 3, detune: 8, dur: 0.18, gain: 0.05, cut: 3000, dly: 0.16, rev: 0.18 });
+    if (bar % 4 === 3 && s === 14) vSnare(t, 0.3, 0.2);
+  }
+  function scheduleStep(step, t) {
+    const k = RAVE.kind, s = step % 16, bar = Math.floor(step / 16);
+    if (k === 'neon') stepEurobeat(s, bar, t);
+    else if (k === 'forest') stepTrance(s, bar, t);
+    else if (k === 'laser') stepDisco(s, bar, t);
+    else stepTechno(s, bar, t);
   }
 
   function makeDancer(hue) {
@@ -867,15 +989,28 @@
     sky.visible = false; clouds.visible = false;
     if (actx) {
       if (actx.state === 'suspended') actx.resume();
-      RAVE.master = actx.createGain(); RAVE.master.gain.value = 0.5; RAVE.master.connect(actx.destination);
-      RAVE.audioStart = actx.currentTime + 0.08; RAVE.nextNote = RAVE.audioStart; RAVE.step = 0;
+      const fx = RAVE_FX[kind] || RAVE_FX.classic, now = actx.currentTime;
+      const out = actx.createGain(); out.gain.setValueAtTime(0.0001, now); out.gain.exponentialRampToValueAtTime(0.5, now + 0.4);
+      const comp = actx.createDynamicsCompressor();
+      comp.threshold.value = -10; comp.knee.value = 12; comp.ratio.value = 3.5; comp.attack.value = 0.004; comp.release.value = 0.18;
+      out.connect(comp).connect(actx.destination);
+      RAVE.master = out;
+      const kb = actx.createGain(); kb.connect(makeShaper(3)).connect(out); RAVE.kickBus = kb;
+      const rev = actx.createConvolver(); rev.buffer = makeReverbIR(fx.revLen, fx.revDecay);
+      const revGain = actx.createGain(); revGain.gain.value = fx.revAmt; rev.connect(revGain).connect(out); RAVE.reverb = rev;
+      const dl = actx.createDelay(1.0); dl.delayTime.value = 60 / cfg.bpm * fx.dlyMul;
+      const fb = actx.createGain(); fb.gain.value = fx.dlyFb;
+      const dhp = actx.createBiquadFilter(); dhp.type = 'highpass'; dhp.frequency.value = 320;
+      dl.connect(fb).connect(dl); dl.connect(dhp).connect(out); RAVE.delay = dl;
+      const duck = actx.createGain(); duck.gain.value = 1; duck.connect(out); RAVE.duck = duck; RAVE.duckDepth = fx.duck;
+      RAVE.audioStart = now + 0.12; RAVE.nextNote = RAVE.audioStart; RAVE.step = 0;
     }
     RAVE.on = true; raveInd.style.display = 'block'; raveInd.textContent = `${cfg.label}  R/T/Y/U`;
   }
   function raveUpdate(dt) {
     if (!RAVE.on || !actx) return;
     while (RAVE.nextNote < actx.currentTime + 0.12) {
-      scheduleStep(RAVE.step % 16, RAVE.nextNote);
+      scheduleStep(RAVE.step, RAVE.nextNote);
       RAVE.nextNote += SIXTEENTH(); RAVE.step++;
     }
     const cfg = RAVE_VENUES[RAVE.kind], beat = (actx.currentTime - RAVE.audioStart) / (60 / RAVE.bpm);
@@ -892,7 +1027,8 @@
       const sw = Math.sin(beat * 0.7 + i * Math.PI) * RAVE.radius * 0.75;
       S.target.position.set(sw, 0, Math.cos(beat * 0.5 + i) * RAVE.radius * 0.75);
     });
-    RAVE.strobe.intensity = ph < 0.06 && (Math.floor(beat) % 2 === 0) ? 55 : 0;
+    const strobeOn = RAVE.kind === 'classic' ? (Math.floor(beat) % 2 === 0) : RAVE.kind === 'neon' ? true : RAVE.kind === 'laser' ? (Math.floor(beat) % 4 === 0) : false;
+    RAVE.strobe.intensity = ph < 0.06 && strobeOn ? 50 : 0;
     for (const m of RAVE.tiles) {
       if (RAVE.kind === 'neon') {
         const lane = m.userData.check ? 0.05 : 0.13;
@@ -960,7 +1096,7 @@
       moveAxis('x', player.vel.x * dt); moveAxis('z', player.vel.z * dt);
       player.onGround = false;
       if (moveAxis('y', player.vel.y * dt)) { if (player.vel.y < 0) player.onGround = true; player.vel.y = 0; }
-      if (player.pos.y < -40) { player.pos.set(0.5, spawnY, 0.5); player.vel.set(0, 0, 0); }
+      if (player.pos.y < -40) { player.pos.set(spawnX, spawnY, spawnZ); player.vel.set(0, 0, 0); }
     }
 
     // 無限ワールド：移動に応じて生成範囲（窓）を更新
