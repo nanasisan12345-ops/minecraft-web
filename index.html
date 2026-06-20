@@ -54,7 +54,7 @@
       <div><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> 移動　<span class="key">Shift</span> ダッシュ　<span class="key">Space</span> ジャンプ</div>
       <div>マウス 視点　<span class="key">左</span>クリック 壊す　<span class="key">右</span>クリック 置く</div>
       <div><span class="key">1</span>〜<span class="key">9</span> / ホイール ブロック選択　<span class="key">Esc</span> 一時停止</div>
-      <div><span class="key">R</span> レイブモード　<span class="key">N</span> 曲チェンジ</div>
+      <div><span class="key">R</span><span class="key">T</span><span class="key">Y</span><span class="key">U</span> 小さなレイブ会場を出現</div>
     </div>
     <div class="go">クリックして開始</div>
   </div>
@@ -200,22 +200,6 @@
       g.fillStyle = 'rgba(255,255,255,0.4)'; g.fillRect(6, 4, 2, 12); g.fillRect(8, 4, 2, 6);
     }),
     water: makeTex((g, S) => { for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { g.fillStyle = `rgba(${44 + (Math.random() * 18 | 0)},${118 + (Math.random() * 18 | 0)},${210},0.8)`; g.fillRect(x, y, 1, 1); } g.fillStyle = 'rgba(255,255,255,0.12)'; for (let y = 3; y < S; y += 6) g.fillRect(0, y, S, 1); }),
-    neon: makeTex((g, S) => {
-      noise(g, S, 0x07111c, 0.75, 1.15);
-      for (let y = 0; y < S; y += 8) { g.fillStyle = '#00f5ff'; g.fillRect(0, y, S, 2); }
-      for (let x = 0; x < S; x += 8) { g.fillStyle = '#ff2bd6'; g.fillRect(x, 0, 2, S); }
-      g.fillStyle = 'rgba(255,255,255,0.8)'; g.fillRect(14, 14, 4, 4);
-    }),
-    laser: makeTex((g, S) => {
-      noise(g, S, 0x16051d, 0.75, 1.1);
-      g.fillStyle = '#ff0066'; g.fillRect(0, 14, S, 4); g.fillRect(14, 0, 4, S);
-      g.fillStyle = '#fff'; g.fillRect(13, 13, 6, 6);
-    }),
-    speaker: makeTex((g, S) => {
-      noise(g, S, 0x101015, 0.75, 1.08);
-      for (const r of [11, 6]) { g.strokeStyle = r === 11 ? '#333844' : '#ff33cc'; g.lineWidth = 2; g.beginPath(); g.arc(16, 16, r, 0, Math.PI * 2); g.stroke(); }
-      g.fillStyle = '#050507'; g.fillRect(6, 3, 20, 4); g.fillRect(6, 25, 20, 4);
-    }),
   };
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
   for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick'])
@@ -246,12 +230,9 @@
     { name: 'ガラス', color: 0xbfe9ff, icon: T.glass,     mats: faceMats(T.glass, { transparent: true, depthWrite: false }), transparent: true }, // 8
     { name: '水',     color: 0x3a78d8, icon: T.water,     mats: faceMats(T.water, { transparent: true, depthWrite: false, opacity: 0.72, shininess: 90, specular: 0x335577 }), transparent: true, solid: false }, // 9
     { name: '雪',     color: 0xf2f7ff, icon: T.snow,      mats: faceMats(T.snow) },   // 10
-    { name: 'ネオン', color: 0x00f5ff, icon: T.neon,      mats: faceMats(T.neon, { shininess: 120, specular: 0x88ffff }) }, // 11
-    { name: 'レーザー', color: 0xff0066, icon: T.laser,   mats: faceMats(T.laser, { shininess: 140, specular: 0xff88cc }) }, // 12
-    { name: 'スピーカー', color: 0xff33cc, icon: T.speaker, mats: faceMats(T.speaker, { shininess: 55, specular: 0x663366 }) }, // 13
   ];
-  const GRASS = 0, DIRT = 1, STONE = 2, SAND = 5, WATER = 9, SNOW = 10, NEON = 11, LASER = 12, SPEAKER = 13;
-  const HOTBAR = [0, 1, 2, 11, 12, 13, 6, 8, 10]; // 草 土 石 ネオン レーザー スピーカー 板材 ガラス 雪
+  const GRASS = 0, DIRT = 1, STONE = 2, SAND = 5, WATER = 9, SNOW = 10;
+  const HOTBAR = [0, 1, 2, 10, 5, 3, 4, 6, 8]; // 草 土 石 雪 砂 丸太 葉 板材 ガラス
 
   /* ============== インスタンスメッシュ ============== */
   const GEO = new THREE.BoxGeometry(1, 1, 1);
@@ -525,17 +506,12 @@
     const [x, y, z] = tg.block; const t = world.get(key(x, y, z)); if (t === undefined) return;
     burst(x, y, z, TYPES[t].color);
     edits.set(key(x, y, z), -1); setBlock(x, y, z, null); rebuild(); thock(150);
-    if (RAVE.on) raveImpactAt(x + 0.5, y + 0.5, z + 0.5, TYPES[t].color, t === LASER ? 4.5 : 2.8);
   }
   function placeBlock() {
     const tg = pickTarget(); if (!tg) return;
     const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
     if (isSolid(x, y, z) || overlapsPlayer(x, y, z)) return;
     const ty = HOTBAR[selected]; edits.set(key(x, y, z), ty); setBlock(x, y, z, ty); rebuild(); thock(260);
-    if (RAVE.on && (ty === NEON || ty === LASER || ty === SPEAKER)) {
-      raveImpactAt(x + 0.5, y + 0.5, z + 0.5, TYPES[ty].color, ty === SPEAKER ? 5 : 3.5);
-      if (ty === LASER) switchRaveTrack(1);
-    }
   }
 
   /* ============== 入力・開始/一時停止 ============== */
@@ -566,8 +542,10 @@
   addEventListener('keydown', e => {
     keys[e.code] = true;
     if (e.code === 'Escape') pause();
-    if (e.code === 'KeyR') raveToggle();
-    if (e.code === 'KeyN' && RAVE.on) switchRaveTrack(1);
+    if (e.code === 'KeyR') raveToggle('classic');
+    if (e.code === 'KeyT') raveToggle('neon');
+    if (e.code === 'KeyY') raveToggle('forest');
+    if (e.code === 'KeyU') raveToggle('laser');
     if (e.code.startsWith('Digit')) { const n = +e.code.slice(5); if (n >= 1 && n <= 9) selectSlot(n - 1); }
     if (['Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) e.preventDefault();
   });
@@ -587,17 +565,23 @@
   selectSlot(0);
   const stats = document.getElementById('stats');
 
-  /* ============== レイブモード (hallucinate) ============== */
+  /* ============== 小型レイブ会場 ============== */
   const RAVE = {
-    on: false, group: null, built: false,
-    lights: [], spots: [], lasers: [], tiles: [], dancers: [], rings: [], equalizers: [], speakerCones: [], sparks: [], pulseWalls: [],
-    shockwaves: [], trails: [], mirror: null, strobe: null,
-    bpm: 128, audioStart: 0, nextNote: 0, step: 0, trackIndex: 0, master: null, noiseBuf: null,
-    saved: {}, beat: 0, radius: 6, lastTrail: 0,
+    on: false, kind: '', group: null,
+    lights: [], spots: [], lasers: [], tiles: [], dancers: [], rings: [], pulses: [], mirror: null, strobe: null,
+    bpm: 128, audioStart: 0, nextNote: 0, step: 0, master: null, noiseBuf: null, saved: {}, radius: 6,
+  };
+  const RAVE_VENUES = {
+    classic: { label: 'CLASSIC CLUB', bpm: 128, hue: 0.58, floor: 8, tile: 1.5, dancers: 14, lasers: 5, lights: 4, spots: 2 },
+    neon:    { label: 'NEON BOX',     bpm: 124, hue: 0.82, floor: 6, tile: 1.35, dancers: 10, lasers: 4, lights: 6, spots: 2 },
+    forest:  { label: 'FOREST RAVE',  bpm: 118, hue: 0.32, floor: 7, tile: 1.35, dancers: 12, lasers: 3, lights: 4, spots: 2 },
+    laser:   { label: 'LASER PIT',    bpm: 138, hue: 0.96, floor: 7, tile: 1.25, dancers: 8,  lasers: 9, lights: 3, spots: 4 },
   };
   const SIXTEENTH = () => 60 / RAVE.bpm / 4;
 
-  // --- シンセ音源（WebAudio） ---
+  function emissiveMat(hex, opacity = 1) {
+    return new THREE.MeshBasicMaterial({ color: hex, transparent: opacity < 1, opacity, fog: true, blending: opacity < 1 ? THREE.AdditiveBlending : THREE.NormalBlending, depthWrite: opacity >= 1 });
+  }
   function raveNoise() {
     if (RAVE.noiseBuf) return RAVE.noiseBuf;
     const len = actx.sampleRate, b = actx.createBuffer(1, len, actx.sampleRate), d = b.getChannelData(0);
@@ -607,14 +591,14 @@
   function vKick(t) {
     const o = actx.createOscillator(), g = actx.createGain();
     o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.12);
-    g.gain.setValueAtTime(1.0, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
     o.connect(g).connect(RAVE.master); o.start(t); o.stop(t + 0.22);
   }
   function vHat(t, open) {
     const s = actx.createBufferSource(); s.buffer = raveNoise();
     const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7000;
     const g = actx.createGain(); const dur = open ? 0.14 : 0.035;
-    g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     s.connect(hp).connect(g).connect(RAVE.master); s.start(t); s.stop(t + dur + 0.02);
   }
   function vClap(t) {
@@ -622,7 +606,7 @@
       const s = actx.createBufferSource(); s.buffer = raveNoise();
       const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600; bp.Q.value = 1.2;
       const g = actx.createGain(); const tt = t + k * 0.012;
-      g.gain.setValueAtTime(0.0, tt); g.gain.linearRampToValueAtTime(0.5, tt + 0.002); g.gain.exponentialRampToValueAtTime(0.001, tt + 0.12);
+      g.gain.setValueAtTime(0.0, tt); g.gain.linearRampToValueAtTime(0.45, tt + 0.002); g.gain.exponentialRampToValueAtTime(0.001, tt + 0.12);
       s.connect(bp).connect(g).connect(RAVE.master); s.start(tt); s.stop(tt + 0.14);
     }
   }
@@ -630,91 +614,30 @@
     const o = actx.createOscillator(), lp = actx.createBiquadFilter(), g = actx.createGain();
     o.type = 'sawtooth'; o.frequency.value = f;
     lp.type = 'lowpass'; lp.frequency.value = 420; lp.Q.value = 6;
-    g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.28, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.24, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
     o.connect(lp).connect(g).connect(RAVE.master); o.start(t); o.stop(t + 0.22);
   }
   function vStab(t, freqs) {
     const lp = actx.createBiquadFilter(), g = actx.createGain();
-    lp.type = 'lowpass'; lp.frequency.setValueAtTime(2600, t); lp.frequency.exponentialRampToValueAtTime(700, t + 0.14); lp.Q.value = 4;
-    g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.13, t + 0.006); g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(2400, t); lp.frequency.exponentialRampToValueAtTime(700, t + 0.14); lp.Q.value = 4;
+    g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.12, t + 0.006); g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
     lp.connect(g).connect(RAVE.master);
-    for (const f of freqs) { const o = actx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = (Math.random() * 12 - 6); o.connect(lp); o.start(t); o.stop(t + 0.18); }
+    for (const f of freqs) { const o = actx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = rnd(-6, 6); o.connect(lp); o.start(t); o.stop(t + 0.18); }
   }
-  function vLead(t, f) {
-    const g = actx.createGain(), delay = actx.createDelay(), fb = actx.createGain();
-    delay.delayTime.value = 0.18; fb.gain.value = 0.22;
-    g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.08, t + 0.008); g.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
-    for (const detune of [-9, 7]) {
-      const o = actx.createOscillator();
-      o.type = 'triangle'; o.frequency.value = f; o.detune.value = detune;
-      o.connect(g); o.start(t); o.stop(t + 0.25);
-    }
-    g.connect(RAVE.master); g.connect(delay); delay.connect(fb).connect(delay); delay.connect(RAVE.master);
-  }
-  function vSweep(t, up = true) {
-    const s = actx.createBufferSource(); s.buffer = raveNoise();
-    const bp = actx.createBiquadFilter(), g = actx.createGain();
-    bp.type = 'bandpass'; bp.Q.value = 7;
-    bp.frequency.setValueAtTime(up ? 240 : 5200, t); bp.frequency.exponentialRampToValueAtTime(up ? 5200 : 260, t + 0.48);
-    g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.13, t + 0.08); g.gain.exponentialRampToValueAtTime(0.001, t + 0.52);
-    s.connect(bp).connect(g).connect(RAVE.master); s.start(t); s.stop(t + 0.55);
-  }
-  const RAVE_TRACKS = [
-    {
-      name: 'ACID MINE',
-      bpm: 128,
-      k: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
-      c: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-      h: [0,0,2,0, 0,0,1,0, 0,0,2,0, 0,0,1,2],
-      b: [55,null,null,55, null,null,82.41,null, 65.41,null,null,65.41, null,null,49,null],
-      lead: [0,null,329.63,null, 392,null,440,null, 523.25,null,440,null, 392,null,329.63,null],
-      chords: [[220, 261.63, 329.63], [174.61, 220, 261.63]],
-    },
-    {
-      name: 'NEON HOUSE',
-      bpm: 124,
-      k: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
-      c: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-      h: [1,0,2,0, 1,0,2,0, 1,0,2,0, 1,0,2,0],
-      b: [65.41,null,65.41,null, 98,null,82.41,null, 73.42,null,73.42,null, 55,null,61.74,null],
-      lead: [261.63,null,329.63,null, 392,null,329.63,null, 440,null,392,null, 329.63,null,261.63,null],
-      chords: [[261.63, 329.63, 392], [220, 277.18, 329.63]],
-    },
-    {
-      name: 'HARD RAVE',
-      bpm: 142,
-      k: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
-      c: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,1,0],
-      h: [1,2,1,2, 1,2,1,2, 1,2,1,2, 1,2,1,2],
-      b: [49,49,null,55, 49,null,73.42,null, 49,49,null,55, 82.41,null,73.42,null],
-      lead: [392,null,392,440, 523.25,null,440,null, 392,null,587.33,null, 523.25,440,392,null],
-      chords: [[196, 246.94, 293.66], [164.81, 196, 246.94]],
-    },
-  ];
-  function switchRaveTrack(delta = 1, t = actx && actx.currentTime) {
-    RAVE.trackIndex = (RAVE.trackIndex + delta + RAVE_TRACKS.length) % RAVE_TRACKS.length;
-    RAVE.bpm = RAVE_TRACKS[RAVE.trackIndex].bpm;
-    if (RAVE.master && t) vSweep(t, delta > 0);
-  }
+  const PK = [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0];
+  const PC = [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0];
+  const PH = [0,0,2,0, 0,0,1,0, 0,0,2,0, 0,0,1,2];
+  const PB = [55,null,null,55, null,null,82.41,null, 65.41,null,null,65.41, null,null,49,null];
+  const Am = [220, 261.63, 329.63], F = [174.61, 220, 261.63];
   function scheduleStep(s, t) {
-    if (RAVE.step > 0 && RAVE.step % 256 === 0) switchRaveTrack(1, t);
-    const track = RAVE_TRACKS[RAVE.trackIndex];
-    const bar = Math.floor(RAVE.step / 16), phrase = bar % 8;
-    const intro = phrase === 0, build = phrase === 3, drop = phrase >= 4;
-    if (track.k[s] && !intro) vKick(t);
-    if (track.c[s] && !intro) vClap(t);
-    if (track.h[s] && (drop || build || s % 2 === 0)) vHat(t, track.h[s] === 2);
-    if (track.b[s] != null && (drop || build || s % 4 === 0)) vBass(t, track.b[s]);
-    if ((s === 0 || s === 10) && (drop || build)) vStab(t, track.chords[(bar + (s === 10 ? 1 : 0)) % track.chords.length]);
-    if (track.lead[s] && drop) vLead(t, track.lead[s]);
-    if (s === 15 && build) vSweep(t, true);
+    if (PK[s]) vKick(t);
+    if (PC[s]) vClap(t);
+    if (PH[s]) vHat(t, PH[s] === 2);
+    if (PB[s] != null) vBass(t, PB[s] * (RAVE.kind === 'laser' ? 0.89 : 1));
+    if (s === 0 || s === 10) vStab(t, RAVE.kind === 'forest' ? F : Am);
+    if (s === 6 && RAVE.kind !== 'classic') vStab(t, RAVE.kind === 'neon' ? [261.63, 329.63, 392] : F);
   }
 
-  // --- 会場の構築（一度だけ） ---
-  function emissiveMat(hex) { return new THREE.MeshBasicMaterial({ color: hex, fog: true }); }
-  function glowMat(hex, opacity = 0.7) {
-    return new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
-  }
   function makeDancer(hue) {
     const g = new THREE.Group();
     const shirt = new THREE.Color().setHSL(hue, 0.75, 0.55);
@@ -722,19 +645,21 @@
     const skin = new THREE.Color(0xf0c8a0);
     const mat = c => new THREE.MeshPhongMaterial({ color: c, emissive: c.clone().multiplyScalar(0.18), shininess: 8 });
     const box = (w, h, d, c, y, x = 0, z = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); g.add(m); return m; };
-    box(0.18, 0.7, 0.18, pants, 0.35, -0.12); box(0.18, 0.7, 0.18, pants, 0.35, 0.12); // legs
-    box(0.5, 0.7, 0.28, shirt, 1.05);          // torso
-    box(0.32, 0.32, 0.32, skin, 1.55);         // head
-    const arm = (sx) => { const a = new THREE.Group(); a.position.set(sx * 0.32, 1.32, 0); const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.6, 0.14), mat(skin)); m.position.y = -0.28; a.add(m); g.add(a); return a; };
+    box(0.18, 0.7, 0.18, pants, 0.35, -0.12); box(0.18, 0.7, 0.18, pants, 0.35, 0.12);
+    box(0.5, 0.7, 0.28, shirt, 1.05); box(0.32, 0.32, 0.32, skin, 1.55);
+    const arm = sx => { const a = new THREE.Group(); a.position.set(sx * 0.32, 1.32, 0); const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.6, 0.14), mat(skin)); m.position.y = -0.28; a.add(m); g.add(a); return a; };
     g.userData.armL = arm(-1); g.userData.armR = arm(1);
-    g.userData.phase = Math.random() * Math.PI * 2;
-    g.userData.spin = (Math.random() - 0.5) * 1.2;
+    g.userData.phase = Math.random() * Math.PI * 2; g.userData.spin = rnd(-0.6, 0.6);
     return g;
   }
-  function buildVenue() {
-    const grp = new THREE.Group();
-    // ダンスフロア（光るチェッカー）
-    const TILE = 1.25, N = 18, span = TILE * N, off = -span / 2 + TILE / 2;
+  function raveResetLists() {
+    for (const k of ['lights', 'spots', 'lasers', 'tiles', 'dancers', 'rings', 'pulses']) RAVE[k] = [];
+    RAVE.mirror = null; RAVE.strobe = null;
+  }
+  function buildRaveVenue(kind) {
+    raveResetLists();
+    const cfg = RAVE_VENUES[kind], grp = new THREE.Group();
+    const TILE = cfg.tile, N = cfg.floor, span = TILE * N, off = -span / 2 + TILE / 2;
     RAVE.radius = span / 2;
     const tileGeo = new THREE.PlaneGeometry(TILE * 0.96, TILE * 0.96);
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
@@ -742,299 +667,135 @@
       m.rotation.x = -Math.PI / 2; m.position.set(off + i * TILE, 0.02, off + j * TILE);
       m.userData.ij = i + j; grp.add(m); RAVE.tiles.push(m);
     }
-    // 周囲の床縁
     const rim = new THREE.Mesh(new THREE.BoxGeometry(span + 1, 0.1, span + 1), new THREE.MeshPhongMaterial({ color: 0x101015 }));
     rim.position.y = -0.06; grp.add(rim);
-    // 外周ネオン
-    const railMat = glowMat(0x00ffff, 0.55);
-    const railLongGeo = new THREE.BoxGeometry(span + 0.8, 0.08, 0.08);
-    const railSideGeo = new THREE.BoxGeometry(0.08, 0.08, span + 0.8);
-    for (const z of [-span / 2 - 0.45, span / 2 + 0.45]) {
-      const rail = new THREE.Mesh(railLongGeo, railMat.clone());
-      rail.position.set(0, 0.14, z); grp.add(rail); RAVE.pulseWalls.push(rail);
-    }
-    for (const x of [-span / 2 - 0.45, span / 2 + 0.45]) {
-      const rail = new THREE.Mesh(railSideGeo, railMat.clone());
-      rail.position.set(x, 0.14, 0); grp.add(rail); RAVE.pulseWalls.push(rail);
-    }
-    // トラス支柱
     const postMat = new THREE.MeshPhongMaterial({ color: 0x222228 });
-    for (const [sx, sz] of [[-1,-1],[1,-1],[-1,1],[1,1],[-1,0],[1,0],[0,-1],[0,1]]) {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(0.25, 7.2, 0.25), postMat);
-      p.position.set(sx * span / 2, 3, sz * span / 2); grp.add(p);
+    for (const [sx, sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.25, 5.8, 0.25), postMat);
+      p.position.set(sx * span / 2, 2.9, sz * span / 2); grp.add(p);
     }
-    for (const z of [-span/2, 0, span/2]) { const b = new THREE.Mesh(new THREE.BoxGeometry(span, 0.25, 0.25), postMat); b.position.set(0, 6.6, z); grp.add(b); }
-    for (const x of [-span/2, 0, span/2]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, span), postMat); b.position.set(x, 6.6, 0); grp.add(b); }
-    // ディスコライト（脈動するポイントライト）
-    for (let i = 0; i < 8; i++) {
-      const L = new THREE.PointLight(0xffffff, 1, 46, 1.5); L.position.set(0, 5.9, 0); grp.add(L);
+    for (const z of [-span/2, span/2]) { const b = new THREE.Mesh(new THREE.BoxGeometry(span, 0.25, 0.25), postMat); b.position.set(0, 5.8, z); grp.add(b); }
+    for (let i = 0; i < cfg.lights; i++) {
+      const L = new THREE.PointLight(0xffffff, 1, 24, 1.6); L.position.set(0, 5.2, 0); grp.add(L);
       const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), emissiveMat(0xffffff)); L.add(bulb);
       RAVE.lights.push(L);
     }
-    // スイープするスポットライト
-    for (let i = 0; i < 4; i++) {
-      const S = new THREE.SpotLight(0xffffff, 2.2, 58, 0.32, 0.6, 1.1);
-      const side = i % 2 ? 1 : -1;
-      S.position.set(side * span / 3, 6.4, i < 2 ? -span / 4 : span / 4); grp.add(S); grp.add(S.target);
+    for (let i = 0; i < cfg.spots; i++) {
+      const S = new THREE.SpotLight(0xffffff, 2, 28, 0.34, 0.6, 1.2);
+      S.position.set((i % 2 ? 1 : -1) * span / 3, 5.7, (i > 1 ? 1 : -1) * span / 5); grp.add(S); grp.add(S.target);
       RAVE.spots.push(S);
     }
-    // ストロボ
-    RAVE.strobe = new THREE.PointLight(0xffffff, 0, 72, 1); RAVE.strobe.position.set(0, 5.4, 0); grp.add(RAVE.strobe);
-    // レーザー（加算合成の細いビーム）
-    const laserGeo = new THREE.BoxGeometry(0.05, 0.05, span * 1.9);
-    for (let i = 0; i < 10; i++) {
-      const m = new THREE.Mesh(laserGeo, new THREE.MeshBasicMaterial({ color: 0xff0066, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-      m.position.set(0, 6.1, 0); grp.add(m); RAVE.lasers.push(m);
+    RAVE.strobe = new THREE.PointLight(0xffffff, 0, 36, 1); RAVE.strobe.position.set(0, 5, 0); grp.add(RAVE.strobe);
+    const laserGeo = new THREE.BoxGeometry(0.05, 0.05, span * 1.45);
+    for (let i = 0; i < cfg.lasers; i++) {
+      const m = new THREE.Mesh(laserGeo, emissiveMat(0xff0066, 0.6));
+      m.position.set(0, 5.4, 0); grp.add(m); RAVE.lasers.push(m);
     }
-    // 天井ネオンリング
-    for (let i = 0; i < 5; i++) {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.4 + i * 1.15, 0.035, 8, 96), glowMat(0x66ccff, 0.48));
-      ring.position.set(0, 5.2 - i * 0.16, 0);
-      ring.rotation.x = Math.PI / 2;
-      ring.userData.seed = i * 0.7;
-      grp.add(ring); RAVE.rings.push(ring);
-    }
-    // ミラーボール
-    RAVE.mirror = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 1), new THREE.MeshPhongMaterial({ color: 0x99a0b0, emissive: 0x222233, shininess: 110, flatShading: true }));
-    RAVE.mirror.position.set(0, 4.6, 0); grp.add(RAVE.mirror);
-    // DJブース
-    const stage = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.35, 2.2), new THREE.MeshPhongMaterial({ color: 0x12121a, emissive: 0x070712 }));
-    stage.position.set(0, 0.18, -span / 2 + 1.1); grp.add(stage);
-    const booth = new THREE.Mesh(new THREE.BoxGeometry(5.2, 1.1, 1.5), new THREE.MeshPhongMaterial({ color: 0x15151c }));
+    RAVE.mirror = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55, 1), new THREE.MeshPhongMaterial({ color: 0x99a0b0, emissive: 0x222233, shininess: 110, flatShading: true }));
+    RAVE.mirror.position.set(0, 4.45, 0); grp.add(RAVE.mirror);
+    const booth = new THREE.Mesh(new THREE.BoxGeometry(kind === 'neon' ? 2.4 : 3, 1.05, 1.15), new THREE.MeshPhongMaterial({ color: 0x15151c }));
     booth.position.set(0, 0.55, -span / 2 + 0.8); grp.add(booth);
-    const panel = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 0.7), emissiveMat(0x00ddff));
-    panel.position.set(0, 0.7, -span / 2 + 0.8 + 0.61); grp.add(panel); RAVE.tiles.push(panel); panel.userData.ij = 99;
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(8.8, 3.2), glowMat(0x1111ff, 0.42));
-    screen.position.set(0, 2.85, -span / 2 + 0.08); grp.add(screen); RAVE.pulseWalls.push(screen);
-    const eqGeo = new THREE.BoxGeometry(0.18, 1, 0.08);
-    for (let i = 0; i < 34; i++) {
-      const bar = new THREE.Mesh(eqGeo, glowMat(0xff33cc, 0.82));
-      bar.position.set(-4.05 + i * 0.245, 1.35, -span / 2 + 0.17);
-      bar.scale.y = 0.15;
-      bar.userData.seed = Math.random() * Math.PI * 2;
-      grp.add(bar); RAVE.equalizers.push(bar);
-    }
-    // DJ（踊る）
-    const dj = makeDancer(0.55); dj.position.set(0, 1.1, -span / 2 + 0.8); grp.add(dj); RAVE.dancers.push(dj);
-    // スピーカー
-    for (const [sx, z] of [[-1, -span / 2 + 0.8], [1, -span / 2 + 0.8], [-1, span / 2 - 1.3], [1, span / 2 - 1.3]]) {
-      const sp = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.5, 1), new THREE.MeshPhongMaterial({ color: 0x0c0c10 }));
-      sp.position.set(sx * (span / 2 - 0.9), 1.25, z); grp.add(sp);
-      const cone = new THREE.Mesh(new THREE.CircleGeometry(0.28, 12), emissiveMat(0x331111));
-      cone.position.set(sx * (span / 2 - 0.9), 1.55, z + (z < 0 ? 0.51 : -0.51)); grp.add(cone); RAVE.tiles.push(cone); cone.userData.ij = 50;
-      if (z > 0) cone.rotation.y = Math.PI;
-      RAVE.speakerCones.push(cone);
-    }
-    // 群衆
-    for (let i = 0; i < 44; i++) {
-      const d = makeDancer(Math.random());
-      const a = Math.random() * Math.PI * 2, r = 1.8 + Math.random() * (span / 2 - 2.2);
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(kind === 'laser' ? 3.2 : 2.5, 0.68), emissiveMat(kind === 'forest' ? 0x55ff88 : 0x00ddff));
+    panel.position.set(0, 0.72, -span / 2 + 1.41); grp.add(panel); RAVE.pulses.push(panel);
+    const dj = makeDancer(cfg.hue); dj.position.set(0, 1.05, -span / 2 + 0.8); grp.add(dj); RAVE.dancers.push(dj);
+    for (let i = 0; i < cfg.dancers; i++) {
+      const d = makeDancer((cfg.hue + Math.random() * 0.35) % 1);
+      const a = Math.random() * Math.PI * 2, r = 1.1 + Math.random() * (span / 2 - 1.6);
       d.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); d.rotation.y = -a + Math.PI;
       grp.add(d); RAVE.dancers.push(d);
     }
-    // 空中を漂う小さな光
-    for (let i = 0; i < 140; i++) {
-      const spark = new THREE.Mesh(new THREE.SphereGeometry(0.035 + Math.random() * 0.045, 6, 6), glowMat(0xffffff, 0.65));
-      const a = Math.random() * Math.PI * 2, r = 1.5 + Math.random() * (span / 2);
-      spark.position.set(Math.cos(a) * r, 1.0 + Math.random() * 5.2, Math.sin(a) * r);
-      spark.userData.base = spark.position.clone();
-      spark.userData.seed = Math.random() * 100;
-      grp.add(spark); RAVE.sparks.push(spark);
-    }
-    RAVE.group = grp; RAVE.built = true;
-  }
-
-  function raveLocalPoint(x, y, z) {
-    return new THREE.Vector3(x, y, z).sub(RAVE.group.position);
-  }
-  function raveImpactAt(x, y, z, color = 0x00ffff, max = 3.5) {
-    if (!RAVE.on || !RAVE.group) return;
-    const m = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.035, 8, 72), glowMat(color, 0.85));
-    m.rotation.x = Math.PI / 2;
-    m.position.copy(raveLocalPoint(x, y + 0.05, z));
-    m.userData.life = 0.75; m.userData.age = 0; m.userData.max = max;
-    RAVE.group.add(m); RAVE.shockwaves.push(m);
-    while (RAVE.shockwaves.length > 24) {
-      const old = RAVE.shockwaves.shift();
-      RAVE.group.remove(old); old.geometry.dispose(); old.material.dispose();
-    }
-  }
-  function raveTrailAt(x, y, z) {
-    if (!RAVE.on || !RAVE.group) return;
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), glowMat(0x66ffff, 0.7));
-    m.position.copy(raveLocalPoint(x, y, z));
-    m.userData.life = 0.45; m.userData.age = 0;
-    RAVE.group.add(m); RAVE.trails.push(m);
-    while (RAVE.trails.length > 60) {
-      const old = RAVE.trails.shift();
-      RAVE.group.remove(old); old.geometry.dispose(); old.material.dispose();
-    }
-  }
-  function clearRaveTransient() {
-    for (const list of [RAVE.shockwaves, RAVE.trails]) {
-      while (list.length) {
-        const m = list.pop();
-        RAVE.group.remove(m); m.geometry.dispose(); m.material.dispose();
+    if (kind === 'neon') {
+      for (let i = 0; i < 3; i++) {
+        const r = new THREE.Mesh(new THREE.TorusGeometry(1.1 + i * 0.9, 0.04, 8, 80), emissiveMat(0x00ffff, 0.55));
+        r.rotation.x = Math.PI / 2; r.position.y = 4.7 - i * 0.18; r.userData.seed = i; grp.add(r); RAVE.rings.push(r);
       }
     }
-  }
-  function setTypePulse(type, hue, env) {
-    const mats = Array.isArray(TYPES[type].mats) ? TYPES[type].mats : [TYPES[type].mats];
-    for (const mat of mats) {
-      mat.color.setHSL(hue, 1, 0.5 + env * 0.25);
-      mat.emissive.setHSL(hue, 1, 0.14 + env * 0.34);
+    if (kind === 'forest') {
+      const trunkMat = new THREE.MeshPhongMaterial({ color: 0x3b2414 });
+      const leafMat = new THREE.MeshPhongMaterial({ color: 0x2f8d45, emissive: 0x082810 });
+      for (const [x, z] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+        const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, 2.1, 7), trunkMat); tr.position.set(x * (span / 2 - 0.8), 1.05, z * (span / 2 - 0.8)); grp.add(tr);
+        const lf = new THREE.Mesh(new THREE.SphereGeometry(0.65, 10, 8), leafMat); lf.position.set(tr.position.x, 2.2, tr.position.z); grp.add(lf); RAVE.pulses.push(lf);
+      }
     }
+    if (kind === 'laser') {
+      for (let i = 0; i < 4; i++) {
+        const gate = new THREE.Mesh(new THREE.TorusGeometry(1.4 + i * 0.42, 0.025, 6, 64), emissiveMat(0xff0066, 0.45));
+        gate.position.set(0, 2.1 + i * 0.5, -span / 2 + 1.15); gate.rotation.y = Math.PI / 2; gate.userData.seed = i; grp.add(gate); RAVE.rings.push(gate);
+      }
+    }
+    return grp;
   }
-
-  function raveToggle() {
+  function raveOff() {
+    if (!RAVE.on) return;
+    scene.remove(RAVE.group);
+    const s = RAVE.saved;
+    sun.intensity = s.sun; hemi.intensity = s.hemi; scene.fog = s.fog; scene.background = s.bg; sky.visible = s.sky; clouds.visible = s.clouds;
+    if (RAVE.master && actx) { try { RAVE.master.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.15); } catch (e) {} }
+    RAVE.on = false; RAVE.group = null; RAVE.kind = ''; raveInd.style.display = 'none';
+  }
+  function raveToggle(kind = 'classic') {
     initAudio();
-    RAVE.on = !RAVE.on;
-    if (RAVE.on) {
-      if (!RAVE.built) buildVenue();
-      clearRaveTransient();
-      const fx = Math.round(player.pos.x), fz = Math.round(player.pos.z), fy = Math.floor(player.pos.y - EYE);
-      RAVE.group.position.set(fx, fy, fz);
-      scene.add(RAVE.group);
-      // 夜のクラブ風に環境を退避＆変更
-      RAVE.saved = { sun: sun.intensity, hemi: hemi.intensity, fog: scene.fog, bg: scene.background.clone(), sky: sky.visible, clouds: clouds.visible };
-      sun.intensity = 0.18; hemi.intensity = 0.22;
-      scene.fog = new THREE.Fog(0x0a0612, 12, 70); scene.background = new THREE.Color(0x07050f);
-      sky.visible = false; clouds.visible = false;
-      // 音楽開始
-      if (actx) {
-        if (actx.state === 'suspended') actx.resume();
-        RAVE.bpm = RAVE_TRACKS[RAVE.trackIndex].bpm;
-        RAVE.master = actx.createGain(); RAVE.master.gain.value = 0.55; RAVE.master.connect(actx.destination);
-        RAVE.audioStart = actx.currentTime + 0.08; RAVE.nextNote = RAVE.audioStart; RAVE.step = 0;
-      }
-      raveImpactAt(player.pos.x, player.pos.y - EYE + 0.2, player.pos.z, 0xff33cc, 7);
-      raveInd.style.display = 'block';
-    } else {
-      clearRaveTransient();
-      scene.remove(RAVE.group);
-      const s = RAVE.saved;
-      sun.intensity = s.sun; hemi.intensity = s.hemi; scene.fog = s.fog; scene.background = s.bg; sky.visible = s.sky; clouds.visible = s.clouds;
-      if (RAVE.master) { try { RAVE.master.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.15); } catch (e) {} }
-      raveInd.style.display = 'none';
+    if (RAVE.on && RAVE.kind === kind) { raveOff(); return; }
+    if (RAVE.on) raveOff();
+    const cfg = RAVE_VENUES[kind];
+    RAVE.kind = kind; RAVE.bpm = cfg.bpm; RAVE.group = buildRaveVenue(kind);
+    const fx = Math.round(player.pos.x), fz = Math.round(player.pos.z), fy = Math.floor(player.pos.y - EYE);
+    RAVE.group.position.set(fx, fy, fz); scene.add(RAVE.group);
+    RAVE.saved = { sun: sun.intensity, hemi: hemi.intensity, fog: scene.fog, bg: scene.background.clone(), sky: sky.visible, clouds: clouds.visible };
+    sun.intensity = 0.18; hemi.intensity = 0.22;
+    scene.fog = new THREE.Fog(0x0a0612, 8, 38); scene.background = new THREE.Color(0x07050f);
+    sky.visible = false; clouds.visible = false;
+    if (actx) {
+      if (actx.state === 'suspended') actx.resume();
+      RAVE.master = actx.createGain(); RAVE.master.gain.value = 0.5; RAVE.master.connect(actx.destination);
+      RAVE.audioStart = actx.currentTime + 0.08; RAVE.nextNote = RAVE.audioStart; RAVE.step = 0;
     }
+    RAVE.on = true; raveInd.style.display = 'block'; raveInd.textContent = `${cfg.label}  R/T/Y/U`;
   }
-
   function raveUpdate(dt) {
     if (!RAVE.on || !actx) return;
-    // 先読みスケジューリング
     while (RAVE.nextNote < actx.currentTime + 0.12) {
       scheduleStep(RAVE.step % 16, RAVE.nextNote);
       RAVE.nextNote += SIXTEENTH(); RAVE.step++;
     }
-    // 連続ビート（音に同期）
-    const beat = (actx.currentTime - RAVE.audioStart) / (60 / RAVE.bpm);
-    const ph = beat - Math.floor(beat);
-    const env = Math.pow(1 - ph, 2.2);              // 拍頭で1、減衰
-    const track = RAVE_TRACKS[RAVE.trackIndex];
-    const bar = Math.floor(RAVE.step / 16), phrase = bar % 8;
-    const dropPower = phrase >= 4 ? 1 : phrase === 3 ? 0.65 : 0.35;
-    const t = performance.now() / 1000;
-    if ((keys['ShiftLeft'] || keys['ShiftRight']) && Math.hypot(player.vel.x, player.vel.z) > WALK && t - RAVE.lastTrail > 0.045) {
-      RAVE.lastTrail = t;
-      raveTrailAt(player.pos.x, player.pos.y - EYE + 0.08, player.pos.z);
-    }
-    setTypePulse(NEON, (beat * 0.08) % 1, env);
-    setTypePulse(LASER, (0.92 + beat * 0.1) % 1, env * dropPower);
-    setTypePulse(SPEAKER, (0.78 + beat * 0.04) % 1, env);
-    // ポイントライト：色相回転＋脈動＋円運動
+    const cfg = RAVE_VENUES[RAVE.kind], beat = (actx.currentTime - RAVE.audioStart) / (60 / RAVE.bpm);
+    const ph = beat - Math.floor(beat), env = Math.pow(1 - ph, 2.2);
     RAVE.lights.forEach((L, i) => {
-      const hue = (beat * 0.07 + i / RAVE.lights.length) % 1;
+      const hue = (cfg.hue + beat * 0.07 + i / Math.max(1, RAVE.lights.length)) % 1;
       L.color.setHSL(hue, 1, 0.5); L.children[0].material.color.copy(L.color);
-      L.intensity = 5 + dropPower * 4 + env * (18 + dropPower * 12);
-      const a = beat * 0.5 + i * (Math.PI * 2 / RAVE.lights.length);
-      L.position.set(Math.cos(a) * RAVE.radius * 0.72, 5.9, Math.sin(a) * RAVE.radius * 0.72);
+      L.intensity = 5 + env * 22;
+      const a = beat * 0.5 + i * Math.PI * 2 / Math.max(1, RAVE.lights.length);
+      L.position.set(Math.cos(a) * RAVE.radius * 0.68, 5.2, Math.sin(a) * RAVE.radius * 0.68);
     });
-    // スポットライト：スイープ
     RAVE.spots.forEach((S, i) => {
-      S.color.setHSL((beat * 0.11 + i * 0.5) % 1, 1, 0.55); S.intensity = 6 + dropPower * 6 + env * 16;
-      const sw = Math.sin(beat * 0.7 + i * Math.PI) * RAVE.radius * 0.78;
-      S.target.position.set(sw, 0, Math.cos(beat * 0.5 + i) * RAVE.radius * 0.78);
+      S.color.setHSL((cfg.hue + beat * 0.11 + i * 0.5) % 1, 1, 0.55); S.intensity = 7 + env * 15;
+      const sw = Math.sin(beat * 0.7 + i * Math.PI) * RAVE.radius * 0.75;
+      S.target.position.set(sw, 0, Math.cos(beat * 0.5 + i) * RAVE.radius * 0.75);
     });
-    // ストロボ：拍頭で短く白
-    RAVE.strobe.intensity = ph < 0.06 && (Math.floor(beat) % 2 === 0) ? 38 + dropPower * 34 : 0;
-    // 床タイル：色相ウェーブ＋脈動
+    RAVE.strobe.intensity = ph < 0.06 && (Math.floor(beat) % 2 === 0) ? 55 : 0;
     for (const m of RAVE.tiles) {
-      const hue = ((m.userData.ij) * 0.06 + beat * 0.12) % 1;
-      m.material.color.setHSL(hue, 0.95, 0.18 + 0.42 * env);
+      const hue = (cfg.hue + m.userData.ij * 0.06 + beat * 0.12) % 1;
+      m.material.color.setHSL(hue, 0.95, 0.16 + 0.42 * env);
     }
-    // レーザー：回転＋色
     RAVE.lasers.forEach((m, i) => {
-      m.material.color.setHSL((beat * 0.2 + i * 0.18) % 1, 1, 0.55);
-      m.rotation.y = beat * 0.6 + i * (Math.PI * 2 / RAVE.lasers.length);
+      m.material.color.setHSL((cfg.hue + beat * 0.2 + i * 0.18) % 1, 1, 0.55);
+      m.rotation.y = beat * 0.6 + i * (Math.PI * 2 / Math.max(1, RAVE.lasers.length));
       m.rotation.z = Math.sin(beat * 0.9 + i) * 0.5;
-      m.material.opacity = 0.25 + env * 0.55;
+      m.material.opacity = 0.22 + env * 0.58;
     });
-    for (let i = RAVE.shockwaves.length - 1; i >= 0; i--) {
-      const m = RAVE.shockwaves[i];
-      m.userData.age += dt;
-      const p = m.userData.age / m.userData.life;
-      if (p >= 1) {
-        RAVE.shockwaves.splice(i, 1);
-        RAVE.group.remove(m); m.geometry.dispose(); m.material.dispose();
-      } else {
-        const sc = 1 + p * m.userData.max;
-        m.scale.set(sc, sc, sc);
-        m.material.opacity = (1 - p) * 0.85;
-      }
-    }
-    for (let i = RAVE.trails.length - 1; i >= 0; i--) {
-      const m = RAVE.trails[i];
-      m.userData.age += dt;
-      const p = m.userData.age / m.userData.life;
-      if (p >= 1) {
-        RAVE.trails.splice(i, 1);
-        RAVE.group.remove(m); m.geometry.dispose(); m.material.dispose();
-      } else {
-        m.scale.setScalar(1 + p * 2.2);
-        m.material.opacity = (1 - p) * 0.7;
-      }
-    }
     RAVE.rings.forEach((r, i) => {
-      const hue = (beat * 0.09 + i * 0.14) % 1;
-      const sc = 1 + env * (0.08 + i * 0.018);
-      r.material.color.setHSL(hue, 1, 0.58);
-      r.material.opacity = 0.25 + env * 0.48;
-      r.rotation.z = beat * (0.2 + i * 0.045);
-      r.rotation.x = Math.PI / 2 + Math.sin(beat * 0.42 + r.userData.seed) * 0.24;
-      r.scale.set(sc, sc, sc);
+      r.material.color.setHSL((cfg.hue + beat * 0.12 + i * 0.17) % 1, 1, 0.56);
+      r.rotation.z += dt * (0.4 + i * 0.12);
+      r.scale.setScalar(1 + env * 0.12);
     });
-    RAVE.equalizers.forEach((bar, i) => {
-      const pulse = Math.pow(Math.abs(Math.sin(beat * 0.8 + bar.userData.seed)), 2);
-      const kick = i % 4 === 0 ? env * 1.3 : env * 0.45;
-      const h = 0.14 + pulse * 1.35 + kick;
-      bar.scale.y = h;
-      bar.position.y = 0.98 + h * 0.5;
-      bar.material.color.setHSL((i / RAVE.equalizers.length + beat * 0.08) % 1, 1, 0.55);
-      bar.material.opacity = 0.55 + env * 0.4;
+    RAVE.pulses.forEach((m, i) => {
+      if (m.material.emissive) m.material.emissive.setHSL((cfg.hue + beat * 0.1 + i * 0.2) % 1, 1, 0.16 + env * 0.35);
+      else m.material.color.setHSL((cfg.hue + beat * 0.1 + i * 0.2) % 1, 1, 0.35 + env * 0.25);
     });
-    RAVE.speakerCones.forEach((cone, i) => {
-      const sc = 1 + env * 0.38;
-      cone.scale.set(sc, sc, sc);
-      cone.material.color.setHSL((0.95 + i * 0.08 + beat * 0.03) % 1, 1, 0.25 + env * 0.35);
-    });
-    RAVE.pulseWalls.forEach((wall, i) => {
-      wall.material.color.setHSL((beat * 0.07 + i * 0.21) % 1, 1, 0.45 + env * 0.22);
-      wall.material.opacity = 0.24 + env * 0.48;
-    });
-    RAVE.sparks.forEach((spark, i) => {
-      const seed = spark.userData.seed;
-      spark.position.x = spark.userData.base.x + Math.sin(t * 0.65 + seed) * 0.22;
-      spark.position.y = spark.userData.base.y + Math.sin(t * 1.5 + seed) * 0.42 + env * 0.22;
-      spark.position.z = spark.userData.base.z + Math.cos(t * 0.55 + seed) * 0.22;
-      spark.material.color.setHSL((beat * 0.08 + i * 0.011) % 1, 1, 0.62);
-      spark.material.opacity = 0.28 + env * 0.55;
-    });
-    // ミラーボール
     if (RAVE.mirror) RAVE.mirror.rotation.y += dt * 1.5;
-    // ダンサー：ビートに合わせて踊る
     for (const d of RAVE.dancers) {
-      const p = d.userData.phase;
-      const bob = Math.abs(Math.sin(beat * Math.PI + p));
+      const p = d.userData.phase, bob = Math.abs(Math.sin(beat * Math.PI + p));
       d.position.y = (d === RAVE.dancers[0] ? 1.1 : 0) + bob * 0.18;
       d.rotation.z = Math.sin(beat * Math.PI * 0.5 + p) * 0.12;
       if (d !== RAVE.dancers[0]) d.rotation.y += dt * d.userData.spin * 0.5;
@@ -1043,7 +804,6 @@
       d.userData.armL.rotation.z = raise; d.userData.armL.rotation.x = wave;
       d.userData.armR.rotation.z = -raise; d.userData.armR.rotation.x = -wave;
     }
-    raveInd.textContent = `RAVE ON  ${track.name}  ${phrase < 3 ? 'BUILD' : phrase === 3 ? 'RISE' : 'DROP'}  N: NEXT`;
   }
 
   // 画面右上のレイブ表示
@@ -1068,7 +828,6 @@
       player.vel.y -= GRAVITY * dt;
       if (keys['Space'] && player.onGround) {
         player.vel.y = JUMP; player.onGround = false;
-        if (RAVE.on) raveImpactAt(player.pos.x, player.pos.y - EYE + 0.12, player.pos.z, 0x00ffff, 5.4);
       }
       moveAxis('x', player.vel.x * dt); moveAxis('z', player.vel.z * dt);
       player.onGround = false;
