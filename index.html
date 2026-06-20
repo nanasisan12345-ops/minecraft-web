@@ -825,13 +825,85 @@
     const arm = sx => { const a = new THREE.Group(); a.position.set(sx * 0.32, 1.32, 0); const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.6, 0.14), mat(skin)); m.position.y = -0.28; a.add(m); g.add(a); return a; };
     g.userData.armL = arm(-1); g.userData.armR = arm(1);
     g.userData.phase = Math.random() * Math.PI * 2; g.userData.spin = rnd(-0.6, 0.6);
-    g.userData.rate = rnd(0.86, 1.16); g.userData.amp = rnd(0.7, 1.3); g.userData.variant = Math.random();
+    g.userData.rate = rnd(0.86, 1.16); g.userData.amp = rnd(0.7, 1.3); g.userData.moveSeed = Math.random();
+    const ang = Math.random() * Math.PI * 2; g.userData.sideX = Math.cos(ang); g.userData.sideZ = Math.sin(ang);
     return g;
   }
   function raveResetLists() {
     for (const k of ['lights', 'spots', 'lasers', 'tiles', 'dancers', 'rings', 'pulses']) RAVE[k] = [];
     RAVE.mirror = null; RAVE.strobe = null;
   }
+  // ジャンルごとに使う踊りの種類（NPCが時間とともにランダムに切り替える）
+  const MOVE_POOL = {
+    classic: ['headbang', 'stomp', 'twist', 'bounce'],
+    forest:  ['handsup', 'sway', 'spin', 'bounce'],
+    laser:   ['point', 'spin', 'twist', 'jumpclap', 'sidestep'],
+  };
+  const setArms = (aL, aR, lz, lx, rz, rx) => { aL.rotation.z = lz; aL.rotation.x = lx; aR.rotation.z = rz; aR.rotation.x = rx; };
+  // 各踊り。c = { home, facing, bd(個別ビート), pe(個別の拍エンベロープ), amp, dt, spin, sideX, sideZ, ud }
+  const MOVES = {
+    bounce(d, aL, aR, c) {                       // その場で大きくジャンプ、腕を上げてポンプ
+      d.position.set(c.home.x, c.home.y + c.pe * 0.4 * c.amp, c.home.z);
+      d.rotation.set(0, c.facing, Math.sin(c.bd * Math.PI) * 0.1);
+      const r = 2.2 + Math.sin(c.bd * Math.PI * 2) * 0.5;
+      setArms(aL, aR, r, 0, -r, 0);
+    },
+    headbang(d, aL, aR, c) {                     // 前傾で激しく縦ノリ、腕は低くポンプ
+      d.position.set(c.home.x, c.home.y + c.pe * 0.12, c.home.z);
+      d.rotation.set(0.3 + c.pe * 0.25, c.facing, Math.sin(c.bd * 0.5) * 0.1);
+      const pump = 0.3 + c.pe * 0.4;
+      setArms(aL, aR, pump, -0.5 - c.pe * 0.5, -pump, -0.5 - c.pe * 0.5);
+    },
+    stomp(d, aL, aR, c) {                        // 左右に体重移動してステップ
+      const lean = Math.sin(c.bd * Math.PI);
+      d.position.set(c.home.x, c.home.y + Math.abs(lean) * 0.22, c.home.z);
+      d.rotation.set(0, c.facing, lean * 0.18);
+      setArms(aL, aR, 0.6 + c.pe * 0.3, lean * 0.4, -0.6 - c.pe * 0.3, -lean * 0.4);
+    },
+    twist(d, aL, aR, c) {                        // 腰をひねるツイスト
+      const tw = Math.sin(c.bd * Math.PI * 2);
+      d.position.set(c.home.x, c.home.y + c.pe * 0.15, c.home.z);
+      d.rotation.set(0, c.facing + tw * 0.5, 0);
+      setArms(aL, aR, 1.5, tw * 0.6, -1.5, -tw * 0.6);
+    },
+    spin(d, aL, aR, c) {                         // その場でぐるぐる回る
+      c.ud._spin = (c.ud._spin || 0) + c.dt * (c.spin < 0 ? -5 : 5);
+      d.position.set(c.home.x, c.home.y + c.pe * 0.2, c.home.z);
+      d.rotation.set(0, c.facing + c.ud._spin, 0);
+      setArms(aL, aR, 1.9, 0, -1.9, 0);
+    },
+    handsup(d, aL, aR, c) {                       // 両手を高く上げて飛び跳ねる
+      const s = Math.sin(c.bd * 0.8);
+      d.position.set(c.home.x, c.home.y + c.pe * 0.3 * c.amp, c.home.z);
+      d.rotation.set(0, c.facing, s * 0.2);
+      setArms(aL, aR, 2.7, s * 0.4, -2.7, s * 0.4);
+    },
+    sway(d, aL, aR, c) {                          // 大きく左右に揺れる
+      const s = Math.sin(c.bd * 0.6);
+      d.position.set(c.home.x + s * 0.3 * c.sideX, c.home.y + (Math.sin(c.bd * Math.PI * 0.5) * 0.5 + 0.5) * 0.1, c.home.z + s * 0.3 * c.sideZ);
+      d.rotation.set(0, c.facing, s * 0.25);
+      setArms(aL, aR, 2.5 + s * 0.3, s * 0.5, -2.5 + s * 0.3, s * 0.5);
+    },
+    point(d, aL, aR, c) {                         // 天を指すディスコポイント＋ホップ
+      const up = Math.floor(c.bd) % 2 === 0, h = Math.abs(Math.sin(c.bd * Math.PI)), shuf = Math.sin(c.bd * Math.PI) * 0.25;
+      d.position.set(c.home.x + shuf * c.sideX, c.home.y + h * 0.2, c.home.z + shuf * c.sideZ);
+      d.rotation.set(0, c.facing + Math.sin(c.bd * Math.PI) * 0.3, (up ? 1 : -1) * 0.18);
+      if (up) setArms(aL, aR, 0.4, 0.2, -2.4, -1.0); else setArms(aL, aR, 2.4, -1.0, -0.4, 0.2);
+    },
+    jumpclap(d, aL, aR, c) {                      // ジャンプして手を前で打ち合わせる
+      const j = Math.abs(Math.sin(c.bd * Math.PI));
+      d.position.set(c.home.x, c.home.y + j * 0.45 * c.amp, c.home.z);
+      d.rotation.set(0, c.facing, 0);
+      const close = 1.2 - j * 0.8;
+      setArms(aL, aR, close, 1.4, -close, 1.4);
+    },
+    sidestep(d, aL, aR, c) {                      // 横にシャッフルして移動
+      const off = Math.sin(c.bd * Math.PI);
+      d.position.set(c.home.x + off * 0.5 * c.sideX, c.home.y + Math.abs(off) * 0.15, c.home.z + off * 0.5 * c.sideZ);
+      d.rotation.set(0, c.facing, off * 0.2);
+      setArms(aL, aR, 1.4, off * 0.5, -1.4, -off * 0.5);
+    },
+  };
   function makeSign(text, color = '#00ddff', width = 3.2, height = 0.9) {
     const c = document.createElement('canvas'); c.width = 512; c.height = 160;
     const x = c.getContext('2d');
@@ -953,11 +1025,11 @@
     const booth = addBox(grp, boothW, 0.95, 1.0, new THREE.MeshPhongMaterial({ color: kind === 'laser' ? 0x5a3810 : 0x15151c }), 0, 0.5, -spanZ / 2 + 0.82);
     const panel = new THREE.Mesh(new THREE.PlaneGeometry(boothW * 0.82, 0.56), emissiveMat(kind === 'neon' ? 0xffcc22 : kind === 'forest' ? 0x55ddff : kind === 'laser' ? 0xffcc66 : 0x00ddff));
     panel.position.set(0, 0.72, -spanZ / 2 + 1.33); grp.add(panel); RAVE.pulses.push(panel);
-    const dj = makeDancer(cfg.hue); dj.position.set(0, 1.0, -spanZ / 2 + 0.78); grp.add(dj); RAVE.dancers.push(dj);
+    const dj = makeDancer(cfg.hue); dj.position.set(0, 1.0, -spanZ / 2 + 0.78); dj.userData.home = dj.position.clone(); grp.add(dj); RAVE.dancers.push(dj);
     for (let i = 0; i < cfg.dancers; i++) {
       const d = makeDancer((cfg.hue + Math.random() * 0.35) % 1);
       const p = raveDancerPoint(kind, spanX, spanZ);
-      d.position.copy(p); d.rotation.y = Math.atan2(-p.x, -p.z);
+      d.position.copy(p); d.rotation.y = Math.atan2(-p.x, -p.z); d.userData.home = p.clone();
       grp.add(d); RAVE.dancers.push(d);
     }
     return grp;
@@ -1061,48 +1133,24 @@
     if (RAVE.mirror) RAVE.mirror.rotation.y += dt * 1.5;
     const k = RAVE.kind;
     for (let di = 0; di < RAVE.dancers.length; di++) {
-      const d = RAVE.dancers[di], isDJ = di === 0, p = d.userData.phase;
-      const aL = d.userData.armL, aR = d.userData.armR, baseY = isDJ ? 1.1 : 0;
-      const facing = isDJ ? 0 : Math.atan2(-d.position.x, -d.position.z);
-      // NPCごとに速さ・位相・振幅をずらし、全員バラバラに踊らせる
-      const rate = d.userData.rate, amp = d.userData.amp, vr = d.userData.variant;
-      const bd = beat * rate + p, pe = Math.abs(Math.sin(bd * Math.PI));
-      if (k === 'classic') {
-        // ダークテクノ: 頭を落として小刻みに縦ノリ、腕は低くポンプ
-        d.position.y = baseY + pe * 0.1 * amp;
-        d.rotation.x = 0.13 + pe * 0.1;
-        d.rotation.z = Math.sin(bd * 0.5) * 0.08;
-        d.rotation.y = facing;
-        const pump = (0.22 + pe * 0.5) * amp;
-        aL.rotation.z = pump; aL.rotation.x = -0.35 - pe * 0.4;
-        aR.rotation.z = -pump; aR.rotation.x = -0.35 - pe * 0.4;
-      } else if (k === 'neon') {
-        // ユーロビート: 全員同期のパラパラ風・高速振付（ここはあえて揃える）
-        d.rotation.x = 0;
-        d.position.y = baseY + Math.abs(Math.sin(beat * Math.PI * 2)) * 0.12;
-        d.rotation.z = 0; d.rotation.y = facing;
+      const d = RAVE.dancers[di], isDJ = di === 0, ud = d.userData;
+      const aL = ud.armL, aR = ud.armR, home = ud.home || d.position;
+      const facing = isDJ ? 0 : Math.atan2(-home.x, -home.z);
+      const bd = beat * ud.rate + ud.phase, pe = Math.abs(Math.sin(bd * Math.PI));
+      if (k === 'neon') {
+        // ユーロビート: 全員同期のパラパラ風・高速振付＋同期ジャンプ（あえて揃える）
+        d.position.set(home.x, home.y + Math.abs(Math.sin(beat * Math.PI)) * 0.3, home.z);
+        d.rotation.set(0, facing, 0);
         const pose = beat * Math.PI;
-        aL.rotation.z = 1.6 + Math.sin(pose) * 1.0; aL.rotation.x = Math.sin(pose * 0.5) * 1.2;
-        aR.rotation.z = -1.6 + Math.sin(pose + Math.PI) * 1.0; aR.rotation.x = Math.sin(pose * 0.5 + Math.PI) * 1.2;
-      } else if (k === 'forest') {
-        // トランス: 両手を高く上げてゆったり全身を揺らす
-        d.rotation.x = 0;
-        d.position.y = baseY + (Math.sin(bd * Math.PI * 0.5) * 0.5 + 0.5) * 0.12 * amp;
-        const sway = Math.sin(bd * 0.5);
-        d.rotation.z = sway * 0.22;
-        if (!isDJ) d.rotation.y += dt * d.userData.spin * 0.2; // ゆっくり漂う
-        aL.rotation.z = 2.5 + sway * 0.3 * amp; aL.rotation.x = sway * 0.5;
-        aR.rotation.z = -2.5 - sway * 0.3 * amp; aR.rotation.x = sway * 0.5;
-      } else {
-        // ディスコ: 片手で天を指すサタデーナイト・フィーバー（指す手・タイミングは各自バラバラ）
-        const up = (Math.floor(bd) + (vr < 0.5 ? 0 : 1)) % 2 === 0;
-        d.rotation.x = 0;
-        d.position.y = baseY + Math.abs(Math.sin(bd * Math.PI)) * 0.12 * amp;
-        d.rotation.z = (up ? 1 : -1) * 0.18;
-        d.rotation.y = facing + Math.sin(bd * Math.PI) * 0.3;
-        if (up) { aR.rotation.z = -2.4; aR.rotation.x = -1.0; aL.rotation.z = 0.4; aL.rotation.x = 0.2; }
-        else { aL.rotation.z = 2.4; aL.rotation.x = -1.0; aR.rotation.z = -0.4; aR.rotation.x = 0.2; }
+        aL.rotation.z = 1.6 + Math.sin(pose); aL.rotation.x = Math.sin(pose * 0.5) * 1.2;
+        aR.rotation.z = -1.6 + Math.sin(pose + Math.PI); aR.rotation.x = Math.sin(pose * 0.5 + Math.PI) * 1.2;
+        continue;
       }
+      // 他ジャンルは各NPCが自分のタイミングで踊りをランダムに切り替える
+      const pool = MOVE_POOL[k] || MOVE_POOL.classic;
+      const idx = Math.floor(beat / 4 + ud.moveSeed * 9);
+      const name = isDJ ? 'bounce' : pool[((idx % pool.length) + pool.length) % pool.length];
+      MOVES[name](d, aL, aR, { home, facing, bd, pe, amp: ud.amp, dt, spin: ud.spin, sideX: ud.sideX, sideZ: ud.sideZ, ud });
     }
   }
 
