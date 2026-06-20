@@ -736,73 +736,111 @@
     const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.05);
     s.connect(bp).connect(g).connect(RAVE.master); sendTo(g, RAVE.reverb, 0.3); s.start(t); s.stop(t + dur + 0.08);
   }
-  // 音名テーブル（Hz）
+  // 音名テーブル（Hz） — コード構成音
   const Am = [220, 261.63, 329.63], F = [174.61, 220, 261.63], C = [261.63, 329.63, 392], G = [196, 246.94, 293.66];
-  const Cmaj7 = [261.63, 329.63, 392, 493.88], Am7 = [220, 261.63, 329.63, 392], Dm7 = [146.83, 174.61, 220, 261.63], G7 = [196, 246.94, 293.66, 349.23];
-  // 4小節のコード進行（n: コード構成音, r: ベース基音Hz）
-  const PROG = {
-    neon:   [ { n: Am, r: 55 }, { n: F, r: 43.65 }, { n: C, r: 65.41 }, { n: G, r: 49 } ],
-    forest: [ { n: Am, r: 55 }, { n: F, r: 43.65 }, { n: C, r: 65.41 }, { n: G, r: 49 } ],
-    laser:  [ { n: Cmaj7, r: 65.41 }, { n: Am7, r: 55 }, { n: Dm7, r: 73.42 }, { n: G7, r: 49 } ],
-  };
-  // ユーロビートのリードメロディ（小節ごと・16分音符, 0=休み）
-  const EUMEL = [
+  const Dm = [146.83, 174.61, 220], Em = [164.81, 196, 246.94], Bb = [233.08, 293.66, 349.23];
+  const Emaj = [164.81, 207.65, 246.94], Dmaj = [146.83, 185.00, 220];
+  const Cmaj7 = [261.63, 329.63, 392, 493.88], Am7 = [220, 261.63, 329.63, 392], Dm7 = [146.83, 174.61, 220, 261.63];
+  const G7 = [196, 246.94, 293.66, 349.23], Fmaj7 = [174.61, 220, 261.63, 329.63], Em7 = [164.81, 196, 246.94, 293.66];
+  const ROOT = { A: 55, F: 43.65, C: 65.41, G: 49, D: 73.42, E: 41.20, Bb: 58.27 }; // ベース基音(低Hz)
+  // ユーロビートのリードメロディ（曲ごと・小節×16分音符, 0=休み）
+  const EUMEL1 = [
     [880, 0, 659.25, 0, 783.99, 0, 659.25, 0, 587.33, 0, 523.25, 0, 659.25, 0, 587.33, 0],
     [783.99, 0, 659.25, 0, 523.25, 0, 587.33, 0, 659.25, 0, 587.33, 0, 523.25, 0, 440, 0],
     [659.25, 0, 783.99, 0, 880, 0, 783.99, 0, 1046.5, 0, 880, 0, 783.99, 0, 659.25, 0],
     [587.33, 0, 659.25, 0, 783.99, 0, 880, 0, 987.77, 0, 880, 0, 659.25, 0, 587.33, 0],
   ];
+  const EUMEL2 = [
+    [587.33, 0, 698.46, 0, 880, 0, 698.46, 0, 587.33, 0, 523.25, 0, 440, 0, 523.25, 0],
+    [466.16, 0, 587.33, 0, 698.46, 0, 587.33, 0, 932.33, 0, 698.46, 0, 587.33, 0, 466.16, 0],
+    [349.23, 0, 523.25, 0, 698.46, 0, 523.25, 0, 880, 0, 698.46, 0, 523.25, 0, 440, 0],
+    [523.25, 0, 659.25, 0, 783.99, 0, 1046.5, 0, 783.99, 0, 659.25, 0, 523.25, 0, 587.33, 0],
+  ];
+  const EUMEL3 = [
+    [880, 0, 659.25, 0, 523.25, 0, 659.25, 0, 880, 0, 1046.5, 0, 880, 0, 659.25, 0],
+    [783.99, 0, 587.33, 0, 493.88, 0, 587.33, 0, 783.99, 0, 587.33, 0, 493.88, 0, 440, 0],
+    [698.46, 0, 523.25, 0, 440, 0, 523.25, 0, 698.46, 0, 880, 0, 698.46, 0, 523.25, 0],
+    [830.61, 0, 659.25, 0, 493.88, 0, 659.25, 0, 830.61, 0, 659.25, 0, 830.61, 0, 880, 0],
+  ];
   // ディスコのファンキーベース／スタブ（1=基音, 2=オクターブ上, 0=休み）
-  const DISCO_BASS = [1, 0, 2, 0, 1, 1, 0, 2, 1, 0, 2, 0, 1, 2, 1, 0];
-  const DISCO_STAB = [0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0];
+  const DBASS1 = [1, 0, 2, 0, 1, 1, 0, 2, 1, 0, 2, 0, 1, 2, 1, 0], DSTAB1 = [0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0];
+  const DBASS2 = [1, 0, 1, 2, 0, 1, 0, 2, 1, 0, 1, 2, 0, 2, 0, 1], DSTAB2 = [0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0];
+  const DBASS3 = [1, 1, 0, 2, 1, 0, 2, 0, 1, 1, 0, 2, 1, 0, 2, 0], DSTAB3 = [1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1];
+  // 各ジャンルの曲リスト（会場を出すたびにランダムで1曲選ぶ）。
+  // 曲ごとに BPM・ベース/リード音色・リズム密度まで変えて差を大きくする。
+  const SONGS = {
+    classic: [
+      { bpm: 130, root: 55, alt: 82.41, stabA: Am, stabB: F, bw: 'sawtooth', bcut: 240, roll: false },
+      { bpm: 140, root: 73.42, alt: 110, stabA: Dm, stabB: Bb, bw: 'square', bcut: 320, roll: true },
+      { bpm: 124, root: 82.41, alt: 61.74, stabA: Em, stabB: C, bw: 'sawtooth', bcut: 190, roll: false },
+    ],
+    neon: [
+      { bpm: 158, prog: [{ n: Am, r: ROOT.A }, { n: F, r: ROOT.F }, { n: C, r: ROOT.C }, { n: G, r: ROOT.G }], mel: EUMEL1, lw: 'sawtooth', lcut: 4200 },
+      { bpm: 150, prog: [{ n: Dm, r: ROOT.D }, { n: Bb, r: ROOT.Bb }, { n: F, r: ROOT.F }, { n: C, r: ROOT.C }], mel: EUMEL2, lw: 'square', lcut: 3200 },
+      { bpm: 170, prog: [{ n: Am, r: ROOT.A }, { n: G, r: ROOT.G }, { n: F, r: ROOT.F }, { n: Emaj, r: ROOT.E }], mel: EUMEL3, lw: 'sawtooth', lcut: 5400 },
+    ],
+    forest: [
+      { bpm: 138, prog: [{ n: Am, r: ROOT.A }, { n: F, r: ROOT.F }, { n: C, r: ROOT.C }, { n: G, r: ROOT.G }], pw: 'sawtooth', arpEvery: 2 },
+      { bpm: 132, prog: [{ n: Em, r: ROOT.E }, { n: C, r: ROOT.C }, { n: G, r: ROOT.G }, { n: Dmaj, r: ROOT.D }], pw: 'triangle', arpEvery: 2 },
+      { bpm: 145, prog: [{ n: Am, r: ROOT.A }, { n: F, r: ROOT.F }, { n: Dm, r: ROOT.D }, { n: Emaj, r: ROOT.E }], pw: 'sawtooth', arpEvery: 1 },
+    ],
+    laser: [
+      { bpm: 124, prog: [{ n: Cmaj7, r: ROOT.C }, { n: Am7, r: ROOT.A }, { n: Dm7, r: ROOT.D }, { n: G7, r: ROOT.G }], bass: DBASS1, stab: DSTAB1, bw: 'sawtooth', bcut: 700 },
+      { bpm: 116, prog: [{ n: Fmaj7, r: ROOT.F }, { n: Em7, r: ROOT.E }, { n: Dm7, r: ROOT.D }, { n: G7, r: ROOT.G }], bass: DBASS2, stab: DSTAB2, bw: 'square', bcut: 560 },
+      { bpm: 128, prog: [{ n: Am7, r: ROOT.A }, { n: Dm7, r: ROOT.D }, { n: G7, r: ROOT.G }, { n: Cmaj7, r: ROOT.C }], bass: DBASS3, stab: DSTAB3, bw: 'sawtooth', bcut: 950 },
+    ],
+  };
 
   // ── ダークテクノ（重いキック＋うねるオフビートのサブ＋暗いスタブ）
   function stepTechno(s, bar, t) {
+    const sg = RAVE.song;
     if (s % 4 === 0) vKick(t, 42, 1.05, 0.34);
     else if (s === 14) vKick(t, 42, 0.55, 0.18);
     if (s === 4 || s === 12) vClap(t, 0.4, 1500, 0.18);
     if (s % 4 === 2) vHat(t, true, 7800, 0.22);
     if (s % 2 === 1) vHat(t, false, 9000, 0.12);
-    if (s % 4 === 2) vBass(t, 55, { wave: 'sawtooth', cut: 240, q: 7, dur: 0.22, gain: 0.3, env: 1.8 });
-    else if (s % 2 === 1) vBass(t, 55, { wave: 'sawtooth', cut: 180, dur: 0.12, gain: 0.18, sub: false });
-    if (s === 0) vStab(t, bar % 4 < 2 ? Am : F, 0.35);
+    if (s % 4 === 2) vBass(t, sg.root, { wave: sg.bw, cut: sg.bcut, q: 7, dur: 0.22, gain: 0.3, env: 1.8 });
+    else if (s === 7 || s === 15) vBass(t, sg.alt, { wave: sg.bw, cut: sg.bcut * 0.9, dur: 0.14, gain: 0.22, env: 1.6 });
+    else if (sg.roll && s % 2 === 1) vBass(t, sg.root, { wave: sg.bw, cut: sg.bcut * 0.75, dur: 0.1, gain: 0.2, sub: false });
+    else if (!sg.roll && s % 2 === 1) vBass(t, sg.root, { wave: sg.bw, cut: 180, dur: 0.12, gain: 0.16, sub: false });
+    if (s === 0) vStab(t, bar % 4 < 2 ? sg.stabA : sg.stabB, 0.35);
     if (s === 6 || s === 11) vNoiseHit(t, s === 6 ? 1500 : 3200, 0.12, 0.07, 0.3);
     if (bar % 4 === 3 && s === 8) vRiser(t, 60 / RAVE.bpm * 2);
   }
   // ── ユーロビート（16分オクターブ走りベース＋スーパーソウのリード）
   function stepEurobeat(s, bar, t) {
-    const ch = PROG.neon[bar % 4];
+    const sg = RAVE.song, ch = sg.prog[bar % 4];
     if (s % 4 === 0) vKick(t, 50, 1.0, 0.26);
     if (s === 4 || s === 12) vClap(t, 0.34, 2300, 0.1);
     vHat(t, s % 4 === 2, 8200, s % 4 === 2 ? 0.26 : 0.16);
     vBass(t, s % 2 ? ch.r * 2 : ch.r, { wave: 'sawtooth', cut: 1400, q: 4, dur: 0.12, gain: 0.24, sub: s % 2 === 0 });
     if (s % 4 === 2) vStab(t, ch.n, 0.16);
-    const mel = EUMEL[bar % 4][s];
-    if (mel) vSuper(t, mel, { voices: 6, detune: 16, dur: 0.16, gain: 0.06, cut: 4200, dly: 0.18, rev: 0.1, duck: false });
+    const mel = sg.mel[bar % 4][s];
+    if (mel) vSuper(t, mel, { voices: 6, detune: 16, dur: 0.16, gain: 0.06, type: sg.lw, cut: sg.lcut, dly: 0.18, rev: 0.1, duck: false });
     if (bar % 8 === 7 && s >= 8 && s % 2 === 0) vSnare(t, 0.3, 0.15);
   }
   // ── アップリフティングトランス（オフビートのゲートベース＋巨大パッド＋アルペジオ）
   function stepTrance(s, bar, t) {
-    const ch = PROG.forest[bar % 4];
+    const sg = RAVE.song, ch = sg.prog[bar % 4];
     if (s % 4 === 0) vKick(t, 46, 0.9, 0.3);
     if (s === 4 || s === 12) vSnare(t, 0.26, 0.3);
     if (s % 4 === 2) vHat(t, true, 9500, 0.2);
     if (s % 4 === 2) vBass(t, ch.r, { wave: 'sawtooth', cut: 320, q: 6, dur: 0.16, gain: 0.28, env: 1.5 });
-    if (s === 0) vChord(t, ch.n, { voices: 7, detune: 18, dur: 60 / RAVE.bpm * 4, gain: 0.04, cutStart: 600, cutEnd: 2600, atk: 0.12, rev: 0.4 });
+    if (s === 0) vChord(t, ch.n, { voices: 7, detune: 18, type: sg.pw, dur: 60 / RAVE.bpm * 4, gain: 0.04, cutStart: 600, cutEnd: 2600, atk: 0.12, rev: 0.4 });
     const an = ch.n[s % ch.n.length] * (s % (ch.n.length * 2) >= ch.n.length ? 2 : 1);
-    if (s % 2 === 0) vSuper(t, an, { voices: 4, detune: 12, dur: 0.18, gain: 0.045, cut: 3800, dly: 0.28, rev: 0.25, duck: false });
+    if (s % (sg.arpEvery || 2) === 0) vSuper(t, an, { voices: 4, detune: 12, type: sg.pw, dur: 0.18, gain: 0.045, cut: 3800, dly: 0.28, rev: 0.25, duck: false });
     if (bar % 8 === 7) vRiser(t, 60 / RAVE.bpm / 4);
   }
   // ── ディスコハウス（ファンキーベース＋7thコードのスタブ）
   function stepDisco(s, bar, t) {
-    const ch = PROG.laser[bar % 4];
+    const sg = RAVE.song, ch = sg.prog[bar % 4];
     if (s % 4 === 0) vKick(t, 52, 0.95, 0.28);
     if (s === 4 || s === 12) vClap(t, 0.36, 1700, 0.14);
     if (s % 4 === 2) vHat(t, true, 6500, 0.2);
     if (s % 2 === 1) vHat(t, false, 8000, 0.12);
-    const b = DISCO_BASS[s];
-    if (b) vBass(t, b === 2 ? ch.r * 2 : ch.r, { wave: 'sawtooth', cut: 700, q: 5, dur: 0.16, gain: 0.26, env: 2.2 });
-    if (DISCO_STAB[s]) vChord(t, ch.n, { voices: 3, detune: 8, dur: 0.18, gain: 0.05, cut: 3000, dly: 0.16, rev: 0.18 });
+    const b = sg.bass[s];
+    if (b) vBass(t, b === 2 ? ch.r * 2 : ch.r, { wave: sg.bw, cut: sg.bcut, q: 5, dur: 0.16, gain: 0.26, env: 2.2 });
+    if (sg.stab[s]) vChord(t, ch.n, { voices: 3, detune: 8, dur: 0.18, gain: 0.05, cut: 3000, dly: 0.16, rev: 0.18 });
     if (bar % 4 === 3 && s === 14) vSnare(t, 0.3, 0.2);
   }
   function scheduleStep(step, t) {
@@ -818,14 +856,46 @@
     const shirt = new THREE.Color().setHSL(hue, 0.75, 0.55);
     const pants = new THREE.Color().setHSL((hue + 0.5) % 1, 0.6, 0.4);
     const skin = new THREE.Color(0xf0c8a0);
-    const mat = c => new THREE.MeshPhongMaterial({ color: c, emissive: c.clone().multiplyScalar(0.18), shininess: 8 });
-    const box = (w, h, d, c, y, x = 0, z = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); g.add(m); return m; };
-    box(0.18, 0.7, 0.18, pants, 0.35, -0.12); box(0.18, 0.7, 0.18, pants, 0.35, 0.12);
-    box(0.5, 0.7, 0.28, shirt, 1.05); box(0.32, 0.32, 0.32, skin, 1.55);
-    const arm = sx => { const a = new THREE.Group(); a.position.set(sx * 0.32, 1.32, 0); const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.6, 0.14), mat(skin)); m.position.y = -0.28; a.add(m); g.add(a); return a; };
-    g.userData.armL = arm(-1); g.userData.armR = arm(1);
+    const hair = new THREE.Color().setHSL((hue + 0.2) % 1, 0.5, 0.22);
+    const mat = c => new THREE.MeshPhongMaterial({ color: c, emissive: (c.clone ? c : new THREE.Color(c)).clone().multiplyScalar(0.18), shininess: 22 });
+    const cyl = (rt, rb, h, c) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 12), mat(c));
+    const sph = (r, c) => new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), mat(c));
+    // 腰（脚のルート）
+    const hips = new THREE.Group(); hips.position.y = 0.94; g.add(hips);
+    hips.add(cyl(0.2, 0.18, 0.18, pants)); // 骨盤
+    const makeLeg = sx => {
+      const hip = new THREE.Group(); hip.position.set(sx * 0.12, -0.05, 0); hips.add(hip);
+      const thigh = cyl(0.1, 0.085, 0.46, pants); thigh.position.y = -0.23; hip.add(thigh);
+      const knee = new THREE.Group(); knee.position.y = -0.46; hip.add(knee);
+      const shin = cyl(0.075, 0.06, 0.44, pants); shin.position.y = -0.22; knee.add(shin);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.26), mat(new THREE.Color(0x202024))); foot.position.set(0, -0.44, 0.06); knee.add(foot);
+      hip.userData.knee = knee; return hip;
+    };
+    const legL = makeLeg(-1), legR = makeLeg(1);
+    // 胴・首・頭
+    const torso = cyl(0.2, 0.26, 0.6, shirt); torso.position.y = 1.25; g.add(torso);
+    const neck = cyl(0.06, 0.06, 0.1, skin); neck.position.y = 1.6; g.add(neck);
+    const headG = new THREE.Group(); headG.position.y = 1.74; g.add(headG);
+    headG.add(sph(0.17, skin));
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(hair)); headG.add(cap);
+    // 腕（肩→上腕→肘→前腕→手）
+    const makeArm = sx => {
+      const sh = new THREE.Group(); sh.position.set(sx * 0.26, 1.48, 0); g.add(sh);
+      const up = cyl(0.065, 0.055, 0.4, skin); up.position.y = -0.2; sh.add(up);
+      const el = new THREE.Group(); el.position.y = -0.4; sh.add(el);
+      const fore = cyl(0.055, 0.045, 0.38, skin); fore.position.y = -0.19; el.add(fore);
+      el.add((() => { const h = sph(0.065, skin); h.position.y = -0.4; return h; })());
+      sh.userData.elbow = el; return sh;
+    };
+    const armL = makeArm(-1), armR = makeArm(1);
+    g.userData.armL = armL; g.userData.armR = armR;
+    g.userData.elbowL = armL.userData.elbow; g.userData.elbowR = armR.userData.elbow;
+    g.userData.legL = legL; g.userData.legR = legR;
+    g.userData.kneeL = legL.userData.knee; g.userData.kneeR = legR.userData.knee;
+    g.userData.head = headG; g.userData.hips = hips; g.userData.torso = torso;
     g.userData.phase = Math.random() * Math.PI * 2; g.userData.spin = rnd(-0.6, 0.6);
-    g.userData.rate = rnd(0.86, 1.16); g.userData.amp = rnd(0.7, 1.3); g.userData.moveSeed = Math.random();
+    // テンポは曲に同期。拍のオフセットだけずらして“合ってるけどバラバラ”に
+    g.userData.beatOffset = Math.random() < 0.5 ? 0 : 0.5; g.userData.amp = rnd(0.8, 1.25); g.userData.moveSeed = Math.random();
     const ang = Math.random() * Math.PI * 2; g.userData.sideX = Math.cos(ang); g.userData.sideZ = Math.sin(ang);
     return g;
   }
@@ -835,73 +905,103 @@
   }
   // ジャンルごとに使う踊りの種類（NPCが時間とともにランダムに切り替える）
   const MOVE_POOL = {
-    classic: ['headbang', 'stomp', 'twist', 'bounce'],
-    forest:  ['handsup', 'sway', 'spin', 'bounce'],
-    laser:   ['point', 'spin', 'twist', 'jumpclap', 'sidestep'],
+    classic: ['headbang', 'stomp', 'twist', 'bounce', 'runningman'],
+    forest:  ['handsup', 'sway', 'spin', 'bounce', 'charleston'],
+    laser:   ['point', 'spin', 'twist', 'jumpclap', 'sidestep', 'charleston', 'runningman'],
   };
   const setArms = (aL, aR, lz, lx, rz, rx) => { aL.rotation.z = lz; aL.rotation.x = lx; aR.rotation.z = rz; aR.rotation.x = rx; };
+  const setElbows = (u, l, r) => { u.elbowL.rotation.x = l; u.elbowR.rotation.x = r; };
+  // 脚：股関節と膝の前後曲げ(rotation.x)
+  const setLegs = (u, lh, lk, rh, rk) => { u.legL.rotation.x = lh; u.kneeL.rotation.x = lk; u.legR.rotation.x = rh; u.kneeR.rotation.x = rk; };
   // 各踊り。c = { home, facing, bd(個別ビート), pe(個別の拍エンベロープ), amp, dt, spin, sideX, sideZ, ud }
   const MOVES = {
     bounce(d, aL, aR, c) {                       // その場で大きくジャンプ、腕を上げてポンプ
-      d.position.set(c.home.x, c.home.y + c.pe * 0.4 * c.amp, c.home.z);
-      d.rotation.set(0, c.facing, Math.sin(c.bd * Math.PI) * 0.1);
+      const u = c.ud;
+      d.position.set(c.home.x, c.home.y + c.pe * 0.42 * c.amp, c.home.z);
+      d.rotation.set(0, c.facing, Math.sin(c.bd * Math.PI) * 0.08);
       const r = 2.2 + Math.sin(c.bd * Math.PI * 2) * 0.5;
-      setArms(aL, aR, r, 0, -r, 0);
+      setArms(aL, aR, r, 0, -r, 0); setElbows(u, -0.5, -0.5);
+      const tuck = c.pe * 0.7; setLegs(u, tuck * 0.3, tuck, tuck * 0.3, tuck);
     },
-    headbang(d, aL, aR, c) {                     // 前傾で激しく縦ノリ、腕は低くポンプ
-      d.position.set(c.home.x, c.home.y + c.pe * 0.12, c.home.z);
-      d.rotation.set(0.3 + c.pe * 0.25, c.facing, Math.sin(c.bd * 0.5) * 0.1);
+    headbang(d, aL, aR, c) {                     // 前傾で激しく縦ノリ、頭を振る
+      const u = c.ud;
+      d.position.set(c.home.x, c.home.y + c.pe * 0.1, c.home.z);
+      d.rotation.set(0.18 + c.pe * 0.18, c.facing, Math.sin(c.bd * 0.5) * 0.1);
+      u.head.rotation.x = c.pe * 0.5;
       const pump = 0.3 + c.pe * 0.4;
-      setArms(aL, aR, pump, -0.5 - c.pe * 0.5, -pump, -0.5 - c.pe * 0.5);
+      setArms(aL, aR, pump, -0.5 - c.pe * 0.5, -pump, -0.5 - c.pe * 0.5); setElbows(u, -1.2, -1.2);
+      const k = 0.15 + c.pe * 0.2; setLegs(u, 0, k, 0, k);
     },
-    stomp(d, aL, aR, c) {                        // 左右に体重移動してステップ
-      const lean = Math.sin(c.bd * Math.PI);
-      d.position.set(c.home.x, c.home.y + Math.abs(lean) * 0.22, c.home.z);
-      d.rotation.set(0, c.facing, lean * 0.18);
-      setArms(aL, aR, 0.6 + c.pe * 0.3, lean * 0.4, -0.6 - c.pe * 0.3, -lean * 0.4);
+    stomp(d, aL, aR, c) {                        // 左右の脚を交互に踏みしめる
+      const u = c.ud, lean = Math.sin(c.bd * Math.PI), L = Math.max(0, lean), R = Math.max(0, -lean);
+      d.position.set(c.home.x, c.home.y + Math.abs(lean) * 0.18, c.home.z);
+      d.rotation.set(0, c.facing, lean * 0.16);
+      setArms(aL, aR, 0.6 + c.pe * 0.3, lean * 0.4, -0.6 - c.pe * 0.3, -lean * 0.4); setElbows(u, -0.6, -0.6);
+      setLegs(u, -L * 0.7, L * 1.0, -R * 0.7, R * 1.0);
     },
-    twist(d, aL, aR, c) {                        // 腰をひねるツイスト
-      const tw = Math.sin(c.bd * Math.PI * 2);
-      d.position.set(c.home.x, c.home.y + c.pe * 0.15, c.home.z);
-      d.rotation.set(0, c.facing + tw * 0.5, 0);
-      setArms(aL, aR, 1.5, tw * 0.6, -1.5, -tw * 0.6);
+    twist(d, aL, aR, c) {                        // 上半身と腰を逆にひねるツイスト
+      const u = c.ud, tw = Math.sin(c.bd * Math.PI * 2);
+      d.position.set(c.home.x, c.home.y + c.pe * 0.12, c.home.z);
+      d.rotation.set(0, c.facing + tw * 0.5, 0); u.hips.rotation.y = -tw * 0.4;
+      setArms(aL, aR, 1.5, tw * 0.6, -1.5, -tw * 0.6); setElbows(u, -1.0, -1.0);
+      setLegs(u, 0, 0.2, 0, 0.2);
     },
     spin(d, aL, aR, c) {                         // その場でぐるぐる回る
-      c.ud._spin = (c.ud._spin || 0) + c.dt * (c.spin < 0 ? -5 : 5);
+      const u = c.ud; u._spin = (u._spin || 0) + c.dt * (c.spin < 0 ? -5 : 5);
       d.position.set(c.home.x, c.home.y + c.pe * 0.2, c.home.z);
-      d.rotation.set(0, c.facing + c.ud._spin, 0);
-      setArms(aL, aR, 1.9, 0, -1.9, 0);
+      d.rotation.set(0, c.facing + u._spin, 0);
+      setArms(aL, aR, 1.9, 0, -1.9, 0); setElbows(u, -0.3, -0.3); setLegs(u, 0.1, 0.15, 0.1, 0.15);
     },
     handsup(d, aL, aR, c) {                       // 両手を高く上げて飛び跳ねる
-      const s = Math.sin(c.bd * 0.8);
+      const u = c.ud, s = Math.sin(c.bd * 0.8);
       d.position.set(c.home.x, c.home.y + c.pe * 0.3 * c.amp, c.home.z);
-      d.rotation.set(0, c.facing, s * 0.2);
-      setArms(aL, aR, 2.7, s * 0.4, -2.7, s * 0.4);
+      d.rotation.set(0, c.facing, s * 0.18);
+      setArms(aL, aR, 2.7, s * 0.4, -2.7, s * 0.4); setElbows(u, -0.2, -0.2);
+      const k = 0.1 + c.pe * 0.15; setLegs(u, 0, k, 0, k);
     },
-    sway(d, aL, aR, c) {                          // 大きく左右に揺れる
-      const s = Math.sin(c.bd * 0.6);
+    sway(d, aL, aR, c) {                          // 大きく左右に揺れて体重移動
+      const u = c.ud, s = Math.sin(c.bd * 0.6);
       d.position.set(c.home.x + s * 0.3 * c.sideX, c.home.y + (Math.sin(c.bd * Math.PI * 0.5) * 0.5 + 0.5) * 0.1, c.home.z + s * 0.3 * c.sideZ);
-      d.rotation.set(0, c.facing, s * 0.25);
-      setArms(aL, aR, 2.5 + s * 0.3, s * 0.5, -2.5 + s * 0.3, s * 0.5);
+      d.rotation.set(0, c.facing, s * 0.22); u.head.rotation.z = -s * 0.2;
+      setArms(aL, aR, 2.5 + s * 0.3, s * 0.5, -2.5 + s * 0.3, s * 0.5); setElbows(u, -0.3 - Math.abs(s) * 0.3, -0.3 - Math.abs(s) * 0.3);
+      setLegs(u, s > 0 ? -s * 0.2 : 0, Math.max(0, s) * 0.3, s < 0 ? s * 0.2 : 0, Math.max(0, -s) * 0.3);
     },
     point(d, aL, aR, c) {                         // 天を指すディスコポイント＋ホップ
-      const up = Math.floor(c.bd) % 2 === 0, h = Math.abs(Math.sin(c.bd * Math.PI)), shuf = Math.sin(c.bd * Math.PI) * 0.25;
+      const u = c.ud, up = Math.floor(c.bd) % 2 === 0, h = Math.abs(Math.sin(c.bd * Math.PI)), shuf = Math.sin(c.bd * Math.PI) * 0.25;
       d.position.set(c.home.x + shuf * c.sideX, c.home.y + h * 0.2, c.home.z + shuf * c.sideZ);
-      d.rotation.set(0, c.facing + Math.sin(c.bd * Math.PI) * 0.3, (up ? 1 : -1) * 0.18);
-      if (up) setArms(aL, aR, 0.4, 0.2, -2.4, -1.0); else setArms(aL, aR, 2.4, -1.0, -0.4, 0.2);
+      d.rotation.set(0, c.facing + Math.sin(c.bd * Math.PI) * 0.3, (up ? 1 : -1) * 0.16);
+      if (up) { setArms(aL, aR, 0.4, 0.2, -2.5, -1.0); setElbows(u, -0.3, -0.1); setLegs(u, 0.3, 0.1, -0.2, 0.4); }
+      else { setArms(aL, aR, 2.5, -1.0, -0.4, 0.2); setElbows(u, -0.1, -0.3); setLegs(u, -0.2, 0.4, 0.3, 0.1); }
     },
     jumpclap(d, aL, aR, c) {                      // ジャンプして手を前で打ち合わせる
-      const j = Math.abs(Math.sin(c.bd * Math.PI));
+      const u = c.ud, j = Math.abs(Math.sin(c.bd * Math.PI));
       d.position.set(c.home.x, c.home.y + j * 0.45 * c.amp, c.home.z);
       d.rotation.set(0, c.facing, 0);
-      const close = 1.2 - j * 0.8;
-      setArms(aL, aR, close, 1.4, -close, 1.4);
+      const close = 1.2 - j * 0.8; setArms(aL, aR, close, 1.4, -close, 1.4); setElbows(u, -1.3, -1.3);
+      const tuck = j * 0.8; setLegs(u, tuck * 0.3, tuck, tuck * 0.3, tuck);
     },
     sidestep(d, aL, aR, c) {                      // 横にシャッフルして移動
-      const off = Math.sin(c.bd * Math.PI);
-      d.position.set(c.home.x + off * 0.5 * c.sideX, c.home.y + Math.abs(off) * 0.15, c.home.z + off * 0.5 * c.sideZ);
-      d.rotation.set(0, c.facing, off * 0.2);
-      setArms(aL, aR, 1.4, off * 0.5, -1.4, -off * 0.5);
+      const u = c.ud, off = Math.sin(c.bd * Math.PI), L = Math.max(0, off), R = Math.max(0, -off);
+      d.position.set(c.home.x + off * 0.5 * c.sideX, c.home.y + Math.abs(off) * 0.14, c.home.z + off * 0.5 * c.sideZ);
+      d.rotation.set(0, c.facing, off * 0.18);
+      setArms(aL, aR, 1.4, off * 0.5, -1.4, -off * 0.5); setElbows(u, -0.5, -0.5);
+      setLegs(u, -L * 0.5, L * 0.3, -R * 0.5, R * 0.3);
+    },
+    runningman(d, aL, aR, c) {                    // ランニングマン（脚を交互に蹴り上げて滑る）
+      const u = c.ud, ph = c.bd * Math.PI, s = Math.sin(ph);
+      d.position.set(c.home.x, c.home.y + Math.abs(Math.cos(ph)) * 0.08, c.home.z);
+      d.rotation.set(0.08, c.facing, 0);
+      const L = Math.max(0, s), R = Math.max(0, -s);
+      setLegs(u, -L * 1.0, L * 1.0, -R * 1.0, R * 1.0);
+      setArms(aL, aR, 0.5, s * 0.8, -0.5, -s * 0.8); setElbows(u, -1.4, -1.4);
+    },
+    charleston(d, aL, aR, c) {                    // チャールストン（膝を内外にひねる）
+      const u = c.ud, s = Math.sin(c.bd * Math.PI * 2);
+      d.position.set(c.home.x, c.home.y + Math.abs(s) * 0.08, c.home.z);
+      d.rotation.set(0, c.facing, 0);
+      u.legL.rotation.z = s * 0.5; u.legR.rotation.z = s * 0.5;
+      setLegs(u, 0.2, 0.3 + Math.abs(s) * 0.2, 0.2, 0.3 + Math.abs(s) * 0.2);
+      setArms(aL, aR, 0.8, -s * 0.6, -0.8, s * 0.6); setElbows(u, -0.8, -0.8);
     },
   };
   function makeSign(text, color = '#00ddff', width = 3.2, height = 0.9) {
@@ -1047,7 +1147,10 @@
     if (RAVE.on && RAVE.kind === kind) { raveOff(); return; }
     if (RAVE.on) raveOff();
     const cfg = RAVE_VENUES[kind];
-    RAVE.kind = kind; RAVE.bpm = cfg.bpm; RAVE.group = buildRaveVenue(kind);
+    RAVE.kind = kind;
+    const songList = SONGS[kind] || SONGS.classic, si = Math.floor(Math.random() * songList.length);
+    RAVE.song = songList[si]; RAVE.songNo = si + 1; RAVE.bpm = RAVE.song.bpm || cfg.bpm;
+    RAVE.group = buildRaveVenue(kind);
     const fx = Math.round(player.pos.x), fz = Math.round(player.pos.z), fy = Math.floor(player.pos.y - EYE);
     RAVE.group.position.set(fx, fy, fz); scene.add(RAVE.group);
     RAVE.saved = { sun: sun.intensity, hemi: hemi.intensity, fog: scene.fog, bg: scene.background.clone(), sky: sky.visible, clouds: clouds.visible };
@@ -1066,25 +1169,33 @@
       const out = actx.createGain(); out.gain.setValueAtTime(0.0001, now); out.gain.exponentialRampToValueAtTime(0.5, now + 0.4);
       const comp = actx.createDynamicsCompressor();
       comp.threshold.value = -10; comp.knee.value = 12; comp.ratio.value = 3.5; comp.attack.value = 0.004; comp.release.value = 0.18;
-      out.connect(comp).connect(actx.destination);
+      const distGain = actx.createGain(); distGain.gain.value = 1; RAVE.distGain = distGain; // 会場からの距離で音量を絞る
+      out.connect(distGain); distGain.connect(comp).connect(actx.destination);
       RAVE.master = out;
       const kb = actx.createGain(); kb.connect(makeShaper(3)).connect(out); RAVE.kickBus = kb;
       const rev = actx.createConvolver(); rev.buffer = makeReverbIR(fx.revLen, fx.revDecay);
       const revGain = actx.createGain(); revGain.gain.value = fx.revAmt; rev.connect(revGain).connect(out); RAVE.reverb = rev;
-      const dl = actx.createDelay(1.0); dl.delayTime.value = 60 / cfg.bpm * fx.dlyMul;
+      const dl = actx.createDelay(1.0); dl.delayTime.value = 60 / RAVE.bpm * fx.dlyMul;
       const fb = actx.createGain(); fb.gain.value = fx.dlyFb;
       const dhp = actx.createBiquadFilter(); dhp.type = 'highpass'; dhp.frequency.value = 320;
       dl.connect(fb).connect(dl); dl.connect(dhp).connect(out); RAVE.delay = dl;
       const duck = actx.createGain(); duck.gain.value = 1; duck.connect(out); RAVE.duck = duck; RAVE.duckDepth = fx.duck;
       RAVE.audioStart = now + 0.12; RAVE.nextNote = RAVE.audioStart; RAVE.step = 0;
     }
-    RAVE.on = true; raveInd.style.display = 'block'; raveInd.textContent = `${cfg.label}  R/T/Y/U`;
+    RAVE.on = true; raveInd.style.display = 'block'; raveInd.textContent = `${cfg.label} ♪${RAVE.songNo}  R/T/Y/U`;
   }
   function raveUpdate(dt) {
     if (!RAVE.on || !actx) return;
     while (RAVE.nextNote < actx.currentTime + 0.12) {
       scheduleStep(RAVE.step, RAVE.nextNote);
       RAVE.nextNote += SIXTEENTH(); RAVE.step++;
+    }
+    // 会場から離れるほど音量を下げる（水平距離ベース）
+    if (RAVE.distGain && RAVE.group) {
+      const dx = player.pos.x - RAVE.group.position.x, dz = player.pos.z - RAVE.group.position.z;
+      const dist = Math.hypot(dx, dz), near = RAVE.radius + 2, far = near + 24;
+      const vol = Math.max(0, Math.min(1, 1 - (dist - near) / (far - near)));
+      RAVE.distGain.gain.setTargetAtTime(vol, actx.currentTime, 0.12);
     }
     const cfg = RAVE_VENUES[RAVE.kind], beat = (actx.currentTime - RAVE.audioStart) / (60 / RAVE.bpm);
     const ph = beat - Math.floor(beat), env = Math.pow(1 - ph, 2.2);
@@ -1136,7 +1247,12 @@
       const d = RAVE.dancers[di], isDJ = di === 0, ud = d.userData;
       const aL = ud.armL, aR = ud.armR, home = ud.home || d.position;
       const facing = isDJ ? 0 : Math.atan2(-home.x, -home.z);
-      const bd = beat * ud.rate + ud.phase, pe = Math.abs(Math.sin(bd * Math.PI));
+      const bd = beat + ud.beatOffset, pe = Math.abs(Math.sin(bd * Math.PI));
+      // 前フレームの踊りのポーズが残らないよう関節を初期化
+      ud.elbowL.rotation.set(0, 0, 0); ud.elbowR.rotation.set(0, 0, 0);
+      ud.legL.rotation.set(0, 0, 0); ud.legR.rotation.set(0, 0, 0);
+      ud.kneeL.rotation.set(0, 0, 0); ud.kneeR.rotation.set(0, 0, 0);
+      ud.head.rotation.set(0, 0, 0); ud.hips.rotation.set(0, 0, 0);
       if (k === 'neon') {
         // ユーロビート: 全員同期のパラパラ風・高速振付＋同期ジャンプ（あえて揃える）
         d.position.set(home.x, home.y + Math.abs(Math.sin(beat * Math.PI)) * 0.3, home.z);
@@ -1144,6 +1260,7 @@
         const pose = beat * Math.PI;
         aL.rotation.z = 1.6 + Math.sin(pose); aL.rotation.x = Math.sin(pose * 0.5) * 1.2;
         aR.rotation.z = -1.6 + Math.sin(pose + Math.PI); aR.rotation.x = Math.sin(pose * 0.5 + Math.PI) * 1.2;
+        setElbows(ud, -0.6 - Math.abs(Math.sin(pose)) * 0.5, -0.6 - Math.abs(Math.sin(pose + Math.PI)) * 0.5);
         continue;
       }
       // 他ジャンルは各NPCが自分のタイミングで踊りをランダムに切り替える
