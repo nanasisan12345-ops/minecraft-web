@@ -1058,15 +1058,48 @@
       else m.material.color.setHSL((cfg.hue + beat * 0.1 + i * 0.2) % 1, 1, 0.35 + env * 0.25);
     });
     if (RAVE.mirror) RAVE.mirror.rotation.y += dt * 1.5;
-    for (const d of RAVE.dancers) {
-      const p = d.userData.phase, bob = Math.abs(Math.sin(beat * Math.PI + p));
-      d.position.y = (d === RAVE.dancers[0] ? 1.1 : 0) + bob * 0.18;
-      d.rotation.z = Math.sin(beat * Math.PI * 0.5 + p) * 0.12;
-      if (d !== RAVE.dancers[0]) d.rotation.y += dt * d.userData.spin * 0.5;
-      const raise = 2.1 + Math.sin(beat * Math.PI * 2 + p) * 0.55;
-      const wave = Math.sin(beat * Math.PI * 2 + p + 1) * 0.4;
-      d.userData.armL.rotation.z = raise; d.userData.armL.rotation.x = wave;
-      d.userData.armR.rotation.z = -raise; d.userData.armR.rotation.x = -wave;
+    const k = RAVE.kind;
+    for (let di = 0; di < RAVE.dancers.length; di++) {
+      const d = RAVE.dancers[di], isDJ = di === 0, p = d.userData.phase;
+      const aL = d.userData.armL, aR = d.userData.armR, baseY = isDJ ? 1.1 : 0;
+      const facing = isDJ ? 0 : Math.atan2(-d.position.x, -d.position.z);
+      if (k === 'classic') {
+        // ダークテクノ: 頭を落として小刻みに縦ノリ、腕は低くポンプ
+        const stomp = Math.abs(Math.sin(beat * Math.PI + p));
+        d.position.y = baseY + stomp * 0.1;
+        d.rotation.x = 0.13 + stomp * 0.1;
+        d.rotation.z = Math.sin(beat * 0.5 + p) * 0.08;
+        d.rotation.y = facing;
+        const pump = 0.22 + env * 0.45;
+        aL.rotation.z = pump; aL.rotation.x = -0.35 - env * 0.4;
+        aR.rotation.z = -pump; aR.rotation.x = -0.35 - env * 0.4;
+      } else if (k === 'neon') {
+        // ユーロビート: 全員同期のパラパラ風・高速振付
+        d.rotation.x = 0;
+        d.position.y = baseY + Math.abs(Math.sin(beat * Math.PI * 2)) * 0.12;
+        d.rotation.z = 0; d.rotation.y = facing;
+        const pose = beat * Math.PI;
+        aL.rotation.z = 1.6 + Math.sin(pose) * 1.0; aL.rotation.x = Math.sin(pose * 0.5) * 1.2;
+        aR.rotation.z = -1.6 + Math.sin(pose + Math.PI) * 1.0; aR.rotation.x = Math.sin(pose * 0.5 + Math.PI) * 1.2;
+      } else if (k === 'forest') {
+        // トランス: 両手を高く上げてゆったり全身を揺らす
+        d.rotation.x = 0;
+        d.position.y = baseY + (Math.sin(beat * Math.PI * 0.5 + p) * 0.5 + 0.5) * 0.12;
+        const sway = Math.sin(beat * 0.5 + p);
+        d.rotation.z = sway * 0.22;
+        if (!isDJ) d.rotation.y += dt * d.userData.spin * 0.2; // ゆっくり漂う
+        aL.rotation.z = 2.5 + sway * 0.3; aL.rotation.x = Math.sin(beat * 0.5 + p) * 0.5;
+        aR.rotation.z = -2.5 - sway * 0.3; aR.rotation.x = Math.sin(beat * 0.5 + p) * 0.5;
+      } else {
+        // ディスコ: 片手で天を指すサタデーナイト・フィーバー（左右交互）
+        const up = Math.floor(beat) % 2 === 0;
+        d.rotation.x = 0;
+        d.position.y = baseY + Math.abs(Math.sin(beat * Math.PI)) * 0.12;
+        d.rotation.z = (up ? 1 : -1) * 0.18;
+        d.rotation.y = facing + Math.sin(beat * Math.PI) * 0.3;
+        if (up) { aR.rotation.z = -2.4; aR.rotation.x = -1.0; aL.rotation.z = 0.4; aL.rotation.x = 0.2; }
+        else { aL.rotation.z = 2.4; aL.rotation.x = -1.0; aR.rotation.z = -0.4; aR.rotation.x = 0.2; }
+      }
     }
   }
 
