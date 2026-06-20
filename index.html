@@ -572,10 +572,10 @@
     bpm: 128, audioStart: 0, nextNote: 0, step: 0, master: null, noiseBuf: null, saved: {}, radius: 6,
   };
   const RAVE_VENUES = {
-    classic: { label: 'CLASSIC CLUB', bpm: 128, hue: 0.58, w: 8, d: 8,  tile: 1.5,  shape: 'square', dancers: 14, lasers: 5, lights: 4, spots: 2 },
-    neon:    { label: 'NEON CROSS',   bpm: 124, hue: 0.82, w: 9, d: 9,  tile: 1.18, shape: 'cross',  dancers: 10, lasers: 4, lights: 6, spots: 2 },
-    forest:  { label: 'FOREST RING',  bpm: 118, hue: 0.32, w: 9, d: 9,  tile: 1.22, shape: 'circle', dancers: 12, lasers: 3, lights: 4, spots: 2 },
-    laser:   { label: 'LASER RUNWAY', bpm: 138, hue: 0.96, w: 5, d: 12, tile: 1.15, shape: 'runway', dancers: 8,  lasers: 9, lights: 3, spots: 4 },
+    classic: { label: 'WAREHOUSE RAVE', bpm: 132, hue: 0.60, w: 9,  d: 7,  tile: 1.35, shape: 'square', dancers: 13, lasers: 8, lights: 3, spots: 2 },
+    neon:    { label: 'EUROBEAT ROAD',  bpm: 156, hue: 0.03, w: 7,  d: 13, tile: 1.08, shape: 'runway', dancers: 12, lasers: 2, lights: 5, spots: 4 },
+    forest:  { label: 'TRANCE DOME',    bpm: 138, hue: 0.53, w: 11, d: 11, tile: 1.08, shape: 'circle', dancers: 8,  lasers: 6, lights: 6, spots: 3 },
+    laser:   { label: 'DANCE FLOOR',    bpm: 120, hue: 0.12, w: 8,  d: 8,  tile: 1.3,  shape: 'checker', dancers: 16, lasers: 1, lights: 8, spots: 2 },
   };
   const SIXTEENTH = () => 60 / RAVE.bpm / 4;
 
@@ -637,38 +637,58 @@
     g.gain.setValueAtTime(gainBase, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
     o.connect(g).connect(RAVE.master); o.start(t); o.stop(t + 0.17);
   }
+  function vPad(t, freqs, dur = 0.7, gainBase = 0.045) {
+    const lp = actx.createBiquadFilter(), g = actx.createGain();
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(1000, t); lp.frequency.linearRampToValueAtTime(2200, t + dur * 0.45); lp.Q.value = 1.4;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gainBase, t + 0.08); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    lp.connect(g).connect(RAVE.master);
+    for (const f of freqs) {
+      const o = actx.createOscillator(); o.type = 'triangle'; o.frequency.value = f; o.detune.value = rnd(-9, 9);
+      o.connect(lp); o.start(t); o.stop(t + dur + 0.04);
+    }
+  }
+  function vNoiseHit(t, tone = 900, gainBase = 0.16, dur = 0.08) {
+    const s = actx.createBufferSource(); s.buffer = raveNoise();
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = tone; bp.Q.value = 5;
+    const g = actx.createGain(); g.gain.setValueAtTime(gainBase, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    s.connect(bp).connect(g).connect(RAVE.master); s.start(t); s.stop(t + dur + 0.02);
+  }
   const Am = [220, 261.63, 329.63], F = [174.61, 220, 261.63], Em = [164.81, 196, 246.94], Dm = [146.83, 174.61, 220];
+  const G = [196, 246.94, 293.66], C = [261.63, 329.63, 392], D = [293.66, 369.99, 440], Bm = [246.94, 293.66, 369.99];
   const RAVE_TRACKS = {
     classic: {
-      kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0], clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-      hat:  [0,0,2,0, 0,0,1,0, 0,0,2,0, 0,0,1,2], bass: [55,null,null,55, null,null,82.41,null, 65.41,null,null,65.41, null,null,49,null],
-      stabs: { 0: Am, 10: F }, lead: {}
+      style: 'rave', kick: [1,0,0,0, 1,0,0,0, 1,0,0,1, 1,0,0,0], clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      hat:  [0,0,2,0, 0,1,0,0, 0,0,2,0, 0,1,0,2], bass: [55,null,null,55, null,null,82.41,null, 65.41,null,null,65.41, null,null,49,null],
+      stabs: { 0: Am, 10: F }, lead: {}, noise: { 7: 700, 15: 1300 }
     },
     neon: {
-      kick: [1,0,0,0, 1,0,0,1, 1,0,0,0, 1,0,1,0], clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-      hat:  [0,1,0,2, 0,1,0,1, 0,1,0,2, 0,1,0,1], bass: [41.2,null,41.2,null, 61.74,null,null,61.74, 55,null,55,null, 73.42,null,null,61.74],
-      stabs: { 0: Em, 8: Dm }, lead: { 3: 659.25, 7: 783.99, 11: 659.25, 15: 987.77 }, wave: 'triangle', cutoff: 2600
+      style: 'eurobeat', kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0], clap: [0,0,1,0, 1,0,1,0, 0,0,1,0, 1,0,1,0],
+      hat:  [1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,2,1], bass: [null,55,null,82.41, null,55,null,73.42, null,65.41,null,98, null,73.42,82.41,98],
+      stabs: { 0: C, 4: G, 8: Am, 12: F }, lead: { 1: 659.25, 3: 783.99, 5: 880, 7: 783.99, 9: 659.25, 11: 987.77, 13: 880, 15: 1174.66 }, wave: 'sawtooth', cutoff: 3200
     },
     forest: {
-      kick: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0], clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,0,0],
-      hat:  [0,1,0,1, 0,0,1,0, 0,1,0,1, 0,0,1,2], bass: [49,null,null,65.41, null,73.42,null,null, 43.65,null,null,65.41, null,55,null,null],
-      stabs: { 0: F, 12: Dm }, toms: { 2: 165, 5: 120, 10: 150, 14: 98 }, lead: { 7: 440, 15: 392 }, wave: 'sine', cutoff: 1300
+      style: 'trance', kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0], clap: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+      hat:  [0,2,0,1, 0,2,0,1, 0,2,0,1, 0,2,0,1], bass: [null,49,null,73.42, null,49,null,73.42, null,55,null,82.41, null,55,null,82.41],
+      stabs: {}, pads: { 0: Em, 8: Bm }, lead: { 2: 659.25, 4: 739.99, 6: 880, 10: 987.77, 12: 880, 14: 739.99 }, wave: 'triangle', cutoff: 2500
     },
     laser: {
-      kick: [1,0,0,1, 1,0,1,0, 1,0,0,1, 1,0,1,1], clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-      hat:  [1,1,2,1, 1,1,2,1, 1,1,2,1, 1,1,2,1], bass: [36.71,null,49,null, 36.71,43.65,null,49, 55,null,49,null, 36.71,null,65.41,49],
-      stabs: { 4: [220, 277.18, 329.63], 12: [196, 246.94, 293.66] }, lead: { 1: 220, 5: 246.94, 9: 293.66, 13: 329.63 }, wave: 'square', cutoff: 900
+      style: 'dance', kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0], clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      hat:  [0,1,0,2, 0,1,0,1, 0,1,0,2, 0,1,0,1], bass: [65.41,null,98,null, 87.31,null,98,110, 73.42,null,110,null, 98,87.31,73.42,null],
+      stabs: { 0: F, 6: C, 10: G, 14: C }, lead: { 3: 392, 7: 440, 11: 493.88, 15: 523.25 }, wave: 'square', cutoff: 1800
     },
   };
   function scheduleStep(s, t) {
     const tr = RAVE_TRACKS[RAVE.kind] || RAVE_TRACKS.classic;
-    if (tr.kick[s]) vKick(t, RAVE.kind === 'laser' ? 42 : RAVE.kind === 'forest' ? 52 : 48, RAVE.kind === 'forest' ? 0.68 : 0.92);
-    if (tr.clap[s]) vClap(t, RAVE.kind === 'forest' ? 0.24 : 0.45, RAVE.kind === 'neon' ? 2100 : 1600);
-    if (tr.hat[s]) vHat(t, tr.hat[s] === 2, RAVE.kind === 'forest' ? 5200 : RAVE.kind === 'laser' ? 8400 : 7000, RAVE.kind === 'laser' ? 0.22 : 0.3);
-    if (tr.bass[s] != null) vBass(t, tr.bass[s], RAVE.kind === 'neon' ? 'triangle' : 'sawtooth', tr.cutoff || 420, RAVE.kind === 'laser' ? 0.2 : 0.24, RAVE.kind === 'forest' ? 0.28 : 0.2);
+    const style = tr.style;
+    if (tr.kick[s]) vKick(t, style === 'dance' ? 55 : style === 'trance' ? 45 : style === 'eurobeat' ? 50 : 46, style === 'trance' ? 0.8 : 0.92);
+    if (tr.clap[s]) vClap(t, style === 'eurobeat' ? 0.35 : style === 'dance' ? 0.38 : 0.45, style === 'eurobeat' ? 2400 : 1600);
+    if (tr.hat[s]) vHat(t, tr.hat[s] === 2, style === 'trance' ? 9000 : style === 'dance' ? 6200 : style === 'eurobeat' ? 7800 : 7000, style === 'dance' ? 0.22 : 0.28);
+    if (tr.bass[s] != null) vBass(t, tr.bass[s], style === 'eurobeat' ? 'sawtooth' : style === 'trance' ? 'triangle' : style === 'dance' ? 'square' : 'sawtooth', tr.cutoff || 500, style === 'dance' ? 0.18 : 0.24, style === 'trance' ? 0.16 : 0.2);
     if (tr.stabs[s]) vStab(t, tr.stabs[s]);
+    if (tr.pads && tr.pads[s]) vPad(t, tr.pads[s], 1.15, 0.04);
+    if (tr.noise && tr.noise[s]) vNoiseHit(t, tr.noise[s], 0.14, 0.09);
     if (tr.toms && tr.toms[s]) vTom(t, tr.toms[s], 0.18);
-    if (tr.lead[s]) vTone(t, tr.lead[s], tr.wave || 'triangle', RAVE.kind === 'laser' ? 0.08 : 0.14, RAVE.kind === 'forest' ? 0.045 : 0.065, tr.cutoff || 1800);
+    if (tr.lead[s]) vTone(t, tr.lead[s], tr.wave || 'triangle', style === 'eurobeat' ? 0.1 : style === 'trance' ? 0.22 : 0.12, style === 'trance' ? 0.04 : 0.07, tr.cutoff || 1800);
   }
 
   function makeDancer(hue) {
@@ -689,18 +709,37 @@
     for (const k of ['lights', 'spots', 'lasers', 'tiles', 'dancers', 'rings', 'pulses']) RAVE[k] = [];
     RAVE.mirror = null; RAVE.strobe = null;
   }
+  function makeSign(text, color = '#00ddff', width = 3.2, height = 0.9) {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 160;
+    const x = c.getContext('2d');
+    x.fillStyle = 'rgba(0,0,0,0.7)'; x.fillRect(0, 0, c.width, c.height);
+    x.strokeStyle = color; x.lineWidth = 12; x.strokeRect(10, 10, c.width - 20, c.height - 20);
+    x.fillStyle = color; x.font = 'bold 48px Segoe UI, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(text, c.width / 2, c.height / 2);
+    const tex = new THREE.CanvasTexture(c);
+    return new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending }));
+  }
+  function addBox(g, w, h, d, mat, x, y, z) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z); g.add(m); return m;
+  }
   function raveFloorCell(shape, i, j, w, d) {
     const cx = (w - 1) / 2, cz = (d - 1) / 2;
     if (shape === 'cross') return Math.abs(i - cx) <= 1 || Math.abs(j - cz) <= 1;
     if (shape === 'circle') return Math.hypot(i - cx, j - cz) <= Math.min(w, d) / 2 - 0.35;
     if (shape === 'runway') return true;
+    if (shape === 'checker') return true;
     return true;
   }
   function raveDancerPoint(kind, spanX, spanZ) {
-    if (kind === 'laser') return new THREE.Vector3(rnd(-spanX * 0.28, spanX * 0.28), 0, rnd(-spanZ * 0.32, spanZ * 0.36));
+    if (kind === 'laser') return new THREE.Vector3(rnd(-spanX * 0.42, spanX * 0.42), 0, rnd(-spanZ * 0.42, spanZ * 0.42));
     if (kind === 'neon') return Math.random() < 0.5
-      ? new THREE.Vector3(rnd(-spanX * 0.45, spanX * 0.45), 0, rnd(-0.9, 0.9))
-      : new THREE.Vector3(rnd(-0.9, 0.9), 0, rnd(-spanZ * 0.45, spanZ * 0.45));
+      ? new THREE.Vector3(rnd(-spanX * 0.62, -spanX * 0.42), 0, rnd(-spanZ * 0.35, spanZ * 0.35))
+      : new THREE.Vector3(rnd(spanX * 0.42, spanX * 0.62), 0, rnd(-spanZ * 0.35, spanZ * 0.35));
+    if (kind === 'forest') {
+      const a = Math.random() * Math.PI * 2, r = 1.5 + Math.random() * (Math.min(spanX, spanZ) / 2 - 2.0);
+      return new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r);
+    }
     const a = Math.random() * Math.PI * 2, r = 1.1 + Math.random() * (Math.min(spanX, spanZ) / 2 - 1.6);
     return new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r);
   }
@@ -713,19 +752,19 @@
     const tileGeo = new THREE.PlaneGeometry(TILE * 0.96, TILE * 0.96);
     for (let i = 0; i < W; i++) for (let j = 0; j < D; j++) {
       if (!raveFloorCell(cfg.shape, i, j, W, D)) continue;
-      const m = new THREE.Mesh(tileGeo, emissiveMat(0x111111));
+      let mat = emissiveMat(0x111111);
+      if (kind === 'neon') mat = emissiveMat((i === Math.floor(W / 2) || j % 3 === 1) ? 0xffcc22 : 0x151515);
+      if (kind === 'forest') mat = emissiveMat((i + j) % 2 ? 0x123b58 : 0x08162a);
+      if (kind === 'laser') mat = emissiveMat((i + j) % 2 ? 0xffffff : 0x101010);
+      if (kind === 'classic') mat = emissiveMat((i + j) % 3 ? 0x121217 : 0x23232b);
+      const m = new THREE.Mesh(tileGeo, mat);
       m.rotation.x = -Math.PI / 2; m.position.set(offX + i * TILE, 0.02, offZ + j * TILE);
-      m.userData.ij = i + j; grp.add(m); RAVE.tiles.push(m);
+      m.userData.ij = i + j; m.userData.kind = kind; m.userData.check = (i + j) % 2; grp.add(m); RAVE.tiles.push(m);
     }
-    const rim = new THREE.Mesh(new THREE.BoxGeometry(spanX + 1, 0.1, spanZ + 1), new THREE.MeshPhongMaterial({ color: 0x101015 }));
-    rim.position.y = -0.06; grp.add(rim);
-    const postMat = new THREE.MeshPhongMaterial({ color: 0x222228 });
-    for (const [sx, sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(0.25, 5.8, 0.25), postMat);
-      p.position.set(sx * spanX / 2, 2.9, sz * spanZ / 2); grp.add(p);
-    }
-    for (const z of [-spanZ/2, spanZ/2]) { const b = new THREE.Mesh(new THREE.BoxGeometry(spanX, 0.25, 0.25), postMat); b.position.set(0, 5.8, z); grp.add(b); }
-    if (kind !== 'laser') for (const x of [-spanX/2, spanX/2]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, spanZ), postMat); b.position.set(x, 5.8, 0); grp.add(b); }
+    const dark = new THREE.MeshPhongMaterial({ color: 0x121218 });
+    const metal = new THREE.MeshPhongMaterial({ color: 0x303038, shininess: 30 });
+    const rim = addBox(grp, spanX + 1, 0.1, spanZ + 1, dark, 0, -0.06, 0);
+    if (kind === 'forest') { rim.geometry.dispose(); rim.geometry = new THREE.CylinderGeometry(spanX / 2 + 0.45, spanX / 2 + 0.45, 0.12, 48); }
     for (let i = 0; i < cfg.lights; i++) {
       const L = new THREE.PointLight(0xffffff, 1, 24, 1.6); L.position.set(0, 5.2, 0); grp.add(L);
       const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), emissiveMat(0xffffff)); L.add(bulb);
@@ -742,47 +781,61 @@
       const m = new THREE.Mesh(laserGeo, emissiveMat(0xff0066, 0.6));
       m.position.set(0, 5.4, 0); grp.add(m); RAVE.lasers.push(m);
     }
-    RAVE.mirror = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55, 1), new THREE.MeshPhongMaterial({ color: 0x99a0b0, emissive: 0x222233, shininess: 110, flatShading: true }));
-    RAVE.mirror.position.set(0, 4.45, 0); grp.add(RAVE.mirror);
-    const booth = new THREE.Mesh(new THREE.BoxGeometry(kind === 'neon' ? 2.4 : 3, 1.05, 1.15), new THREE.MeshPhongMaterial({ color: 0x15151c }));
-    booth.position.set(0, 0.55, -spanZ / 2 + 0.8); grp.add(booth);
-    const panel = new THREE.Mesh(new THREE.PlaneGeometry(kind === 'laser' ? 3.2 : 2.5, 0.68), emissiveMat(kind === 'forest' ? 0x55ff88 : 0x00ddff));
-    panel.position.set(0, 0.72, -spanZ / 2 + 1.41); grp.add(panel); RAVE.pulses.push(panel);
-    const dj = makeDancer(cfg.hue); dj.position.set(0, 1.05, -spanZ / 2 + 0.8); grp.add(dj); RAVE.dancers.push(dj);
+    if (kind === 'classic') {
+      for (const z of [-spanZ / 2, spanZ / 2]) addBox(grp, spanX, 0.22, 0.22, metal, 0, 4.8, z);
+      for (const x of [-spanX / 2, spanX / 2]) addBox(grp, 0.22, 4.8, 0.22, metal, x, 2.4, -spanZ / 2);
+      for (const x of [-spanX * 0.32, spanX * 0.32]) for (const z of [spanZ / 2 - 0.9]) {
+        addBox(grp, 0.8, 1.7, 0.75, dark, x, 0.85, z); addBox(grp, 0.44, 0.44, 0.08, emissiveMat(0x5500ff, 0.7), x, 1.25, z - 0.39);
+      }
+      const sign = makeSign('RAVE', '#66ddff', 2.8, 0.8); sign.position.set(0, 2.6, -spanZ / 2 + 0.12); grp.add(sign); RAVE.pulses.push(sign);
+    }
+    if (kind === 'neon') {
+      const railMat = emissiveMat(0xff2244, 0.65);
+      for (const x of [-spanX / 2 - 0.38, spanX / 2 + 0.38]) { const r = addBox(grp, 0.12, 0.16, spanZ + 1, railMat.clone(), x, 0.22, 0); RAVE.pulses.push(r); }
+      for (let z = -5; z <= 5; z += 2.5) {
+        const left = addBox(grp, 0.14, 3.0, 0.14, emissiveMat(0xff1133, 0.72), -spanX / 2, 1.5, z);
+        const right = addBox(grp, 0.14, 3.0, 0.14, emissiveMat(0xffcc22, 0.72), spanX / 2, 1.5, z);
+        const top = addBox(grp, spanX, 0.14, 0.14, emissiveMat(0xff8822, 0.65), 0, 3.0, z);
+        RAVE.pulses.push(left, right, top);
+      }
+      const sign = makeSign('EUROBEAT', '#ffcc22', 3.8, 0.9); sign.position.set(0, 2.4, -spanZ / 2 + 0.18); grp.add(sign); RAVE.pulses.push(sign);
+    }
+    if (kind === 'forest') {
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(spanX / 2 + 0.6, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), emissiveMat(0x55ddff, 0.12));
+      dome.position.y = 0.05; grp.add(dome); RAVE.pulses.push(dome);
+      for (let i = 0; i < 4; i++) {
+        const r = new THREE.Mesh(new THREE.TorusGeometry(2.0 + i * 1.1, 0.035, 8, 96), emissiveMat(i % 2 ? 0x44aaff : 0xaa66ff, 0.55));
+        r.rotation.x = Math.PI / 2; r.position.y = 1.0 + i * 0.65; r.userData.seed = i; grp.add(r); RAVE.rings.push(r);
+      }
+      for (let i = 0; i < 7; i++) {
+        const a = i / 7 * Math.PI * 2, crystal = new THREE.Mesh(new THREE.ConeGeometry(0.32, 1.7, 5), emissiveMat(i % 2 ? 0x55ddff : 0x9966ff, 0.5));
+        crystal.position.set(Math.cos(a) * (spanX / 2 - 0.6), 0.85, Math.sin(a) * (spanZ / 2 - 0.6)); grp.add(crystal); RAVE.pulses.push(crystal);
+      }
+      const sign = makeSign('TRANCE', '#66ffff', 3.1, 0.85); sign.position.set(0, 2.0, -spanZ / 2 + 0.2); grp.add(sign); RAVE.pulses.push(sign);
+    }
+    if (kind === 'laser') {
+      const gold = new THREE.MeshPhongMaterial({ color: 0xffc04d, emissive: 0x221000, shininess: 80 });
+      for (const x of [-spanX / 2 - 0.5, spanX / 2 + 0.5]) for (const z of [-spanZ / 2 - 0.5, spanZ / 2 + 0.5]) {
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 3.6, 12), gold); col.position.set(x, 1.8, z); grp.add(col);
+      }
+      RAVE.mirror = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 2), new THREE.MeshPhongMaterial({ color: 0xf7f7ff, emissive: 0x333333, shininess: 140, flatShading: true }));
+      RAVE.mirror.position.set(0, 4.6, 0); grp.add(RAVE.mirror);
+      for (let i = 0; i < 3; i++) {
+        const r = new THREE.Mesh(new THREE.TorusGeometry(1.4 + i * 1.0, 0.025, 6, 72), emissiveMat(0xffcc66, 0.4));
+        r.rotation.x = Math.PI / 2; r.position.y = 4.35 - i * 0.24; r.userData.seed = i; grp.add(r); RAVE.rings.push(r);
+      }
+      const sign = makeSign('DANCE', '#ffdd77', 3.0, 0.85); sign.position.set(0, 2.1, -spanZ / 2 + 0.18); grp.add(sign); RAVE.pulses.push(sign);
+    }
+    const boothW = kind === 'neon' ? spanX * 0.75 : kind === 'forest' ? 2.1 : kind === 'laser' ? 2.8 : 3.2;
+    const booth = addBox(grp, boothW, 0.95, 1.0, new THREE.MeshPhongMaterial({ color: kind === 'laser' ? 0x5a3810 : 0x15151c }), 0, 0.5, -spanZ / 2 + 0.82);
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(boothW * 0.82, 0.56), emissiveMat(kind === 'neon' ? 0xffcc22 : kind === 'forest' ? 0x55ddff : kind === 'laser' ? 0xffcc66 : 0x00ddff));
+    panel.position.set(0, 0.72, -spanZ / 2 + 1.33); grp.add(panel); RAVE.pulses.push(panel);
+    const dj = makeDancer(cfg.hue); dj.position.set(0, 1.0, -spanZ / 2 + 0.78); grp.add(dj); RAVE.dancers.push(dj);
     for (let i = 0; i < cfg.dancers; i++) {
       const d = makeDancer((cfg.hue + Math.random() * 0.35) % 1);
       const p = raveDancerPoint(kind, spanX, spanZ);
       d.position.copy(p); d.rotation.y = Math.atan2(-p.x, -p.z);
       grp.add(d); RAVE.dancers.push(d);
-    }
-    if (kind === 'neon') {
-      const railMat = emissiveMat(0x00ffff, 0.62);
-      for (const z of [-1.8, 1.8]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(spanX + 0.9, 0.08, 0.08), railMat.clone()); rail.position.set(0, 0.22, z); grp.add(rail); RAVE.pulses.push(rail); }
-      for (const x of [-1.8, 1.8]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, spanZ + 0.9), railMat.clone()); rail.position.set(x, 0.22, 0); grp.add(rail); RAVE.pulses.push(rail); }
-      for (let i = 0; i < 3; i++) {
-        const r = new THREE.Mesh(new THREE.TorusGeometry(1.1 + i * 0.9, 0.04, 8, 80), emissiveMat(0x00ffff, 0.55));
-        r.rotation.x = Math.PI / 2; r.position.y = 4.7 - i * 0.18; r.userData.seed = i; grp.add(r); RAVE.rings.push(r);
-      }
-    }
-    if (kind === 'forest') {
-      const trunkMat = new THREE.MeshPhongMaterial({ color: 0x3b2414 });
-      const leafMat = new THREE.MeshPhongMaterial({ color: 0x2f8d45, emissive: 0x082810 });
-      for (const [x, z] of [[-1,-1],[1,-1],[-1,1],[1,1],[0,1.2],[0,-1.2]]) {
-        const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, 2.1, 7), trunkMat); tr.position.set(x * (spanX / 2 - 0.8), 1.05, z * (spanZ / 2 - 0.8)); grp.add(tr);
-        const lf = new THREE.Mesh(new THREE.SphereGeometry(0.65, 10, 8), leafMat); lf.position.set(tr.position.x, 2.2, tr.position.z); grp.add(lf); RAVE.pulses.push(lf);
-      }
-      const fire = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.0, 6), emissiveMat(0xffaa22, 0.72));
-      fire.position.set(0, 0.55, 0); grp.add(fire); RAVE.pulses.push(fire);
-    }
-    if (kind === 'laser') {
-      for (const x of [-spanX / 2 - 0.25, spanX / 2 + 0.25]) {
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, spanZ + 0.5), emissiveMat(0xff0066, 0.58));
-        rail.position.set(x, 0.18, 0); grp.add(rail); RAVE.pulses.push(rail);
-      }
-      for (let i = 0; i < 4; i++) {
-        const gate = new THREE.Mesh(new THREE.TorusGeometry(1.4 + i * 0.42, 0.025, 6, 64), emissiveMat(0xff0066, 0.45));
-        gate.position.set(0, 2.1 + i * 0.5, -spanZ / 2 + 1.15 + i * 1.9); gate.rotation.y = Math.PI / 2; gate.userData.seed = i; grp.add(gate); RAVE.rings.push(gate);
-      }
     }
     return grp;
   }
@@ -804,7 +857,13 @@
     RAVE.group.position.set(fx, fy, fz); scene.add(RAVE.group);
     RAVE.saved = { sun: sun.intensity, hemi: hemi.intensity, fog: scene.fog, bg: scene.background.clone(), sky: sky.visible, clouds: clouds.visible };
     sun.intensity = 0.18; hemi.intensity = 0.22;
-    scene.fog = new THREE.Fog(0x0a0612, 8, 38); scene.background = new THREE.Color(0x07050f);
+    const mood = {
+      classic: { bg: 0x07050f, fog: 0x0a0612 },
+      neon:    { bg: 0x120307, fog: 0x26080a },
+      forest:  { bg: 0x03111f, fog: 0x05203a },
+      laser:   { bg: 0x140c03, fog: 0x261506 },
+    }[kind] || { bg: 0x07050f, fog: 0x0a0612 };
+    scene.fog = new THREE.Fog(mood.fog, 8, 38); scene.background = new THREE.Color(mood.bg);
     sky.visible = false; clouds.visible = false;
     if (actx) {
       if (actx.state === 'suspended') actx.resume();
@@ -835,8 +894,17 @@
     });
     RAVE.strobe.intensity = ph < 0.06 && (Math.floor(beat) % 2 === 0) ? 55 : 0;
     for (const m of RAVE.tiles) {
-      const hue = (cfg.hue + m.userData.ij * 0.06 + beat * 0.12) % 1;
-      m.material.color.setHSL(hue, 0.95, 0.16 + 0.42 * env);
+      if (RAVE.kind === 'neon') {
+        const lane = m.userData.check ? 0.05 : 0.13;
+        m.material.color.setHSL(lane, 1, 0.12 + env * (m.userData.check ? 0.42 : 0.22));
+      } else if (RAVE.kind === 'forest') {
+        m.material.color.setHSL((0.55 + m.userData.ij * 0.025 + beat * 0.035) % 1, 0.85, 0.13 + env * 0.24);
+      } else if (RAVE.kind === 'laser') {
+        m.material.color.setHSL(m.userData.check ? 0.12 : 0, m.userData.check ? 0.85 : 0, m.userData.check ? 0.62 + env * 0.25 : 0.06 + env * 0.16);
+      } else {
+        const hue = (cfg.hue + m.userData.ij * 0.06 + beat * 0.12) % 1;
+        m.material.color.setHSL(hue, 0.95, 0.12 + 0.42 * env);
+      }
     }
     RAVE.lasers.forEach((m, i) => {
       m.material.color.setHSL((cfg.hue + beat * 0.2 + i * 0.18) % 1, 1, 0.55);
