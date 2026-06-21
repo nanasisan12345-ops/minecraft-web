@@ -54,7 +54,7 @@
       <div><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> 移動　<span class="key">Shift</span> ダッシュ　<span class="key">Space</span> ジャンプ</div>
       <div>マウス 視点　<span class="key">左</span>クリック 壊す　<span class="key">右</span>クリック 置く</div>
       <div><span class="key">1</span>〜<span class="key">9</span> / ホイール ブロック選択　<span class="key">Esc</span> 一時停止</div>
-      <div><span class="key">R</span><span class="key">T</span><span class="key">Y</span><span class="key">U</span> 小さなレイブ会場を出現</div>
+      <div><span class="key">R</span><span class="key">T</span><span class="key">Y</span><span class="key">U</span><span class="key">I</span><span class="key">O</span><span class="key">P</span> 小さな音楽会場を出現</div>
     </div>
     <div class="go">クリックして開始</div>
   </div>
@@ -561,6 +561,9 @@
     if (e.code === 'KeyT') raveToggle('neon');
     if (e.code === 'KeyY') raveToggle('forest');
     if (e.code === 'KeyU') raveToggle('laser');
+    if (e.code === 'KeyI') raveToggle('future');
+    if (e.code === 'KeyO') raveToggle('bass');
+    if (e.code === 'KeyP') raveToggle('chill');
     if (e.code.startsWith('Digit')) { const n = +e.code.slice(5); if (n >= 1 && n <= 9) selectSlot(n - 1); }
     if (['Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) e.preventDefault();
   });
@@ -583,7 +586,7 @@
   /* ============== 小型レイブ会場 ============== */
   const RAVE = {
     on: false, kind: '', group: null,
-    lights: [], spots: [], lasers: [], tiles: [], dancers: [], rings: [], pulses: [], mirror: null, strobe: null,
+    lights: [], spots: [], lasers: [], tiles: [], dancers: [], rings: [], pulses: [], entryObstacles: [], mirror: null, strobe: null,
     bpm: 128, audioStart: 0, nextNote: 0, step: 0, master: null, noiseBuf: null, saved: {}, radius: 6,
     reverb: null, delay: null, duck: null, duckDepth: 0.4, kickBus: null,
   };
@@ -592,6 +595,9 @@
     neon:    { label: 'EUROBEAT ROAD',  bpm: 156, hue: 0.03, w: 7,  d: 13, tile: 1.08, shape: 'runway', dancers: 12, lasers: 2, lights: 5, spots: 4 },
     forest:  { label: 'TRANCE DOME',    bpm: 138, hue: 0.53, w: 11, d: 11, tile: 1.08, shape: 'circle', dancers: 8,  lasers: 6, lights: 6, spots: 3 },
     laser:   { label: 'DANCE FLOOR',    bpm: 124, hue: 0.12, w: 8,  d: 8,  tile: 1.3,  shape: 'checker', dancers: 16, lasers: 1, lights: 8, spots: 2 },
+    future:  { label: 'FUTURE BASS SKY', bpm: 150, hue: 0.78, w: 10, d: 8,  tile: 1.18, shape: 'diamond', dancers: 12, lasers: 3, lights: 6, spots: 3 },
+    bass:    { label: 'DRUM BASS TUNNEL', bpm: 174, hue: 0.30, w: 7,  d: 14, tile: 1.04, shape: 'runway', dancers: 14, lasers: 7, lights: 3, spots: 4 },
+    chill:   { label: 'LOFI HOUSE LOUNGE', bpm: 112, hue: 0.66, w: 10, d: 8,  tile: 1.24, shape: 'circle', dancers: 9,  lasers: 0, lights: 3, spots: 1 },
   };
   // 会場ごとのFX設定（リバーブ・ディレイ・サイドチェインの深さ）
   const RAVE_FX = {
@@ -599,6 +605,9 @@
     neon:    { revLen: 1.4, revDecay: 2.8, revAmt: 0.6, dlyMul: 0.75, dlyFb: 0.32, duck: 0.32 },
     forest:  { revLen: 3.4, revDecay: 1.8, revAmt: 1.1, dlyMul: 0.75, dlyFb: 0.42, duck: 0.6 },
     laser:   { revLen: 1.8, revDecay: 2.4, revAmt: 0.7, dlyMul: 0.5,  dlyFb: 0.22, duck: 0.28 },
+    future:  { revLen: 2.2, revDecay: 2.6, revAmt: 0.75, dlyMul: 0.375, dlyFb: 0.34, duck: 0.62 },
+    bass:    { revLen: 1.1, revDecay: 2.0, revAmt: 0.45, dlyMul: 0.375, dlyFb: 0.2,  duck: 0.5 },
+    chill:   { revLen: 2.8, revDecay: 2.1, revAmt: 0.85, dlyMul: 0.75,  dlyFb: 0.36, duck: 0.22 },
   };
   const SIXTEENTH = () => 60 / RAVE.bpm / 4;
 
@@ -736,6 +745,65 @@
     const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.05);
     s.connect(bp).connect(g).connect(RAVE.master); sendTo(g, RAVE.reverb, 0.3); s.start(t); s.stop(t + dur + 0.08);
   }
+  function vCrash(t, gainBase = 0.2, dur = 1.2, bright = 7200) {
+    const s = actx.createBufferSource(); s.buffer = raveNoise();
+    const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = bright;
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = bright * 1.2; bp.Q.value = 0.8;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(gainBase, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    s.connect(hp).connect(bp).connect(g).connect(RAVE.master); sendTo(g, RAVE.reverb, 0.38);
+    s.start(t); s.stop(t + dur + 0.04);
+  }
+  function vRide(t, gainBase = 0.055, bright = 8800) {
+    const s = actx.createBufferSource(); s.buffer = raveNoise();
+    const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = bright;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(gainBase, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    s.connect(hp).connect(g).connect(RAVE.master);
+    s.start(t); s.stop(t + 0.25);
+  }
+  function vSubDrop(t, start = 92, end = 34, gainBase = 0.42, dur = 0.75) {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(start, t);
+    o.frequency.exponentialRampToValueAtTime(end, t + dur);
+    g.gain.setValueAtTime(gainBase, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(RAVE.duck); o.start(t); o.stop(t + dur + 0.04);
+  }
+  function vVocalChop(t, f, opt = {}) {
+    const dur = opt.dur || 0.1, gain = opt.gain || 0.045;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    g.connect(RAVE.master); sendTo(g, RAVE.delay, opt.dly || 0.16); sendTo(g, RAVE.reverb, opt.rev || 0.12);
+    for (const formant of [760, 1320, 2450]) {
+      const o = actx.createOscillator(), bp = actx.createBiquadFilter();
+      o.type = opt.type || 'square'; o.frequency.value = f;
+      bp.type = 'bandpass'; bp.frequency.value = formant * (opt.tone || 1); bp.Q.value = 7;
+      o.connect(bp).connect(g); o.start(t); o.stop(t + dur + 0.03);
+    }
+  }
+  function vWobble(t, f, opt = {}) {
+    const dur = opt.dur || 0.22, gain = opt.gain || 0.22, cut = opt.cut || 420;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = opt.q || 10; lp.frequency.value = cut;
+    const lfo = actx.createOscillator(), lg = actx.createGain();
+    lfo.frequency.value = opt.rate || 6; lg.gain.value = opt.depth || 260;
+    lfo.connect(lg).connect(lp.frequency);
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    lp.connect(g).connect(RAVE.duck);
+    for (const det of [0, opt.detune || 7]) {
+      const o = actx.createOscillator(); o.type = opt.wave || 'sawtooth'; o.frequency.value = f; o.detune.value = det;
+      o.connect(lp); o.start(t); o.stop(t + dur + 0.04);
+    }
+    lfo.start(t); lfo.stop(t + dur + 0.04);
+  }
   // 音名テーブル（Hz） — コード構成音
   const Am = [220, 261.63, 329.63], F = [174.61, 220, 261.63], C = [261.63, 329.63, 392], G = [196, 246.94, 293.66];
   const Dm = [146.83, 174.61, 220], Em = [164.81, 196, 246.94], Bb = [233.08, 293.66, 349.23];
@@ -766,6 +834,11 @@
   const DBASS1 = [1, 0, 2, 0, 1, 1, 0, 2, 1, 0, 2, 0, 1, 2, 1, 0], DSTAB1 = [0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0];
   const DBASS2 = [1, 0, 1, 2, 0, 1, 0, 2, 1, 0, 1, 2, 0, 2, 0, 1], DSTAB2 = [0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0];
   const DBASS3 = [1, 1, 0, 2, 1, 0, 2, 0, 1, 1, 0, 2, 1, 0, 2, 0], DSTAB3 = [1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1];
+  const FCHOP1 = [0, 659.25, 0, 783.99, 987.77, 0, 783.99, 0, 659.25, 0, 523.25, 0, 587.33, 783.99, 0, 987.77];
+  const FCHOP2 = [0, 783.99, 0, 1046.5, 1174.66, 0, 1046.5, 0, 880, 0, 698.46, 0, 783.99, 1046.5, 0, 1318.51];
+  const DNB1 = [1, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 2, 0, 1, 0, 2], DNB2 = [1, 0, 0, 2, 0, 1, 0, 0, 2, 0, 1, 0, 0, 2, 1, 0];
+  const DNBHIT = [1, 0, 1, 0, 2, 0, 1, 1, 0, 1, 2, 0, 1, 0, 1, 0];
+  const HOUSEBASS1 = [1, 0, 0, 1, 0, 2, 0, 1, 0, 1, 0, 2, 1, 0, 1, 0], HOUSEBASS2 = [1, 0, 2, 0, 1, 0, 0, 1, 0, 2, 0, 1, 1, 0, 0, 2];
   // 各ジャンルの曲リスト（会場を出すたびにランダムで1曲選ぶ）。
   // 曲ごとに BPM・ベース/リード音色・リズム密度まで変えて差を大きくする。
   const SONGS = {
@@ -789,75 +862,207 @@
       { bpm: 116, prog: [{ n: Fmaj7, r: ROOT.F }, { n: Em7, r: ROOT.E }, { n: Dm7, r: ROOT.D }, { n: G7, r: ROOT.G }], bass: DBASS2, stab: DSTAB2, bw: 'square', bcut: 560 },
       { bpm: 128, prog: [{ n: Am7, r: ROOT.A }, { n: Dm7, r: ROOT.D }, { n: G7, r: ROOT.G }, { n: Cmaj7, r: ROOT.C }], bass: DBASS3, stab: DSTAB3, bw: 'sawtooth', bcut: 950 },
     ],
+    future: [
+      { bpm: 148, prog: [{ n: Am7, r: ROOT.A }, { n: Fmaj7, r: ROOT.F }, { n: Cmaj7, r: ROOT.C }, { n: G7, r: ROOT.G }], chop: FCHOP1, bw: 'sawtooth' },
+      { bpm: 154, prog: [{ n: Dm7, r: ROOT.D }, { n: Bb, r: ROOT.Bb }, { n: Fmaj7, r: ROOT.F }, { n: Cmaj7, r: ROOT.C }], chop: FCHOP2, bw: 'square' },
+      { bpm: 142, prog: [{ n: Em7, r: ROOT.E }, { n: Cmaj7, r: ROOT.C }, { n: G7, r: ROOT.G }, { n: Dmaj, r: ROOT.D }], chop: FCHOP1, bw: 'sawtooth' },
+    ],
+    bass: [
+      { bpm: 172, prog: [{ n: Am, r: ROOT.A }, { n: F, r: ROOT.F }, { n: C, r: ROOT.C }, { n: G, r: ROOT.G }], bass: DNB1, hits: DNBHIT, bw: 'sawtooth', bcut: 420 },
+      { bpm: 178, prog: [{ n: Em, r: ROOT.E }, { n: C, r: ROOT.C }, { n: G, r: ROOT.G }, { n: Dmaj, r: ROOT.D }], bass: DNB2, hits: DNBHIT, bw: 'square', bcut: 520 },
+      { bpm: 168, prog: [{ n: Dm, r: ROOT.D }, { n: Bb, r: ROOT.Bb }, { n: F, r: ROOT.F }, { n: C, r: ROOT.C }], bass: DNB1, hits: DNBHIT, bw: 'sawtooth', bcut: 360 },
+    ],
+    chill: [
+      { bpm: 110, prog: [{ n: Fmaj7, r: ROOT.F }, { n: Em7, r: ROOT.E }, { n: Dm7, r: ROOT.D }, { n: Cmaj7, r: ROOT.C }], bass: HOUSEBASS1, bw: 'triangle' },
+      { bpm: 116, prog: [{ n: Cmaj7, r: ROOT.C }, { n: G7, r: ROOT.G }, { n: Am7, r: ROOT.A }, { n: Fmaj7, r: ROOT.F }], bass: HOUSEBASS2, bw: 'sawtooth' },
+      { bpm: 104, prog: [{ n: Am7, r: ROOT.A }, { n: Dm7, r: ROOT.D }, { n: G7, r: ROOT.G }, { n: Cmaj7, r: ROOT.C }], bass: HOUSEBASS1, bw: 'triangle' },
+    ],
   };
+
+  function sectionBeat(bar) {
+    return bar % 32;
+  }
+  function sectionEnergy(bar) {
+    const b = sectionBeat(bar);
+    if (b < 4) return 0.72;
+    if (b < 8) return 0.95;
+    if (b < 10) return 0.42;
+    if (b < 12) return 0.68;
+    if (b < 16) return 1.12;
+    if (b < 24) return 1.34;
+    if (b < 26) return 0.5;
+    if (b < 28) return 0.75;
+    if (b < 31) return 1.18;
+    return 1.42;
+  }
+  function isBreakBar(bar) {
+    const b = sectionBeat(bar);
+    return b === 8 || b === 9 || b === 24 || b === 25;
+  }
+  function isBuildBar(bar) {
+    const b = sectionBeat(bar);
+    return (b >= 12 && b < 16) || b >= 28;
+  }
+  function isChorusBar(bar) {
+    const b = sectionBeat(bar);
+    return b >= 16 && b < 24;
+  }
+  function isDropStart(s, bar) {
+    const b = sectionBeat(bar);
+    return s === 0 && (b === 16 || b === 28);
+  }
+  function isBreakStart(s, bar) {
+    const b = sectionBeat(bar);
+    return s === 0 && (b === 8 || b === 24);
+  }
+  function isFillStep(s, bar) {
+    return (bar % 4 === 3 || sectionBeat(bar) === 23 || sectionBeat(bar) === 31) && s >= 12;
+  }
+  function stepArrangementFx(kind, s, bar, t) {
+    const b = sectionBeat(bar), build = isBuildBar(bar), chorus = isChorusBar(bar);
+    if (isDropStart(s, bar)) {
+      const big = b === 16 ? 1 : 1.18;
+      vCrash(t, (kind === 'chill' ? 0.11 : kind === 'bass' ? 0.16 : 0.22) * big, kind === 'bass' ? 0.55 : 1.3, kind === 'chill' ? 5200 : 8200);
+      if (kind !== 'chill' && kind !== 'laser') vSubDrop(t, kind === 'bass' ? 118 : 92, kind === 'future' ? 38 : 32, kind === 'bass' ? 0.52 : 0.38, kind === 'bass' ? 0.52 : 0.72);
+    }
+    if (isBreakStart(s, bar)) vCrash(t, kind === 'chill' ? 0.075 : 0.12, kind === 'bass' ? 0.42 : 1.5, kind === 'chill' ? 4200 : 6200);
+    if (build && s === 0) vRiser(t, 60 / RAVE.bpm * (b >= 28 ? 4 : 2.5));
+    if (build && (s === 12 || s === 14)) vNoiseHit(t, 3000 + s * 230, kind === 'bass' ? 0.085 : 0.05, 0.035, 0.1);
+    if (chorus && s % 4 === 2 && kind !== 'chill') vRide(t, kind === 'bass' ? 0.045 : 0.06, kind === 'forest' ? 9400 : 10200);
+    if (chorus && kind === 'chill' && (s === 2 || s === 10)) vRide(t, 0.025, 6400);
+  }
 
   // ── ダークテクノ（重いキック＋うねるオフビートのサブ＋暗いスタブ）
   function stepTechno(s, bar, t) {
-    const sg = RAVE.song;
-    if (s % 4 === 0) vKick(t, 42, 1.05, 0.34);
+    const sg = RAVE.song, energy = sectionEnergy(bar), breakBar = isBreakBar(bar), build = isBuildBar(bar), chorus = isChorusBar(bar);
+    if (!breakBar && (s % 4 === 0 || (chorus && s === 10))) vKick(t, 42, 1.05 * energy, 0.34);
     else if (s === 14) vKick(t, 42, 0.55, 0.18);
-    if (s === 4 || s === 12) vClap(t, 0.4, 1500, 0.18);
-    if (s % 4 === 2) vHat(t, true, 7800, 0.22);
-    if (s % 2 === 1) vHat(t, false, 9000, 0.12);
-    if (s % 4 === 2) vBass(t, sg.root, { wave: sg.bw, cut: sg.bcut, q: 7, dur: 0.22, gain: 0.3, env: 1.8 });
+    if ((s === 4 || s === 12) && !breakBar) vClap(t, 0.4 * energy, 1500, 0.18);
+    if (s % 4 === 2 && !breakBar) vHat(t, true, 7800 + (build ? 1800 : 0), 0.22 * energy);
+    if ((s % 2 === 1 || (build && s % 2 === 0)) && !breakBar) vHat(t, false, 9000, build ? 0.09 : 0.12);
+    if (!breakBar && s % 4 === 2) vBass(t, sg.root, { wave: sg.bw, cut: sg.bcut * (build ? 1.35 : 1), q: 7, dur: 0.22, gain: 0.3 * energy, env: 1.8 });
     else if (s === 7 || s === 15) vBass(t, sg.alt, { wave: sg.bw, cut: sg.bcut * 0.9, dur: 0.14, gain: 0.22, env: 1.6 });
     else if (sg.roll && s % 2 === 1) vBass(t, sg.root, { wave: sg.bw, cut: sg.bcut * 0.75, dur: 0.1, gain: 0.2, sub: false });
     else if (!sg.roll && s % 2 === 1) vBass(t, sg.root, { wave: sg.bw, cut: 180, dur: 0.12, gain: 0.16, sub: false });
-    if (s === 0) vStab(t, bar % 4 < 2 ? sg.stabA : sg.stabB, 0.35);
+    if (chorus && (s === 1 || s === 9 || s === 13)) vWobble(t, sg.root, { wave: sg.bw, cut: 280 + s * 18, rate: s === 13 ? 11 : 7, depth: 180, dur: 0.16, gain: 0.12, sub: false });
+    if (s === 0 || (build && s === 8) || (chorus && s === 6)) vStab(t, bar % 4 < 2 ? sg.stabA : sg.stabB, breakBar ? 0.52 : 0.35);
+    if (chorus && (s === 3 || s === 10 || s === 13)) vSuper(t, (bar % 4 < 2 ? sg.stabA : sg.stabB)[s % 3] * 2, { voices: 3, detune: 9, dur: 0.08, gain: 0.026, cut: 2800, dly: 0.12, rev: 0.18, duck: false });
     if (s === 6 || s === 11) vNoiseHit(t, s === 6 ? 1500 : 3200, 0.12, 0.07, 0.3);
-    if (bar % 4 === 3 && s === 8) vRiser(t, 60 / RAVE.bpm * 2);
+    if (isFillStep(s, bar)) vTom(t, 120 + (s - 12) * 22, 0.12);
+    if (bar % 4 === 3 && s === 8) vRiser(t, 60 / RAVE.bpm * (build ? 3 : 2));
   }
   // ── ユーロビート（16分オクターブ走りベース＋スーパーソウのリード）
   function stepEurobeat(s, bar, t) {
-    const sg = RAVE.song, ch = sg.prog[bar % 4];
-    if (s % 4 === 0) vKick(t, 50, 1.0, 0.26);
-    if (s === 4 || s === 12) vClap(t, 0.34, 2300, 0.1);
-    vHat(t, s % 4 === 2, 8200, s % 4 === 2 ? 0.26 : 0.16);
-    vBass(t, s % 2 ? ch.r * 2 : ch.r, { wave: 'sawtooth', cut: 1400, q: 4, dur: 0.12, gain: 0.24, sub: s % 2 === 0 });
-    if (s % 4 === 2) vStab(t, ch.n, 0.16);
+    const sg = RAVE.song, ch = sg.prog[bar % 4], energy = sectionEnergy(bar), breakBar = isBreakBar(bar), build = isBuildBar(bar), chorus = isChorusBar(bar);
+    if (!breakBar && (s % 4 === 0 || (build && s === 14))) vKick(t, 50, (s === 14 ? 0.55 : 1.0) * energy, 0.26);
+    if ((s === 4 || s === 12) && !breakBar) vClap(t, 0.34 * energy, 2300, 0.1);
+    if (!breakBar) vHat(t, s % 4 === 2, 8200 + (build ? 1600 : 0), (s % 4 === 2 ? 0.26 : 0.16) * energy);
+    if (!breakBar || s % 4 === 2) vBass(t, s % 2 ? ch.r * 2 : ch.r, { wave: 'sawtooth', cut: 1200 + energy * 350, q: 4, dur: 0.12, gain: 0.22 * energy, sub: s % 2 === 0 });
+    if ((s % 4 === 2 || (build && s % 4 === 0)) && !breakBar) vStab(t, ch.n, 0.16);
     const mel = sg.mel[bar % 4][s];
-    if (mel) vSuper(t, mel, { voices: 6, detune: 16, dur: 0.16, gain: 0.06, type: sg.lw, cut: sg.lcut, dly: 0.18, rev: 0.1, duck: false });
+    if (mel && (!breakBar || s % 4 === 0)) vSuper(t, mel * (chorus || bar % 8 >= 4 ? 2 : 1), { voices: chorus ? 8 : 6, detune: chorus ? 22 : 16, dur: breakBar ? 0.28 : 0.16, gain: (breakBar ? 0.035 : chorus ? 0.072 : 0.06) * energy, type: sg.lw, cut: sg.lcut + (build || chorus ? 1600 : 0), dly: 0.18, rev: breakBar ? 0.22 : 0.1, duck: false });
+    if (chorus && (s === 5 || s === 13)) vSuper(t, ch.n[(s + bar) % ch.n.length] * 4, { voices: 4, detune: 14, dur: 0.1, gain: 0.035, type: 'sawtooth', cut: 5200, dly: 0.12, rev: 0.12, duck: false });
+    if (chorus && (s === 3 || s === 11)) vVocalChop(t, ch.n[(bar + s) % ch.n.length] * 4, { dur: 0.09, gain: 0.032, tone: 1.08, dly: 0.12, rev: 0.1 });
     if (bar % 8 === 7 && s >= 8 && s % 2 === 0) vSnare(t, 0.3, 0.15);
+    if (isFillStep(s, bar)) vNoiseHit(t, 2800 + s * 150, 0.06, 0.035, 0.08);
   }
   // ── アップリフティングトランス（オフビートのゲートベース＋巨大パッド＋アルペジオ）
   function stepTrance(s, bar, t) {
-    const sg = RAVE.song, ch = sg.prog[bar % 4];
-    if (s % 4 === 0) vKick(t, 46, 0.9, 0.3);
-    if (s === 4 || s === 12) vSnare(t, 0.26, 0.3);
-    if (s % 4 === 2) vHat(t, true, 9500, 0.2);
-    if (s % 4 === 2) vBass(t, ch.r, { wave: 'sawtooth', cut: 320, q: 6, dur: 0.16, gain: 0.28, env: 1.5 });
-    if (s === 0) vChord(t, ch.n, { voices: 7, detune: 18, type: sg.pw, dur: 60 / RAVE.bpm * 4, gain: 0.04, cutStart: 600, cutEnd: 2600, atk: 0.12, rev: 0.4 });
+    const sg = RAVE.song, ch = sg.prog[bar % 4], energy = sectionEnergy(bar), breakBar = isBreakBar(bar), build = isBuildBar(bar), chorus = isChorusBar(bar);
+    if (!breakBar && s % 4 === 0) vKick(t, 46, 0.9 * energy, 0.3);
+    if ((s === 4 || s === 12) && !breakBar) vSnare(t, 0.26 * energy, 0.3);
+    if (s % 4 === 2 && !breakBar) vHat(t, true, 9500 + (build ? 1200 : 0), 0.2 * energy);
+    if (s % 4 === 2 && !breakBar) vBass(t, ch.r, { wave: 'sawtooth', cut: 320 * (build ? 1.6 : 1), q: 6, dur: 0.16, gain: 0.28 * energy, env: 1.5 });
+    if (s === 0) vChord(t, ch.n, { voices: 7, detune: 18, type: sg.pw, dur: 60 / RAVE.bpm * (breakBar ? 8 : 4), gain: (breakBar ? 0.055 : 0.04) * energy, cutStart: breakBar ? 320 : 600, cutEnd: build ? 3800 : 2600, atk: breakBar ? 0.24 : 0.12, rev: 0.4 });
     const an = ch.n[s % ch.n.length] * (s % (ch.n.length * 2) >= ch.n.length ? 2 : 1);
-    if (s % (sg.arpEvery || 2) === 0) vSuper(t, an, { voices: 4, detune: 12, type: sg.pw, dur: 0.18, gain: 0.045, cut: 3800, dly: 0.28, rev: 0.25, duck: false });
-    if (bar % 8 === 7) vRiser(t, 60 / RAVE.bpm / 4);
+    if ((s % (sg.arpEvery || 2) === 0 || build || chorus) && (!breakBar || s % 4 === 0)) vSuper(t, an * (chorus && s > 8 ? 2 : 1), { voices: chorus ? 6 : 4, detune: chorus ? 18 : 12, type: sg.pw, dur: build ? 0.11 : 0.18, gain: 0.045 * energy, cut: chorus ? 5600 : build ? 5200 : 3800, dly: 0.28, rev: 0.25, duck: false });
+    if (chorus && s === 8) vChord(t, ch.n.map(f => f * 2), { voices: 5, detune: 14, type: sg.pw, dur: 60 / RAVE.bpm * 2, gain: 0.034, cutStart: 1200, cutEnd: 4800, atk: 0.04, rev: 0.32, dly: 0.24, duck: false });
+    if ((bar % 8 === 7 && s === 12) || (build && s === 8)) vRiser(t, 60 / RAVE.bpm * (build ? 1.2 : 0.75));
   }
   // ── ディスコハウス（ファンキーベース＋7thコードのスタブ）
   function stepDisco(s, bar, t) {
-    const sg = RAVE.song, ch = sg.prog[bar % 4];
-    if (s % 4 === 0) vKick(t, 52, 0.95, 0.28);
-    if (s === 4 || s === 12) vClap(t, 0.36, 1700, 0.14);
-    if (s % 4 === 2) vHat(t, true, 6500, 0.2);
-    if (s % 2 === 1) vHat(t, false, 8000, 0.12);
+    const sg = RAVE.song, ch = sg.prog[bar % 4], energy = sectionEnergy(bar), breakBar = isBreakBar(bar), chorus = isChorusBar(bar), build = isBuildBar(bar);
+    if (!breakBar && s % 4 === 0) vKick(t, 52, 0.95 * energy, 0.28);
+    if ((s === 4 || s === 12) && !breakBar) vClap(t, 0.36 * energy, 1700, 0.14);
+    if (s % 4 === 2 && !breakBar) vHat(t, true, 6500 + (chorus ? 1600 : 0), 0.2 * energy);
+    if ((s % 2 === 1 || (chorus && s % 4 === 0)) && !breakBar) vHat(t, false, 8000, (chorus ? 0.09 : 0.12) * energy);
     const b = sg.bass[s];
-    if (b) vBass(t, b === 2 ? ch.r * 2 : ch.r, { wave: sg.bw, cut: sg.bcut, q: 5, dur: 0.16, gain: 0.26, env: 2.2 });
-    if (sg.stab[s]) vChord(t, ch.n, { voices: 3, detune: 8, dur: 0.18, gain: 0.05, cut: 3000, dly: 0.16, rev: 0.18 });
-    if (bar % 4 === 3 && s === 14) vSnare(t, 0.3, 0.2);
+    if (b && !breakBar) vBass(t, b === 2 ? ch.r * 2 : ch.r, { wave: sg.bw, cut: sg.bcut * (chorus ? 1.35 : 1), q: 5, dur: 0.16, gain: 0.26 * energy, env: 2.2 });
+    if ((sg.stab[s] || (chorus && s % 4 === 2)) && !breakBar) vChord(t, ch.n, { voices: chorus ? 5 : 3, detune: chorus ? 14 : 8, dur: 0.18, gain: 0.045 * energy, cut: chorus ? 4200 : 3000, dly: 0.16, rev: 0.18 });
+    if (chorus && (s === 3 || s === 10 || s === 15)) vSuper(t, ch.n[(s + bar) % ch.n.length] * 2, { voices: 3, detune: 10, dur: 0.12, gain: 0.032, cut: 3600, dly: 0.12, rev: 0.12, duck: false });
+    if (chorus && (s === 0 || s === 8)) vRide(t, 0.055, 7600);
+    if ((bar % 4 === 3 && s === 14) || (build && s >= 12 && s % 2 === 0)) vSnare(t, 0.3, 0.2);
+  }
+  function stepFutureBass(s, bar, t) {
+    const sg = RAVE.song, ch = sg.prog[bar % 4], half = s >= 8 ? 2 : 1, energy = sectionEnergy(bar), breakBar = isBreakBar(bar), chorus = isChorusBar(bar), build = isBuildBar(bar);
+    if (!breakBar && (s === 0 || s === 8 || (chorus && s === 11))) vKick(t, 47, (s === 0 ? 1.05 : 0.8) * energy, 0.3);
+    if ((s === 4 || s === 12) && !breakBar) vSnare(t, 0.34 * energy, 0.28);
+    if (!breakBar && (s % 2 === 1 || (chorus && s % 4 === 2))) vHat(t, s % 4 === 3, 9800 + (build ? 1800 : 0), (s % 4 === 3 ? 0.17 : 0.09) * energy);
+    if (s === 0 || s === 8) vChord(t, ch.n, { voices: chorus ? 10 : 8, detune: chorus ? 28 : 22, type: sg.bw, dur: 60 / RAVE.bpm * (breakBar ? 3.5 : 2.2), gain: (chorus ? 0.07 : 0.055) * energy, cutStart: breakBar ? 400 : 700, cutEnd: chorus ? 5600 : 4200, atk: breakBar ? 0.16 : 0.04, rev: 0.28, dly: 0.16 });
+    if (!breakBar && (s === 0 || s === 3 || s === 6 || s === 8 || s === 11 || s === 14 || (chorus && s === 13))) vBass(t, ch.r * half, { wave: 'sawtooth', cut: chorus ? 700 : 460, q: 7, dur: chorus ? 0.22 : 0.18, gain: 0.3 * energy, env: 2.4 });
+    const chop = sg.chop[s];
+    if (chop && (!breakBar || s % 4 === 0)) vSuper(t, chop * (chorus && s > 7 ? 2 : 1), { voices: chorus ? 7 : 5, detune: chorus ? 24 : 18, type: 'square', dur: chorus ? 0.1 : 0.12, gain: 0.042 * energy, cut: chorus ? 6800 : 5200, dly: 0.22, rev: 0.2, duck: false });
+    if (chop && chorus && (s === 1 || s === 5 || s === 9 || s === 13)) vVocalChop(t, chop * 2, { dur: 0.12, gain: 0.038, tone: 1 + (s % 3) * 0.06, dly: 0.2, rev: 0.16 });
+    if (chorus && (s === 3 || s === 11)) vWobble(t, ch.r * (s > 8 ? 2 : 1), { cut: 520, rate: s === 11 ? 12 : 8, depth: 320, dur: 0.18, gain: 0.18, wave: 'square' });
+    if (bar % 8 === 7 && s >= 12 && s % 2 === 0) vNoiseHit(t, 4200, 0.09, 0.05, 0.22);
+    if (build && s >= 12) vNoiseHit(t, 5200 + s * 120, 0.04, 0.03, 0.16);
+  }
+  function stepDrumBass(s, bar, t) {
+    const sg = RAVE.song, ch = sg.prog[bar % 4], energy = sectionEnergy(bar), breakBar = isBreakBar(bar), chorus = isChorusBar(bar), build = isBuildBar(bar);
+    const kickPattern = chorus ? (s === 0 || s === 3 || s === 7 || s === 10 || s === 14) : (s === 0 || s === 7 || s === 10);
+    if (!breakBar && kickPattern) vKick(t, 48, (s === 0 ? 1.0 : 0.72) * energy, 0.23);
+    if ((s === 4 || s === 12) && !breakBar) vSnare(t, 0.44 * energy, 0.08);
+    if (!breakBar) vHat(t, s % 2 === 1 || (chorus && s % 4 === 2), 10500 + (chorus ? 1300 : 0), (s % 2 === 1 ? 0.14 : 0.055) * energy);
+    if (!breakBar && sg.hits[s] === 2) vNoiseHit(t, 2400, 0.1 * energy, 0.045, 0.08);
+    else if (!breakBar && sg.hits[s]) vNoiseHit(t, 6500, 0.055 * energy, 0.025, 0.04);
+    const b = sg.bass[s];
+    if (b && !breakBar) {
+      const bf = b === 2 ? ch.r * 2 : ch.r;
+      if (chorus && (s === 3 || s === 6 || s === 11 || s === 14)) vWobble(t, bf, { wave: sg.bw, cut: sg.bcut + 180, rate: 10 + (s % 3) * 2, depth: 420, q: 12, dur: 0.14, gain: 0.28 * energy });
+      else vBass(t, bf, { wave: sg.bw, cut: sg.bcut + (s % 4) * (chorus ? 180 : 110), q: 9, dur: chorus ? 0.16 : 0.13, gain: 0.34 * energy, env: 2.9 });
+    }
+    if (s === 0) vChord(t, ch.n, { voices: chorus ? 6 : 4, detune: chorus ? 18 : 10, type: 'sawtooth', dur: 60 / RAVE.bpm * (breakBar ? 5 : 3.5), gain: (breakBar ? 0.04 : 0.026) * energy, cutStart: breakBar ? 220 : 350, cutEnd: chorus ? 2600 : 1800, atk: breakBar ? 0.18 : 0.08, rev: 0.18 });
+    if (chorus && (s === 2 || s === 6 || s === 13)) vSuper(t, ch.n[(s + bar) % ch.n.length] * 2, { voices: 2, detune: 8, type: 'square', dur: 0.06, gain: 0.025, cut: 3600, rev: 0.08, duck: false });
+    if ((bar % 4 === 3 && s === 15) || (build && s === 12)) vRiser(t, 60 / RAVE.bpm * 0.75);
+  }
+  function stepLofiHouse(s, bar, t) {
+    const sg = RAVE.song, ch = sg.prog[bar % 4], energy = sectionEnergy(bar), breakBar = isBreakBar(bar), chorus = isChorusBar(bar), build = isBuildBar(bar);
+    if (!breakBar && s % 4 === 0) vKick(t, 50, 0.82 * energy, 0.32);
+    if ((s === 4 || s === 12) && !breakBar) vClap(t, 0.22 * energy, 1350, 0.24);
+    if (s % 4 === 2 && !breakBar) vHat(t, true, 5600 + (chorus ? 900 : 0), 0.13 * energy);
+    if ((s % 2 === 1 || (chorus && s === 10)) && !breakBar) vHat(t, false, 7200, 0.055 * energy);
+    const b = sg.bass[s];
+    if (b && !breakBar) vBass(t, b === 2 ? ch.r * 2 : ch.r, { wave: sg.bw, cut: chorus ? 860 : 620, q: 3, dur: 0.2, gain: 0.2 * energy, env: 1.5 });
+    if (s === 0 || s === 8) vChord(t, ch.n, { voices: chorus ? 5 : 4, detune: chorus ? 11 : 7, type: 'triangle', dur: 60 / RAVE.bpm * (breakBar ? 4 : 2.6), gain: (chorus ? 0.048 : 0.04) * energy, cutStart: breakBar ? 500 : 900, cutEnd: chorus ? 3400 : 2600, atk: breakBar ? 0.3 : 0.16, rev: 0.34, dly: 0.22, duck: false });
+    if ((s === 3 || s === 7 || s === 10 || s === 14) && (!breakBar || s === 10)) vSuper(t, ch.n[(s + bar) % ch.n.length] * (chorus ? 3 : 2), { voices: chorus ? 3 : 2, detune: 5, type: 'triangle', dur: chorus ? 0.22 : 0.16, gain: 0.03 * energy, cut: chorus ? 3200 : 2400, dly: 0.24, rev: 0.28, duck: false });
+    if (chorus && (s === 5 || s === 13)) vVocalChop(t, ch.n[(bar + s) % ch.n.length] * 2, { dur: 0.16, gain: 0.018, tone: 0.78, dly: 0.26, rev: 0.3, type: 'triangle' });
+    if (bar % 8 === 7 && s === 12) vTom(t, 140, 0.12);
+    if (build && s >= 12 && s % 2 === 0) vNoiseHit(t, 1800 + s * 80, 0.035, 0.05, 0.24);
   }
   function scheduleStep(step, t) {
     const k = RAVE.kind, s = step % 16, bar = Math.floor(step / 16);
+    stepArrangementFx(k, s, bar, t);
     if (k === 'neon') stepEurobeat(s, bar, t);
     else if (k === 'forest') stepTrance(s, bar, t);
     else if (k === 'laser') stepDisco(s, bar, t);
+    else if (k === 'future') stepFutureBass(s, bar, t);
+    else if (k === 'bass') stepDrumBass(s, bar, t);
+    else if (k === 'chill') stepLofiHouse(s, bar, t);
     else stepTechno(s, bar, t);
   }
 
   function makeDancer(hue) {
     const g = new THREE.Group();
-    const shirt = new THREE.Color().setHSL(hue, 0.75, 0.55);
-    const pants = new THREE.Color().setHSL((hue + 0.5) % 1, 0.6, 0.4);
-    const skin = new THREE.Color(0xf0c8a0);
-    const hair = new THREE.Color().setHSL((hue + 0.2) % 1, 0.5, 0.22);
+    const skinTones = [0xf8d2b4, 0xf0c8a0, 0xc88452, 0x8f5838, 0x5a351f];
+    const hairTones = [0x201612, 0x4b2514, 0xc89a42, 0xeeeeee, 0xff2266, 0x33ccff, 0xb866ff];
+    const shirt = new THREE.Color().setHSL((hue + rnd(-0.08, 0.08) + 1) % 1, rnd(0.55, 0.95), rnd(0.42, 0.64));
+    const pants = new THREE.Color().setHSL((hue + rnd(0.25, 0.6)) % 1, rnd(0.35, 0.75), rnd(0.22, 0.46));
+    const skin = new THREE.Color(skinTones[Math.floor(Math.random() * skinTones.length)]);
+    const hair = new THREE.Color(hairTones[Math.floor(Math.random() * hairTones.length)]);
+    const accent = new THREE.Color().setHSL((hue + rnd(0.08, 0.28)) % 1, 0.95, 0.58);
+    const shoe = new THREE.Color().setHSL(Math.random(), 0.35, 0.08);
     const mat = c => new THREE.MeshPhongMaterial({ color: c, emissive: (c.clone ? c : new THREE.Color(c)).clone().multiplyScalar(0.18), shininess: 22 });
+    const glowMat = c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending });
     const cyl = (rt, rb, h, c) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 12), mat(c));
     const sph = (r, c) => new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), mat(c));
     // 腰（脚のルート）
@@ -868,16 +1073,34 @@
       const thigh = cyl(0.1, 0.085, 0.46, pants); thigh.position.y = -0.23; hip.add(thigh);
       const knee = new THREE.Group(); knee.position.y = -0.46; hip.add(knee);
       const shin = cyl(0.075, 0.06, 0.44, pants); shin.position.y = -0.22; knee.add(shin);
-      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.26), mat(new THREE.Color(0x202024))); foot.position.set(0, -0.44, 0.06); knee.add(foot);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.26), mat(shoe)); foot.position.set(0, -0.44, 0.06); knee.add(foot);
       hip.userData.knee = knee; return hip;
     };
     const legL = makeLeg(-1), legR = makeLeg(1);
     // 胴・首・頭
     const torso = cyl(0.2, 0.26, 0.6, shirt); torso.position.y = 1.25; g.add(torso);
+    if (Math.random() < 0.55) {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.205, 0.012, 6, 28), mat(accent));
+      band.rotation.x = Math.PI / 2; band.position.y = rnd(1.15, 1.38); g.add(band);
+    }
     const neck = cyl(0.06, 0.06, 0.1, skin); neck.position.y = 1.6; g.add(neck);
     const headG = new THREE.Group(); headG.position.y = 1.74; g.add(headG);
     headG.add(sph(0.17, skin));
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(hair)); headG.add(cap);
+    const hairStyle = Math.floor(Math.random() * 5);
+    if (hairStyle === 0) {
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(hair)); headG.add(cap);
+    } else if (hairStyle === 1) {
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), mat(hair)); headG.add(cap);
+      for (const sx of [-1, 1]) { const bun = sph(0.065, hair); bun.position.set(sx * 0.15, 0.14, 0); headG.add(bun); }
+    } else if (hairStyle === 2) {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.018, 6, 24), mat(accent));
+      band.rotation.x = Math.PI / 2; band.position.y = 0.16; headG.add(band);
+    } else if (hairStyle === 3) {
+      const brim = cyl(0.21, 0.21, 0.035, accent); brim.position.y = 0.31; headG.add(brim);
+      const hat = cyl(0.13, 0.15, 0.12, hair); hat.position.y = 0.38; headG.add(hat);
+    } else {
+      for (let i = -1; i <= 1; i++) { const spike = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.17, 5), mat(hair)); spike.position.set(i * 0.055, 0.31, 0); headG.add(spike); }
+    }
     // 腕（肩→上腕→肘→前腕→手）
     const makeArm = sx => {
       const sh = new THREE.Group(); sh.position.set(sx * 0.26, 1.48, 0); g.add(sh);
@@ -885,6 +1108,10 @@
       const el = new THREE.Group(); el.position.y = -0.4; sh.add(el);
       const fore = cyl(0.055, 0.045, 0.38, skin); fore.position.y = -0.19; el.add(fore);
       el.add((() => { const h = sph(0.065, skin); h.position.y = -0.4; return h; })());
+      if (Math.random() < 0.38) {
+        const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.34, 8), glowMat(accent));
+        stick.rotation.z = Math.PI / 2; stick.position.set(sx * 0.09, -0.42, 0.02); el.add(stick);
+      }
       sh.userData.elbow = el; return sh;
     };
     const armL = makeArm(-1), armR = makeArm(1);
@@ -900,19 +1127,62 @@
     return g;
   }
   function raveResetLists() {
-    for (const k of ['lights', 'spots', 'lasers', 'tiles', 'dancers', 'rings', 'pulses']) RAVE[k] = [];
+    for (const k of ['lights', 'spots', 'lasers', 'tiles', 'dancers', 'rings', 'pulses', 'entryObstacles']) RAVE[k] = [];
     RAVE.mirror = null; RAVE.strobe = null;
+  }
+  function addEntryObstacle(x, z, w, d, h = 0.9) {
+    RAVE.entryObstacles.push({ x, z, w, d, h });
   }
   // ジャンルごとに使う踊りの種類（NPCが時間とともにランダムに切り替える）
   const MOVE_POOL = {
-    classic: ['headbang', 'stomp', 'twist', 'bounce', 'runningman'],
-    forest:  ['handsup', 'sway', 'spin', 'bounce', 'charleston'],
-    laser:   ['point', 'spin', 'twist', 'jumpclap', 'sidestep', 'charleston', 'runningman'],
+    classic: ['headbang', 'stomp', 'twist', 'bounce', 'runningman', 'shuffle'],
+    forest:  ['handsup', 'sway', 'spin', 'bounce', 'charleston', 'wavecircle'],
+    laser:   ['point', 'spin', 'twist', 'jumpclap', 'sidestep', 'charleston', 'runningman', 'robot'],
+    future:  ['handsup', 'jumpclap', 'sway', 'spin', 'sidestep', 'shuffle', 'wavecircle'],
+    bass:    ['headbang', 'stomp', 'runningman', 'jumpclap', 'twist', 'shuffle'],
+    chill:   ['sway', 'twist', 'charleston', 'sidestep', 'bounce', 'wavecircle'],
   };
-  const setArms = (aL, aR, lz, lx, rz, rx) => { aL.rotation.z = lz; aL.rotation.x = lx; aR.rotation.z = rz; aR.rotation.x = rx; };
-  const setElbows = (u, l, r) => { u.elbowL.rotation.x = l; u.elbowR.rotation.x = r; };
+  const BATTLE_MOVES = ['point', 'shuffle', 'jumpclap', 'spin', 'robot'];
+  const armLimit = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const setArms = (aL, aR, lz, lx, rz, rx) => {
+    aL.rotation.z = armLimit(-lz, -2.45, 0.9); aL.rotation.x = armLimit(lx, -1.15, 1.15);
+    aR.rotation.z = armLimit(-rz, -0.9, 2.45); aR.rotation.x = armLimit(rx, -1.15, 1.15);
+  };
+  const setElbows = (u, l, r) => { u.elbowL.rotation.x = armLimit(l, -1.25, -0.05); u.elbowR.rotation.x = armLimit(r, -1.25, -0.05); };
   // 脚：股関節と膝の前後曲げ(rotation.x)
   const setLegs = (u, lh, lk, rh, rk) => { u.legL.rotation.x = lh; u.kneeL.rotation.x = lk; u.legR.rotation.x = rh; u.kneeR.rotation.x = rk; };
+  const angleDelta = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+  function captureDancerFrame(d) {
+    const u = d.userData;
+    u.prevFrame = u.prevFrame || {
+      pos: new THREE.Vector3(),
+      rot: new THREE.Euler(),
+      armL: new THREE.Euler(), armR: new THREE.Euler(), elbowL: new THREE.Euler(), elbowR: new THREE.Euler(),
+      legL: new THREE.Euler(), legR: new THREE.Euler(), kneeL: new THREE.Euler(), kneeR: new THREE.Euler(),
+      head: new THREE.Euler(), hips: new THREE.Euler(),
+    };
+    const f = u.prevFrame;
+    f.pos.copy(d.position); f.rot.copy(d.rotation);
+    f.armL.copy(u.armL.rotation); f.armR.copy(u.armR.rotation); f.elbowL.copy(u.elbowL.rotation); f.elbowR.copy(u.elbowR.rotation);
+    f.legL.copy(u.legL.rotation); f.legR.copy(u.legR.rotation); f.kneeL.copy(u.kneeL.rotation); f.kneeR.copy(u.kneeR.rotation);
+    f.head.copy(u.head.rotation); f.hips.copy(u.hips.rotation);
+    return f;
+  }
+  function smoothEuler(target, previous, amount) {
+    target.x = previous.x + angleDelta(previous.x, target.x) * amount;
+    target.y = previous.y + angleDelta(previous.y, target.y) * amount;
+    target.z = previous.z + angleDelta(previous.z, target.z) * amount;
+  }
+  function smoothDancerFrame(d, previous, amount) {
+    const u = d.userData;
+    d.position.lerpVectors(previous.pos, d.position, amount);
+    smoothEuler(d.rotation, previous.rot, amount);
+    smoothEuler(u.armL.rotation, previous.armL, amount); smoothEuler(u.armR.rotation, previous.armR, amount);
+    smoothEuler(u.elbowL.rotation, previous.elbowL, amount); smoothEuler(u.elbowR.rotation, previous.elbowR, amount);
+    smoothEuler(u.legL.rotation, previous.legL, amount); smoothEuler(u.legR.rotation, previous.legR, amount);
+    smoothEuler(u.kneeL.rotation, previous.kneeL, amount); smoothEuler(u.kneeR.rotation, previous.kneeR, amount);
+    smoothEuler(u.head.rotation, previous.head, amount); smoothEuler(u.hips.rotation, previous.hips, amount);
+  }
   // 各踊り。c = { home, facing, bd(個別ビート), pe(個別の拍エンベロープ), amp, dt, spin, sideX, sideZ, ud }
   const MOVES = {
     bounce(d, aL, aR, c) {                       // その場で大きくジャンプ、腕を上げてポンプ
@@ -1003,6 +1273,28 @@
       setLegs(u, 0.2, 0.3 + Math.abs(s) * 0.2, 0.2, 0.3 + Math.abs(s) * 0.2);
       setArms(aL, aR, 0.8, -s * 0.6, -0.8, s * 0.6); setElbows(u, -0.8, -0.8);
     },
+    shuffle(d, aL, aR, c) {
+      const u = c.ud, step = Math.sin(c.bd * Math.PI * 4), slide = Math.sin(c.bd * Math.PI * 2);
+      d.position.set(c.home.x + slide * 0.28 * c.sideX, c.home.y + Math.abs(step) * 0.08, c.home.z + slide * 0.28 * c.sideZ);
+      d.rotation.set(0, c.facing + slide * 0.24, 0);
+      setLegs(u, Math.max(0, step) * 0.55, Math.abs(step) * 0.35, Math.max(0, -step) * 0.55, Math.abs(step) * 0.35);
+      setArms(aL, aR, 0.9 + slide * 0.45, -step * 0.45, -0.9 + slide * 0.45, step * 0.45); setElbows(u, -0.7, -0.7);
+    },
+    robot(d, aL, aR, c) {
+      const u = c.ud, tick = Math.floor(c.bd * 4), pose = tick % 4, snap = Math.sin(c.bd * Math.PI * 8) > 0 ? 1 : -1;
+      d.position.set(c.home.x, c.home.y + (pose % 2) * 0.05, c.home.z);
+      d.rotation.set(0, c.facing + (pose - 1.5) * 0.18, snap * 0.04);
+      u.head.rotation.y = snap * 0.32;
+      setArms(aL, aR, pose < 2 ? 1.2 : 2.2, pose % 2 ? -0.8 : 0.2, pose < 2 ? -2.2 : -1.2, pose % 2 ? 0.2 : -0.8); setElbows(u, -1.55, -1.55);
+      setLegs(u, pose === 0 ? 0.35 : 0, 0.25, pose === 2 ? 0.35 : 0, 0.25);
+    },
+    wavecircle(d, aL, aR, c) {
+      const u = c.ud, s = Math.sin(c.bd * Math.PI * 0.8), w = Math.sin(c.bd * Math.PI * 2);
+      d.position.set(c.home.x, c.home.y + (w * 0.5 + 0.5) * 0.13, c.home.z);
+      d.rotation.set(0, c.facing + s * 0.35, s * 0.14);
+      setArms(aL, aR, 2.4 + w * 0.45, s * 0.7, -2.4 + w * 0.45, -s * 0.7); setElbows(u, -0.25, -0.25);
+      setLegs(u, 0.08 + Math.abs(s) * 0.18, 0.2, 0.08 + Math.abs(s) * 0.18, 0.2);
+    },
   };
   function makeSign(text, color = '#00ddff', width = 3.2, height = 0.9) {
     const c = document.createElement('canvas'); c.width = 512; c.height = 160;
@@ -1018,15 +1310,28 @@
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x, y, z); g.add(m); return m;
   }
+  function addCylinder(g, radiusTop, radiusBottom, height, radialSegments, mat, x, y, z) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments), mat);
+    m.position.set(x, y, z); g.add(m); return m;
+  }
   function raveFloorCell(shape, i, j, w, d) {
     const cx = (w - 1) / 2, cz = (d - 1) / 2;
     if (shape === 'cross') return Math.abs(i - cx) <= 1 || Math.abs(j - cz) <= 1;
     if (shape === 'circle') return Math.hypot(i - cx, j - cz) <= Math.min(w, d) / 2 - 0.35;
+    if (shape === 'diamond') return Math.abs(i - cx) + Math.abs(j - cz) <= Math.min(w, d) * 0.55;
     if (shape === 'runway') return true;
     if (shape === 'checker') return true;
     return true;
   }
   function raveDancerPoint(kind, spanX, spanZ) {
+    if (kind === 'future') return new THREE.Vector3(rnd(-spanX * 0.36, spanX * 0.36), 0, rnd(-spanZ * 0.28, spanZ * 0.42));
+    if (kind === 'bass') return Math.random() < 0.5
+      ? new THREE.Vector3(rnd(-spanX * 0.48, -spanX * 0.18), 0, rnd(-spanZ * 0.44, spanZ * 0.44))
+      : new THREE.Vector3(rnd(spanX * 0.18, spanX * 0.48), 0, rnd(-spanZ * 0.44, spanZ * 0.44));
+    if (kind === 'chill') {
+      const a = Math.random() * Math.PI * 2, r = 1.2 + Math.random() * (Math.min(spanX, spanZ) / 2 - 2.1);
+      return new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r);
+    }
     if (kind === 'laser') return new THREE.Vector3(rnd(-spanX * 0.42, spanX * 0.42), 0, rnd(-spanZ * 0.42, spanZ * 0.42));
     if (kind === 'neon') return Math.random() < 0.5
       ? new THREE.Vector3(rnd(-spanX * 0.62, -spanX * 0.42), 0, rnd(-spanZ * 0.35, spanZ * 0.35))
@@ -1037,6 +1342,121 @@
     }
     const a = Math.random() * Math.PI * 2, r = 1.1 + Math.random() * (Math.min(spanX, spanZ) / 2 - 1.6);
     return new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r);
+  }
+  function updateDancerHome(d, kind, beat) {
+    const u = d.userData, anchor = u.anchor || u.home || d.position, home = u.home || anchor.clone();
+    u.home = home;
+    if (u.behavior === 'battle') {
+      const push = Math.max(0, Math.sin(beat * Math.PI * 2 + u.moveSeed * 7));
+      home.x = anchor.x + u.battleSide * (0.18 + push * 0.28);
+      home.z = anchor.z + Math.sin(beat * Math.PI + u.moveSeed * 5) * 0.18;
+      return home;
+    }
+    if (u.behavior === 'spectator') {
+      const sway = Math.sin(beat * 0.9 + u.moveSeed * 8);
+      home.x = anchor.x + sway * 0.12;
+      home.z = anchor.z + Math.cos(beat * 0.7 + u.moveSeed * 5) * 0.12;
+      return home;
+    }
+    if (u.behavior === 'orbit') {
+      const base = Math.atan2(anchor.z, anchor.x) + beat * 0.16 * (u.spin < 0 ? -1 : 1);
+      const radius = Math.max(1.4, Math.hypot(anchor.x, anchor.z));
+      home.x = Math.cos(base) * radius;
+      home.z = Math.sin(base) * radius;
+      return home;
+    }
+    if (u.behavior === 'walk') {
+      home.x = anchor.x + Math.sin(beat * 0.48 + u.moveSeed * 8) * 0.7;
+      home.z = anchor.z + Math.cos(beat * 0.36 + u.moveSeed * 6) * 0.45;
+      return home;
+    }
+    if (u.behavior === 'train') {
+      const angle = beat * 0.28 + u.trainIndex * 0.72 + u.moveSeed;
+      const radius = RAVE.radius * 0.48;
+      home.x = Math.cos(angle) * radius;
+      home.z = Math.sin(angle) * radius;
+      return home;
+    }
+    if (u.behavior === 'stroll') {
+      home.x = anchor.x + Math.sin(beat * 0.18 + u.moveSeed * 9) * 0.45;
+      home.z = anchor.z + Math.cos(beat * 0.14 + u.moveSeed * 5) * 0.35;
+    }
+    return home;
+  }
+  function assignDancerEntrance(d, target, index, spanX, spanZ, kind) {
+    const side = Math.floor(Math.random() * 4), margin = kind === 'bass' ? rnd(12, 17) : kind === 'chill' ? rnd(8, 13) : rnd(10, 15);
+    const gate = new THREE.Vector3(), from = new THREE.Vector3();
+    if (side === 0) { gate.set(-spanX / 2 - 1.05, 0, rnd(-spanZ / 2, spanZ / 2)); from.set(-spanX / 2 - margin, 0, gate.z + rnd(-2.2, 2.2)); }
+    else if (side === 1) { gate.set(spanX / 2 + 1.05, 0, rnd(-spanZ / 2, spanZ / 2)); from.set(spanX / 2 + margin, 0, gate.z + rnd(-2.2, 2.2)); }
+    else if (side === 2) { gate.set(rnd(-spanX / 2, spanX / 2), 0, -spanZ / 2 - 1.05); from.set(gate.x + rnd(-2.2, 2.2), 0, -spanZ / 2 - margin); }
+    else { gate.set(rnd(-spanX / 2, spanX / 2), 0, spanZ / 2 + 1.05); from.set(gate.x + rnd(-2.2, 2.2), 0, spanZ / 2 + margin); }
+    const u = d.userData;
+    const lateBias = Math.pow(Math.random(), 0.58);
+    const delay = rnd(0.15, kind === 'chill' ? 8.5 : 7.2) * lateBias + (index % 3) * rnd(0.05, 0.38);
+    const dist = Math.hypot(target.x - from.x, target.z - from.z);
+    const speed = kind === 'chill' ? rnd(2.1, 3.2) : rnd(3.1, 4.8);
+    u.entryFrom = from; u.entryGate = gate; u.entryTarget = target.clone(); u.entryClock = -delay;
+    u.entryDur = THREE.MathUtils.clamp(dist / speed + rnd(-0.35, 0.85), kind === 'chill' ? 4.2 : 2.8, kind === 'chill' ? 8.2 : 6.7);
+    u.entering = true; u.entrySide = side; u.entryWiggle = rnd(0.24, 0.62); u.entryJump = 0; u.entryJumpT = 1;
+    d.position.copy(from); d.visible = false;
+  }
+  function lerpEntryPath(u, e) {
+    const split = 0.46;
+    if (e < split) return new THREE.Vector3().lerpVectors(u.entryFrom, u.entryGate, e / split);
+    return new THREE.Vector3().lerpVectors(u.entryGate, u.entryTarget, (e - split) / (1 - split));
+  }
+  function entryObstacleAhead(localPos, dir) {
+    if (!RAVE.group) return 0;
+    const gx = RAVE.group.position.x, gy = RAVE.group.position.y, gz = RAVE.group.position.z;
+    let boost = 0;
+    for (const ahead of [0.42, 0.86, 1.28]) {
+      const wx = Math.floor(gx + localPos.x + dir.x * ahead);
+      const wz = Math.floor(gz + localPos.z + dir.z * ahead);
+      const baseY = Math.floor(gy + localPos.y);
+      if (isSolid(wx, baseY, wz)) boost = Math.max(boost, 0.62);
+      if (isSolid(wx, baseY + 1, wz)) boost = Math.max(boost, 1.05);
+      if (isSolid(wx, baseY + 2, wz)) boost = Math.max(boost, 1.35);
+    }
+    return boost;
+  }
+  function entryVenueObstacleAhead(localPos, dir) {
+    let boost = 0;
+    for (const ahead of [0.35, 0.72, 1.08]) {
+      const px = localPos.x + dir.x * ahead, pz = localPos.z + dir.z * ahead;
+      for (const o of RAVE.entryObstacles) {
+        if (Math.abs(px - o.x) <= o.w / 2 + 0.28 && Math.abs(pz - o.z) <= o.d / 2 + 0.28) boost = Math.max(boost, o.h);
+      }
+    }
+    return boost;
+  }
+  function updateDancerEntrance(d, dt, beat) {
+    const u = d.userData;
+    if (!u.entering) return null;
+    u.entryClock += dt;
+    if (u.entryClock < 0) { d.visible = false; return { waiting: true }; }
+    d.visible = true;
+    const raw = Math.min(1, u.entryClock / Math.max(0.1, u.entryDur));
+    const e = raw * raw * (3 - raw * 2);
+    const home = lerpEntryPath(u, e);
+    const next = lerpEntryPath(u, Math.min(1, e + 0.035));
+    const dx = next.x - home.x, dz = next.z - home.z;
+    const len = Math.max(0.001, Math.hypot(dx, dz));
+    const wig = Math.sin((beat * 2.2 + u.moveSeed * 5) * Math.PI) * u.entryWiggle * (1 - e);
+    home.x += (-dz / len) * wig;
+    home.z += (dx / len) * wig;
+    const dir = { x: dx / len, z: dz / len };
+    const obstacleJump = Math.max(entryObstacleAhead(home, dir), entryVenueObstacleAhead(home, dir));
+    if (obstacleJump > 0 && (u.entryJumpT > 0.58 || obstacleJump > u.entryJump + 0.2)) { u.entryJump = obstacleJump; u.entryJumpT = 0; }
+    else u.entryJump = Math.max(0, u.entryJump - dt * 1.9);
+    u.entryJumpT = Math.min(1, u.entryJumpT + dt * 2.6);
+    const plannedHop = Math.max(0, Math.sin(raw * Math.PI * 8 + u.moveSeed * 2.5)) * 0.16 * (1 - raw);
+    home.y += Math.max(plannedHop, u.entryJump * Math.sin(u.entryJumpT * Math.PI));
+    if (raw >= 1) {
+      u.entering = false;
+      d.position.copy(u.entryTarget);
+      return null;
+    }
+    return { home, facing: Math.atan2(dx, dz), progress: raw };
   }
   function buildRaveVenue(kind) {
     raveResetLists();
@@ -1052,6 +1472,9 @@
       if (kind === 'forest') mat = emissiveMat((i + j) % 2 ? 0x123b58 : 0x08162a);
       if (kind === 'laser') mat = emissiveMat((i + j) % 2 ? 0xffffff : 0x101010);
       if (kind === 'classic') mat = emissiveMat((i + j) % 3 ? 0x121217 : 0x23232b);
+      if (kind === 'future') mat = emissiveMat((i + j) % 2 ? 0x25134a : 0x0c1028);
+      if (kind === 'bass') mat = emissiveMat(j % 2 ? 0x071409 : 0x0d2614);
+      if (kind === 'chill') mat = emissiveMat((i + j) % 2 ? 0x101425 : 0x1b1730);
       const m = new THREE.Mesh(tileGeo, mat);
       m.rotation.x = -Math.PI / 2; m.position.set(offX + i * TILE, 0.02, offZ + j * TILE);
       m.userData.ij = i + j; m.userData.kind = kind; m.userData.check = (i + j) % 2; grp.add(m); RAVE.tiles.push(m);
@@ -1060,6 +1483,8 @@
     const metal = new THREE.MeshPhongMaterial({ color: 0x303038, shininess: 30 });
     const rim = addBox(grp, spanX + 1, 0.1, spanZ + 1, dark, 0, -0.06, 0);
     if (kind === 'forest') { rim.geometry.dispose(); rim.geometry = new THREE.CylinderGeometry(spanX / 2 + 0.45, spanX / 2 + 0.45, 0.12, 48); }
+    if (kind === 'future') { rim.geometry.dispose(); rim.geometry = new THREE.CylinderGeometry(Math.min(spanX, spanZ) * 0.58, Math.min(spanX, spanZ) * 0.58, 0.14, 4); rim.rotation.y = Math.PI / 4; }
+    if (kind === 'chill') { rim.geometry.dispose(); rim.geometry = new THREE.CylinderGeometry(Math.min(spanX, spanZ) * 0.52, Math.min(spanX, spanZ) * 0.52, 0.1, 64); }
     for (let i = 0; i < cfg.lights; i++) {
       const L = new THREE.PointLight(0xffffff, 1, 24, 1.6); L.position.set(0, 5.2, 0); grp.add(L);
       const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), emissiveMat(0xffffff)); L.add(bulb);
@@ -1071,6 +1496,10 @@
       RAVE.spots.push(S);
     }
     RAVE.strobe = new THREE.PointLight(0xffffff, 0, 36, 1); RAVE.strobe.position.set(0, 5, 0); grp.add(RAVE.strobe);
+    if (kind !== 'chill' && kind !== 'neon') {
+      const battleRing = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.035, 8, 72), emissiveMat(kind === 'bass' ? 0x66ff88 : kind === 'future' ? 0xff66dd : 0xffdd66, 0.52));
+      battleRing.rotation.x = Math.PI / 2; battleRing.position.y = 0.13; grp.add(battleRing); RAVE.rings.push(battleRing);
+    }
     const laserGeo = new THREE.BoxGeometry(0.05, 0.05, Math.max(spanX, spanZ) * 1.45);
     for (let i = 0; i < cfg.lasers; i++) {
       const m = new THREE.Mesh(laserGeo, emissiveMat(0xff0066, 0.6));
@@ -1121,15 +1550,115 @@
       }
       const sign = makeSign('DANCE', '#ffdd77', 3.0, 0.85); sign.position.set(0, 2.1, -spanZ / 2 + 0.18); grp.add(sign); RAVE.pulses.push(sign);
     }
-    const boothW = kind === 'neon' ? spanX * 0.75 : kind === 'forest' ? 2.1 : kind === 'laser' ? 2.8 : 3.2;
-    const booth = addBox(grp, boothW, 0.95, 1.0, new THREE.MeshPhongMaterial({ color: kind === 'laser' ? 0x5a3810 : 0x15151c }), 0, 0.5, -spanZ / 2 + 0.82);
-    const panel = new THREE.Mesh(new THREE.PlaneGeometry(boothW * 0.82, 0.56), emissiveMat(kind === 'neon' ? 0xffcc22 : kind === 'forest' ? 0x55ddff : kind === 'laser' ? 0xffcc66 : 0x00ddff));
-    panel.position.set(0, 0.72, -spanZ / 2 + 1.33); grp.add(panel); RAVE.pulses.push(panel);
-    const dj = makeDancer(cfg.hue); dj.position.set(0, 1.0, -spanZ / 2 + 0.78); dj.userData.home = dj.position.clone(); grp.add(dj); RAVE.dancers.push(dj);
+    if (kind === 'future') {
+      const skyMat = emissiveMat(0xff88ff, 0.2);
+      const mainFloat = addCylinder(grp, 2.4, 2.0, 0.22, 4, skyMat, 0, 0.34, 0.2);
+      mainFloat.rotation.y = Math.PI / 4; RAVE.pulses.push(mainFloat);
+      for (const p of [[-spanX * 0.42, -spanZ * 0.22], [spanX * 0.42, -spanZ * 0.18], [-spanX * 0.22, spanZ * 0.38], [spanX * 0.24, spanZ * 0.36]]) {
+        const island = addCylinder(grp, 0.72, 0.52, 0.16, 6, emissiveMat(0x66ddff, 0.24), p[0], 0.42, p[1]);
+        island.userData.seed = p[0] + p[1]; RAVE.pulses.push(island);
+      }
+      for (let i = 0; i < 5; i++) {
+        const r = new THREE.Mesh(new THREE.TorusGeometry(1.2 + i * 0.75, 0.026, 6, 72), emissiveMat(i % 2 ? 0xff66dd : 0x66ddff, 0.42));
+        r.rotation.x = Math.PI / 2; r.position.y = 0.9 + i * 0.38; r.userData.seed = i; grp.add(r); RAVE.rings.push(r);
+      }
+      for (let i = 0; i < 8; i++) {
+        const a = i / 8 * Math.PI * 2, orb = new THREE.Mesh(new THREE.SphereGeometry(0.18 + (i % 3) * 0.05, 12, 8), emissiveMat(i % 2 ? 0xff66dd : 0x66ddff, 0.5));
+        orb.position.set(Math.cos(a) * spanX * 0.52, 2.4 + Math.sin(i) * 0.45, Math.sin(a) * spanZ * 0.48); grp.add(orb); RAVE.pulses.push(orb);
+      }
+      for (const x of [-spanX * 0.35, spanX * 0.35]) {
+        const wing = addBox(grp, 0.12, 2.9, spanZ * 0.78, emissiveMat(0x9955ff, 0.38), x, 1.45, 0);
+        RAVE.pulses.push(wing);
+      }
+      const sign = makeSign('FUTURE', '#ff88ff', 3.5, 0.85); sign.position.set(0, 2.3, -spanZ / 2 + 0.18); grp.add(sign); RAVE.pulses.push(sign);
+    }
+    if (kind === 'bass') {
+      const ribMat = emissiveMat(0x44ff66, 0.42);
+      addBox(grp, 0.22, 2.8, spanZ + 1.8, new THREE.MeshPhongMaterial({ color: 0x050905, emissive: 0x001a08 }), -spanX / 2 - 0.62, 1.35, 0);
+      addBox(grp, 0.22, 2.8, spanZ + 1.8, new THREE.MeshPhongMaterial({ color: 0x050905, emissive: 0x001a08 }), spanX / 2 + 0.62, 1.35, 0);
+      addBox(grp, spanX + 1.4, 0.16, spanZ + 1.8, new THREE.MeshPhongMaterial({ color: 0x030603, emissive: 0x001005 }), 0, 2.8, 0);
+      for (let z = -spanZ / 2; z <= spanZ / 2; z += 1.25) {
+        const left = addBox(grp, 0.1, 3.4, 0.1, ribMat.clone(), -spanX / 2 - 0.35, 1.7, z);
+        const right = addBox(grp, 0.1, 3.4, 0.1, ribMat.clone(), spanX / 2 + 0.35, 1.7, z);
+        const top = addBox(grp, spanX + 0.8, 0.1, 0.1, ribMat.clone(), 0, 3.4, z);
+        RAVE.pulses.push(left, right, top);
+      }
+      for (const x of [-spanX / 2 - 0.85, spanX / 2 + 0.85]) for (const z of [-spanZ * 0.36, -spanZ * 0.12, spanZ * 0.12, spanZ * 0.36]) {
+        const stack = addBox(grp, 0.55, 1.15, 0.42, new THREE.MeshPhongMaterial({ color: 0x050805, emissive: 0x00220b }), x, 0.58, z);
+        const coneA = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.05, 18), emissiveMat(0x113319, 0.75));
+        const coneB = coneA.clone();
+        coneA.rotation.x = Math.PI / 2; coneB.rotation.x = Math.PI / 2;
+        coneA.position.set(x, 0.78, z - 0.22); coneB.position.set(x, 0.38, z - 0.22);
+        grp.add(coneA, coneB); RAVE.pulses.push(stack, coneA, coneB);
+        addEntryObstacle(x, z, 0.85, 0.9, 1.15);
+      }
+      const sign = makeSign('DNB', '#66ff88', 2.6, 0.8); sign.position.set(0, 2.2, -spanZ / 2 + 0.18); grp.add(sign); RAVE.pulses.push(sign);
+    }
+    if (kind === 'chill') {
+      const carpet = addCylinder(grp, Math.min(spanX, spanZ) * 0.36, Math.min(spanX, spanZ) * 0.36, 0.035, 64, emissiveMat(0x4050aa, 0.38), 0, 0.075, 0);
+      RAVE.pulses.push(carpet);
+      const moon = new THREE.Mesh(new THREE.SphereGeometry(0.72, 24, 16), emissiveMat(0xd8ddff, 0.65));
+      moon.position.set(spanX * 0.25, 3.4, -spanZ * 0.15); grp.add(moon); RAVE.pulses.push(moon);
+      for (const p of [[-2.6, -1.5, 1.1, 0.42], [2.5, -1.2, 1.05, -0.35], [-1.8, 2.0, 0.9, 0.8]]) {
+        const sofa = addBox(grp, 1.25, 0.32, 0.48, new THREE.MeshPhongMaterial({ color: 0x2d345f, emissive: 0x090d22 }), p[0], 0.23, p[1]);
+        sofa.rotation.y = p[3]; RAVE.pulses.push(sofa);
+        const back = addBox(grp, 1.25, 0.55, 0.16, new THREE.MeshPhongMaterial({ color: 0x252b52, emissive: 0x080b1d }), p[0], 0.5, p[1] - Math.cos(p[3]) * 0.24);
+        back.rotation.y = p[3]; RAVE.pulses.push(back);
+        addEntryObstacle(p[0], p[1], 1.45, 0.9, 0.75);
+      }
+      for (const p of [[-1.1, -0.25], [1.25, 0.55], [0.05, 1.55]]) {
+        const table = addCylinder(grp, 0.34, 0.34, 0.08, 28, new THREE.MeshPhongMaterial({ color: 0x171b34, emissive: 0x050817 }), p[0], 0.29, p[1]);
+        const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), emissiveMat(0xb8c7ff, 0.75)); lamp.position.set(p[0], 0.54, p[1]); grp.add(lamp); RAVE.pulses.push(table, lamp);
+      }
+      for (let i = 0; i < 4; i++) {
+        const a = i / 4 * Math.PI * 2, lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.3, 10), emissiveMat(0x8899ff, 0.34));
+        lamp.position.set(Math.cos(a) * spanX * 0.42, 1.15, Math.sin(a) * spanZ * 0.35); grp.add(lamp); RAVE.pulses.push(lamp);
+      }
+      const sign = makeSign('LOUNGE', '#b8c7ff', 3.1, 0.8); sign.position.set(0, 2.0, -spanZ / 2 + 0.18); grp.add(sign); RAVE.pulses.push(sign);
+    }
+    const gateColor = kind === 'bass' ? 0x66ff88 : kind === 'future' ? 0xff66dd : kind === 'chill' ? 0x9fb2ff : kind === 'laser' ? 0xffcc66 : 0x66ddff;
+    const gatePts = [[-spanX / 2 - 0.95, 0], [spanX / 2 + 0.95, 0], [0, -spanZ / 2 - 0.95], [0, spanZ / 2 + 0.95]];
+    gatePts.forEach((p, i) => {
+      const gate = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.035, 8, 34), emissiveMat(gateColor, 0.58));
+      gate.position.set(p[0], 0.18, p[1]); gate.rotation.x = Math.PI / 2; gate.userData.seed = i * 0.7;
+      grp.add(gate); RAVE.rings.push(gate);
+      const beam = addCylinder(grp, 0.08, 0.22, 0.9, 16, emissiveMat(gateColor, 0.2), p[0], 0.45, p[1]);
+      beam.userData.seed = i * 0.7 + 0.35; RAVE.pulses.push(beam);
+    });
+    const boothW = kind === 'neon' ? spanX * 0.75 : kind === 'forest' ? 2.1 : kind === 'laser' ? 2.8 : kind === 'bass' ? spanX * 0.64 : kind === 'future' ? 2.2 : kind === 'chill' ? 1.8 : 3.2;
+    const boothY = kind === 'future' ? 0.82 : kind === 'chill' ? 0.34 : 0.5;
+    const boothZ = kind === 'future' ? 0.2 : kind === 'chill' ? 0.15 : -spanZ / 2 + 0.82;
+    const booth = addBox(grp, boothW, kind === 'chill' ? 0.55 : 0.95, kind === 'chill' ? 0.72 : 1.0, new THREE.MeshPhongMaterial({ color: kind === 'laser' ? 0x5a3810 : kind === 'bass' ? 0x071109 : kind === 'chill' ? 0x20264a : 0x15151c }), 0, boothY, boothZ);
+    addEntryObstacle(0, boothZ, boothW + 0.6, kind === 'chill' ? 1.15 : 1.45, kind === 'chill' ? 0.72 : 1.05);
+    if (kind === 'future') booth.rotation.y = Math.PI / 4;
+    const panelColor = kind === 'neon' ? 0xffcc22 : kind === 'forest' ? 0x55ddff : kind === 'laser' ? 0xffcc66 : kind === 'future' ? 0xff66dd : kind === 'bass' ? 0x66ff88 : kind === 'chill' ? 0xb8c7ff : 0x00ddff;
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(boothW * 0.82, 0.56), emissiveMat(panelColor));
+    panel.position.set(0, boothY + 0.22, boothZ + 0.51); grp.add(panel); RAVE.pulses.push(panel);
+    const dj = makeDancer(cfg.hue);
+    dj.position.set(0, kind === 'future' ? 1.3 : kind === 'chill' ? 0.82 : 1.0, kind === 'future' ? 0.12 : kind === 'chill' ? 0.38 : -spanZ / 2 + 0.78);
+    dj.userData.home = dj.position.clone(); dj.userData.anchor = dj.position.clone(); dj.userData.behavior = 'dj'; grp.add(dj); RAVE.dancers.push(dj);
     for (let i = 0; i < cfg.dancers; i++) {
       const d = makeDancer((cfg.hue + Math.random() * 0.35) % 1);
       const p = raveDancerPoint(kind, spanX, spanZ);
-      d.position.copy(p); d.rotation.y = Math.atan2(-p.x, -p.z); d.userData.home = p.clone();
+      if (i < 6 && kind !== 'chill' && kind !== 'neon') {
+        const pair = Math.floor(i / 2), side = i % 2 === 0 ? -1 : 1;
+        p.set(side * (1.05 + pair * 0.15), 0, (pair - 1) * 1.05);
+        d.userData.behavior = 'battle'; d.userData.battleSide = side;
+      } else if (i < 11 && kind !== 'chill' && kind !== 'neon') {
+        const a = (i - 6) / 5 * Math.PI * 2 + 0.35;
+        p.set(Math.cos(a) * 2.45, 0, Math.sin(a) * 2.05);
+        d.userData.behavior = 'spectator';
+      } else if (i % 7 === 0) {
+        d.userData.behavior = 'train'; d.userData.trainIndex = i;
+      } else if (kind === 'chill') {
+        d.userData.behavior = 'stroll';
+      } else if (kind === 'forest' || kind === 'future' || kind === 'laser') {
+        d.userData.behavior = Math.random() < 0.55 ? 'orbit' : 'walk';
+      } else {
+        d.userData.behavior = 'walk';
+      }
+      d.rotation.y = Math.atan2(-p.x, -p.z); d.userData.home = p.clone(); d.userData.anchor = p.clone();
+      assignDancerEntrance(d, p, i, spanX, spanZ, kind);
       grp.add(d); RAVE.dancers.push(d);
     }
     return grp;
@@ -1160,6 +1689,9 @@
       neon:    { bg: 0x120307, fog: 0x26080a },
       forest:  { bg: 0x03111f, fog: 0x05203a },
       laser:   { bg: 0x140c03, fog: 0x261506 },
+      future:  { bg: 0x08051a, fog: 0x190a33 },
+      bass:    { bg: 0x020903, fog: 0x06200c },
+      chill:   { bg: 0x080a16, fog: 0x111832 },
     }[kind] || { bg: 0x07050f, fog: 0x0a0612 };
     scene.fog = new THREE.Fog(mood.fog, 8, 38); scene.background = new THREE.Color(mood.bg);
     sky.visible = false; clouds.visible = false;
@@ -1182,7 +1714,7 @@
       const duck = actx.createGain(); duck.gain.value = 1; duck.connect(out); RAVE.duck = duck; RAVE.duckDepth = fx.duck;
       RAVE.audioStart = now + 0.12; RAVE.nextNote = RAVE.audioStart; RAVE.step = 0;
     }
-    RAVE.on = true; raveInd.style.display = 'block'; raveInd.textContent = `${cfg.label} ♪${RAVE.songNo}  R/T/Y/U`;
+    RAVE.on = true; raveInd.style.display = 'block'; raveInd.textContent = `${cfg.label} ♪${RAVE.songNo}  R/T/Y/U/I/O/P`;
   }
   function raveUpdate(dt) {
     if (!RAVE.on || !actx) return;
@@ -1211,7 +1743,7 @@
       const sw = Math.sin(beat * 0.7 + i * Math.PI) * RAVE.radius * 0.75;
       S.target.position.set(sw, 0, Math.cos(beat * 0.5 + i) * RAVE.radius * 0.75);
     });
-    const strobeOn = RAVE.kind === 'classic' ? (Math.floor(beat) % 2 === 0) : RAVE.kind === 'neon' ? true : RAVE.kind === 'laser' ? (Math.floor(beat) % 4 === 0) : false;
+    const strobeOn = RAVE.kind === 'classic' ? (Math.floor(beat) % 2 === 0) : RAVE.kind === 'neon' ? true : RAVE.kind === 'laser' ? (Math.floor(beat) % 4 === 0) : RAVE.kind === 'future' ? ph < 0.18 : RAVE.kind === 'bass' ? Math.floor(beat * 2) % 4 === 0 : false;
     RAVE.strobe.intensity = ph < 0.06 && strobeOn ? 50 : 0;
     for (const m of RAVE.tiles) {
       if (RAVE.kind === 'neon') {
@@ -1221,6 +1753,12 @@
         m.material.color.setHSL((0.55 + m.userData.ij * 0.025 + beat * 0.035) % 1, 0.85, 0.13 + env * 0.24);
       } else if (RAVE.kind === 'laser') {
         m.material.color.setHSL(m.userData.check ? 0.12 : 0, m.userData.check ? 0.85 : 0, m.userData.check ? 0.62 + env * 0.25 : 0.06 + env * 0.16);
+      } else if (RAVE.kind === 'future') {
+        m.material.color.setHSL((0.76 + m.userData.ij * 0.035 + beat * 0.08) % 1, 0.95, 0.12 + env * 0.34);
+      } else if (RAVE.kind === 'bass') {
+        m.material.color.setHSL((0.31 + m.userData.ij * 0.01 + beat * 0.02) % 1, 0.95, 0.07 + env * 0.28);
+      } else if (RAVE.kind === 'chill') {
+        m.material.color.setHSL((0.62 + Math.sin(beat * 0.12 + m.userData.ij) * 0.05) % 1, 0.55, 0.1 + env * 0.12);
       } else {
         const hue = (cfg.hue + m.userData.ij * 0.06 + beat * 0.12) % 1;
         m.material.color.setHSL(hue, 0.95, 0.12 + 0.42 * env);
@@ -1243,31 +1781,50 @@
     });
     if (RAVE.mirror) RAVE.mirror.rotation.y += dt * 1.5;
     const k = RAVE.kind;
+    const crowdHype = Math.max(0, Math.sin(beat * Math.PI / 4)) ** 12;
     for (let di = 0; di < RAVE.dancers.length; di++) {
       const d = RAVE.dancers[di], isDJ = di === 0, ud = d.userData;
-      const aL = ud.armL, aR = ud.armR, home = ud.home || d.position;
-      const facing = isDJ ? 0 : Math.atan2(-home.x, -home.z);
+      const previousFrame = captureDancerFrame(d);
+      const aL = ud.armL, aR = ud.armR, entry = isDJ ? null : updateDancerEntrance(d, dt, beat);
+      if (entry && entry.waiting) continue;
+      const home = isDJ ? (ud.home || d.position) : entry ? entry.home : updateDancerHome(d, k, beat);
+      const facing = isDJ ? 0 : entry ? entry.facing : Math.atan2(-home.x, -home.z);
       const bd = beat + ud.beatOffset, pe = Math.abs(Math.sin(bd * Math.PI));
       // 前フレームの踊りのポーズが残らないよう関節を初期化
       ud.elbowL.rotation.set(0, 0, 0); ud.elbowR.rotation.set(0, 0, 0);
       ud.legL.rotation.set(0, 0, 0); ud.legR.rotation.set(0, 0, 0);
       ud.kneeL.rotation.set(0, 0, 0); ud.kneeR.rotation.set(0, 0, 0);
       ud.head.rotation.set(0, 0, 0); ud.hips.rotation.set(0, 0, 0);
+      if (entry) {
+        const entryMove = k === 'chill' ? 'sidestep' : entry.progress < 0.78 ? 'runningman' : 'shuffle';
+        MOVES[entryMove](d, aL, aR, { home, facing, bd: bd * 1.35, pe, amp: ud.amp, dt, spin: ud.spin, sideX: ud.sideX, sideZ: ud.sideZ, ud });
+        ud.head.rotation.y = Math.sin(beat * 1.7 + ud.moveSeed * 5) * 0.25 * (1 - entry.progress);
+        smoothDancerFrame(d, previousFrame, 1 - Math.exp(-dt * 8));
+        continue;
+      }
       if (k === 'neon') {
         // ユーロビート: 全員同期のパラパラ風・高速振付＋同期ジャンプ（あえて揃える）
         d.position.set(home.x, home.y + Math.abs(Math.sin(beat * Math.PI)) * 0.3, home.z);
         d.rotation.set(0, facing, 0);
         const pose = beat * Math.PI;
-        aL.rotation.z = 1.6 + Math.sin(pose); aL.rotation.x = Math.sin(pose * 0.5) * 1.2;
-        aR.rotation.z = -1.6 + Math.sin(pose + Math.PI); aR.rotation.x = Math.sin(pose * 0.5 + Math.PI) * 1.2;
+        aL.rotation.z = -1.6 - Math.sin(pose) * 0.65; aL.rotation.x = Math.sin(pose * 0.5) * 1.0;
+        aR.rotation.z = 1.6 + Math.sin(pose + Math.PI) * 0.65; aR.rotation.x = Math.sin(pose * 0.5 + Math.PI) * 1.0;
         setElbows(ud, -0.6 - Math.abs(Math.sin(pose)) * 0.5, -0.6 - Math.abs(Math.sin(pose + Math.PI)) * 0.5);
+        smoothDancerFrame(d, previousFrame, 1 - Math.exp(-dt * 8));
         continue;
       }
       // 他ジャンルは各NPCが自分のタイミングで踊りをランダムに切り替える
-      const pool = MOVE_POOL[k] || MOVE_POOL.classic;
-      const idx = Math.floor(beat / 4 + ud.moveSeed * 9);
+      const pool = ud.behavior === 'battle' ? BATTLE_MOVES : MOVE_POOL[k] || MOVE_POOL.classic;
+      const idx = Math.floor(beat / (ud.behavior === 'battle' ? 4 : 8) + ud.moveSeed * 9);
       const name = isDJ ? 'bounce' : pool[((idx % pool.length) + pool.length) % pool.length];
       MOVES[name](d, aL, aR, { home, facing, bd, pe, amp: ud.amp, dt, spin: ud.spin, sideX: ud.sideX, sideZ: ud.sideZ, ud });
+      if (!isDJ && k !== 'chill' && crowdHype > 0.08 && ud.behavior !== 'stroll') {
+        const wave = crowdHype * (0.65 + ud.amp * 0.35);
+        d.position.y += wave * 0.18;
+        aL.rotation.z -= wave * 0.65;
+        aR.rotation.z += wave * 0.65;
+      }
+      smoothDancerFrame(d, previousFrame, 1 - Math.exp(-dt * (ud.behavior === 'battle' ? 9 : 6)));
     }
   }
 
