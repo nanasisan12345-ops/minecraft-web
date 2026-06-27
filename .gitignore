@@ -4,3 +4,23 @@
 # OS
 .DS_Store
 Thumbs.db
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+src/game.generated.js
+
+# Local verification logs
+.codex/logs/
+
+# 対象外プロジェクト（別物・巨大）
+gikopoi2/
+hallucinate/
+
+# テクスチャ変換用の素材・中間ファイル（HTMLに埋め込み済みなので不要、HDR等で巨大）
+textures/
+
+# ローカル用の補助ファイル
+*.url
+suno生成プロンプト.txt

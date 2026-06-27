@@ -1,0 +1,20 @@
+{
+  "name": "minecraft-rave-world",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "assemble": "node scripts/assemble-game.mjs",
+    "copy-assets": "node scripts/copy-public-assets.mjs",
+    "dev": "npm run assemble && vite --host 127.0.0.1",
+    "build": "npm run assemble && vite build && npm run copy-assets",
+    "preview": "vite preview --host 127.0.0.1",
+    "check": "npm run build"
+  },
+  "dependencies": {
+    "three": "0.160.1"
+  },
+  "devDependencies": {
+    "vite": "^8.1.0"
+  }
+}
