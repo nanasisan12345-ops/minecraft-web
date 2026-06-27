@@ -62,9 +62,16 @@
       list.appendChild(empty);
       return;
     }
+    const placeSel = typeof currentPlaceType === 'function' ? currentPlaceType() : null;
     for (const entry of entries) {
       const row = document.createElement('div');
       row.className = `inventory-item ${entry.kind}`;
+      const selected = entry.kind === 'block' && entry.id === placeSel;
+      if (entry.kind === 'block') {
+        row.classList.add('placeable');
+        row.dataset.place = entry.id;
+        if (selected) row.classList.add('selected');
+      }
       const icon = document.createElement('span');
       icon.className = 'inventory-icon';
       if (typeof entry.id === 'number' && TYPES[entry.id] && TYPES[entry.id].icon) {
@@ -74,7 +81,8 @@
       }
       const main = document.createElement('div');
       main.className = 'inventory-main';
-      main.innerHTML = `<b>${entry.name}</b><small>${entry.detail || itemCategoryLabel(entry.kind)}</small>`;
+      const sub = entry.kind === 'block' ? (selected ? '✓ 設置中（右クリックで置く）' : 'クリックで設置ブロックに選択') : (entry.detail || itemCategoryLabel(entry.kind));
+      main.innerHTML = `<b>${entry.name}</b><small>${sub}</small>`;
       const count = document.createElement('em');
       count.textContent = `x${entry.count}`;
       row.append(icon, main, count);
@@ -100,10 +108,15 @@
     const close = e.target.closest('[data-close]');
     const tab = e.target.closest('[data-tab]');
     const eat = e.target.closest('[data-eat]');
+    const place = e.target.closest('[data-place]');
     if (close) setInventoryPanelOpen(false);
     if (tab) setInventoryTab(tab.dataset.tab);
     if (eat) {
       eatInventoryFood(eat.dataset.eat);
+      updateInventoryPanel();
+    }
+    if (place && !eat) {
+      if (typeof setHeldBlock === 'function') setHeldBlock(+place.dataset.place);
       updateInventoryPanel();
     }
   });

@@ -70,7 +70,7 @@
     avatarParts.legR.rotation.x = swing;
     avatarParts.head.rotation.x = THREE.MathUtils.clamp(pitch * 0.35, -0.35, 0.35);
     const toolId = mouseHeld.left ? heldToolForTarget(tg) : null;
-    rebuildAvatarHeld(toolId || HOTBAR[selected]);
+    rebuildAvatarHeld(toolId || currentPlaceType());
   }
   function updateCameraView(dt, tg) {
     updatePlayerAvatar(dt, tg);

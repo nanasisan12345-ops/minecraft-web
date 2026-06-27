@@ -125,6 +125,6 @@
     if (hitType === OPEN_CHEST) { thock(120); return; }
     const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
     if (isSolid(x, y, z) || overlapsPlayer(x, y, z)) return;
-    const ty = HOTBAR[selected]; if (!consumeInventory(ty, 1)) { thock(90); return; }
+    const ty = currentPlaceType(); if (!consumeInventory(ty, 1)) { thock(90); return; }
     edits.set(key(x, y, z), ty); saveEditsSoon(); setBlock(x, y, z, ty); requestEditedBlockRebuild(x, y, z); thock(260);
   }

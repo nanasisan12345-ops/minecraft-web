@@ -141,4 +141,29 @@
     }
     return best;
   }
+
+  // ホットバー枠(固定12)に無いブロック（採掘/略奪で得た石レンガ・ランタン等）も設置できるように、
+  // インベントリ画面から選んだブロックを「設置対象」として上書き保持する。
+  let heldBlockOverride = null;
+  function isPlaceableBlock(type) {
+    return typeof type === 'number' && TYPES[type] && TYPES[type].solid !== false;
+  }
+  function currentPlaceType() {
+    if (heldBlockOverride != null && inventoryCount(heldBlockOverride) > 0) return heldBlockOverride;
+    heldBlockOverride = null;
+    return HOTBAR[selected];
+  }
+  function currentPlaceName() {
+    const t = currentPlaceType();
+    return TYPES[t] ? TYPES[t].name : String(t);
+  }
+  function setHeldBlock(type) {
+    if (!isPlaceableBlock(type) || inventoryCount(type) <= 0) return;
+    const slot = HOTBAR.indexOf(type);
+    if (slot >= 0) { heldBlockOverride = null; if (typeof selectSlot === 'function') selectSlot(slot); }
+    else heldBlockOverride = type;
+    if (typeof updateInventoryPanel === 'function') updateInventoryPanel();
+  }
+  function clearHeldOverride() { heldBlockOverride = null; }
+
   initInventory();

@@ -7,7 +7,11 @@
     slot.addEventListener('click', () => selectSlot(i));
     hotbar.appendChild(slot);
   });
-  function selectSlot(i) { selected = i; [...hotbar.children].forEach((s, idx) => s.classList.toggle('on', idx === selected)); }
+  function selectSlot(i, keepOverride = false) {
+    selected = i;
+    if (!keepOverride && typeof clearHeldOverride === 'function') clearHeldOverride();
+    [...hotbar.children].forEach((s, idx) => s.classList.toggle('on', idx === selected));
+  }
   function updateHotbarCounts() {
     [...hotbar.children].forEach((slot, i) => {
       const n = inventoryCount(HOTBAR[i]);

@@ -8,6 +8,7 @@
 
 ### 状態
 - ブランチ `main`。**2026-06-27: Vite移行＋全機能＋ `music/` を初コミット＆push 済み**（commit `dc3a03e`）。これで **GitHub Pages の公開サイトが単一HTML版 → Viteビルド版（GitHub Actions deploy）へ切替**。デプロイ成功確認済み。以降は通常どおり機能ごとにコミット/push してよい。
+- **⚠️ GitHub Pages の配信元は必ず「GitHub Actions」（API上 `build_type: workflow`）にすること。** 初回は「ブランチ main /（legacy）」のままで、ビルド前の素の `index.html`（`/src/styles.css`・`/src/main.js` を絶対パス参照、しかも `game.generated.js` は未コミット）を配信してしまい、全アセット404で公開サイトが真っ白/素テキスト表示になった。`gh api -X PUT repos/<owner>/minecraft-web/pages -f build_type=workflow` で切替→`gh workflow run "Deploy GitHub Pages"` で再デプロイして復旧。配信HTMLが `./assets/...`（相対）を参照していればOK。`vite.config.js` の `base: './'` がサブパス配信の肝。
 - `.gitignore` で `gikopoi2/` `hallucinate/` `textures/` `*.url` `suno生成プロンプト.txt` を除外（巨大/対象外のため）。`music/`（mp3 計~153MB・最大7MB）はPages BGM用にコミット済み。
 - ビルドは通る: `npm.cmd run check` 成功（37パーツ）。`npm run dev`（127.0.0.1:5173）でロード時 `__mcReady=true`・console error/warnなし。
 - 既知の軽微事項: `.github/workflows/deploy-pages.yml` の actions が Node20非推奨警告（Node24で強制実行されるため動作はする）。v5系へ更新推奨。
@@ -31,6 +32,16 @@
 - 採掘した新ブロック（石レンガ等）はインベントリに入るが**ホットバー枠が固定12のため設置不可** → クラフト追加 or ホットバー拡張で設置可能にする（番号キー1〜8は会場用なので競合注意）。
 
 ---
+
+## 2026-06-27 追記: 採掘/略奪した新ブロックを設置可能に（インベントリ画面から選択）
+
+- 課題: ホットバーが固定12枠のため、ダンジョン/村の戦利品（石レンガ・苔石レンガ・ランタン等）はインベントリに入るが**設置できなかった**。番号キー1〜8は会場用で競合するため、ホットバー拡張ではなく**インベントリ画面（Tab）からの選択**で解決。
+- `src/game/parts/53-inventory.js`: `heldBlockOverride` と `currentPlaceType()` / `currentPlaceName()` / `setHeldBlock()` / `clearHeldOverride()` を追加。ホットバー枠外のブロックを「設置対象」として上書き保持し、枠内の種類ならその枠を選択し直す。在庫が尽きたら自動でホットバーに戻る。
+- `src/game/parts/52-raycast.js`: `placeBlock()` が `HOTBAR[selected]` ではなく `currentPlaceType()` を置く。
+- `src/game/parts/56-inventory-panel.js`: ブロック行をクリックで設置対象に選択（`data-place`）。選択中の行をハイライト＋「✓ 設置中」表示。`56-hotbar-ui.js` の `selectSlot()` はホットバー選択時に override をクリア（マウスホイール/枠クリックが常に優先）。
+- `src/game/parts/58-third-person-view.js` / `82-weather-and-loop.js`: 三人称の持ち物と左上「選択:」表示も現在の設置ブロックを反映。`src/styles.css`: 選択行のハイライトCSS。
+- 確認: `npm.cmd run check` 成功。**実ブラウザ（dev `127.0.0.1:5174`）でDOM検証**: ロードで `__mcReady=true`・console error/warnなし。localStorageに石レンガ(20)/ランタン(23)を仕込んでリロード→Tabのブロックタブに出現→クリックで `selected` 化＋「✓設置中」、ホットバー枠クリックで override 解除（枠ブロックが選択）まで確認。
+- 補足: 真のオーシャン/海岸線/島は別途。**現状この世界は海面(SEA=8)以下の地形がほぼ皆無**（52万列中1列）で、海を作るには `terrainHeightRaw` の大改修が要る＝世界の見た目が一変するため、腰を据えてやる方が良い。
 
 ## 2026-06-27 追記: 川の連続性・峡谷・滝（地形拡張）
 

@@ -81,6 +81,10 @@
   #inventoryPanel .inventory-main small { display: block; margin-top: 2px; color: rgba(255,255,255,.68); font-size: 11px; }
   #inventoryPanel .inventory-item em { font-style: normal; font-weight: 850; font-variant-numeric: tabular-nums; }
   #inventoryPanel .inventory-item > button { padding: 6px 9px; font-size: 12px; }
+  #inventoryPanel .inventory-item.placeable { cursor: pointer; }
+  #inventoryPanel .inventory-item.placeable:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.22); }
+  #inventoryPanel .inventory-item.selected { background: rgba(120,200,120,.18); border-color: rgba(140,230,140,.6); box-shadow: 0 0 0 1px rgba(140,230,140,.35) inset; }
+  #inventoryPanel .inventory-item.selected small { color: rgba(170,240,170,.95); }
   #inventoryPanel .inventory-empty { padding: 22px 10px; text-align: center; color: rgba(255,255,255,.68); font-size: 13px; }
 
   #stats { position: fixed; left: 10px; top: 10px; z-index: 10; color: #fff; font-size: 12px;

@@ -158,7 +158,7 @@
     TX.water.offset.x += dt * 0.02; TX.water.offset.y -= dt * 0.03; // 水面の流れ
 
     const biomeLabel = biomeLabelAt(Math.floor(player.pos.x), Math.floor(player.pos.z));
-    stats.textContent = `XYZ ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}　　選択: ${TYPES[HOTBAR[selected]].name}　　地形チャンク: ${terrainChunkCount()}　　バイオーム: ${biomeLabel}${RAVE.on ? '' : '　　時間: ' + DAY.label + '　　天候: ' + weatherLabel}${raveStatsText()}`;
+    stats.textContent = `XYZ ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}　　選択: ${currentPlaceName()}　　地形チャンク: ${terrainChunkCount()}　　バイオーム: ${biomeLabel}${RAVE.on ? '' : '　　時間: ' + DAY.label + '　　天候: ' + weatherLabel}${raveStatsText()}`;
     renderer.render(scene, camera);
   }
   regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z)); // 初期生成
