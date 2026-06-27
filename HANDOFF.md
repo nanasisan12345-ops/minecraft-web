@@ -7,8 +7,10 @@
 ## 🚩 次セッションへの引き継ぎ（最初に読む）
 
 ### 状態
-- ブランチ `main`。**作業はすべて未コミット**。重要: Vite移行で作った `src/` ツリー自体がまだ **git untracked**（`git status` で `?? src/`）。今セッションの全機能もこの未追跡の `src/game/parts/*.js` に入っている。**まず一度コミット/プッシュ推奨**（ユーザーは保留中）。
+- ブランチ `main`。**2026-06-27: Vite移行＋全機能＋ `music/` を初コミット＆push 済み**（commit `dc3a03e`）。これで **GitHub Pages の公開サイトが単一HTML版 → Viteビルド版（GitHub Actions deploy）へ切替**。デプロイ成功確認済み。以降は通常どおり機能ごとにコミット/push してよい。
+- `.gitignore` で `gikopoi2/` `hallucinate/` `textures/` `*.url` `suno生成プロンプト.txt` を除外（巨大/対象外のため）。`music/`（mp3 計~153MB・最大7MB）はPages BGM用にコミット済み。
 - ビルドは通る: `npm.cmd run check` 成功（37パーツ）。`npm run dev`（127.0.0.1:5173）でロード時 `__mcReady=true`・console error/warnなし。
+- 既知の軽微事項: `.github/workflows/deploy-pages.yml` の actions が Node20非推奨警告（Node24で強制実行されるため動作はする）。v5系へ更新推奨。
 
 ### 開発・確認の鉄則
 - 編集対象は `src/game/parts/*.js` と `src/styles.css`。`src/game.generated.js` は `npm run assemble` が結合する自動生成物（直接編集しない）。パーツはファイル名のアルファベット順で結合され、**module直下スコープを全パーツで共有**（関数宣言は巻き上げで前後参照OK、const/letはTDZあり＝トップレベルで後方の値を参照しない）。
