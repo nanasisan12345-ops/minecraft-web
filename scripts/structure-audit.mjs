@@ -47,13 +47,32 @@ function extractFunctions(text) {
 }
 const fnSrc = extractFunctions(src).join('\n');
 
+// 大仏の取り込みデータ（パーツ19）を読み込んで daibutsuVoxels を供給する。
+let DAIBUTSU_DIMS = [0, 0, 0], daibutsuVoxels = () => [];
+try {
+  const d = fs.readFileSync(path.join(ROOT, 'src/game/parts/19-daibutsu-data.js'), 'utf8');
+  const dims = d.match(/DAIBUTSU_DIMS = \[(\d+), (\d+), (\d+)\]/);
+  const b64 = d.match(/DAIBUTSU_B64 = "([^"]+)"/);
+  if (dims && b64) {
+    DAIBUTSU_DIMS = [+dims[1], +dims[2], +dims[3]];
+    const [W, H, Dd] = DAIBUTSU_DIMS;
+    const bin = Buffer.from(b64[1], 'base64');
+    const out = []; let bi = 0;
+    for (let y = 0; y < H; y++) for (let z = 0; z < Dd; z++) for (let x = 0; x < W; x++) {
+      if (bin[bi >> 3] & (1 << (bi & 7))) out.push([x, y, z]);
+      bi++;
+    }
+    daibutsuVoxels = () => out;
+  }
+} catch (e) {}
+
 // --- サンドボックス実行 ---
 function buildStructure(name, plan, box) {
   const blocks = new Map();
   const put = (x, y, z, t) => { if (t != null) blocks.set(`${x},${y},${z}`, t); };
   const air = (x, y, z) => { blocks.delete(`${x},${y},${z}`); };
   const heightAt = () => box.base - 1; // 平地扱い（base 未満の埋めは発生しない）
-  const ctx = { ...NAMES, put, air, heightAt, Math, plan, box };
+  const ctx = { ...NAMES, put, air, heightAt, Math, plan, box, DAIBUTSU_DIMS, daibutsuVoxels };
   const argNames = Object.keys(ctx);
   const body = `${fnSrc}\n; return ${name}(plan, box.base, box.minX, box.maxX, box.minZ, box.maxZ, put, air);`;
   const fn = new Function(...argNames, body);
@@ -174,7 +193,7 @@ const PLANS = {
   pagoda:      {fn:'addPagoda',      plan:{}, half:7, baseY:0},
   teahouse:    {fn:'addTeahouse',    plan:{}, half:5, baseY:1},
   castle:      {fn:'addCastle',      plan:{}, half:7, baseY:0},
-  daibutsu:    {fn:'addGiantDaibutsu',plan:{}, half:14, baseY:0},
+  daibutsu:    {fn:'addGiantDaibutsu',plan:{w:75,d:43}, half:38, baseY:0},
   riceTerrace: {fn:'addRiceTerrace', plan:{dir:'x'}, half:9, baseY:0},
   tokyoTower:  {fn:'addTokyoTower',  plan:{}, half:6, baseY:0},
 };

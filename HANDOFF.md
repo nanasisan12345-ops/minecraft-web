@@ -4,6 +4,23 @@
 
 ---
 
+## 2026-06-30 追記: ★構造データパック取り込み方式を確立（大仏を実データで作り直し）
+
+- ユーザー指示「Minecraftの構造物追加データパックを参照して作れないか。**うまくいったら今後の構造物・自然物追加はこの方式を基本に**」。手彫りの大仏が斜めから見ると緑の塊で不評だったため、**実在の構造データを取り込む方式**へ転換し、成立した。
+- **取り込み元**: Sengoku Jidai: Japanese Overworld（CurseForge データパック, project 1056976）。`buddah1〜5` / `pagoda` / `castle` / 各 shrine 等の **vanilla structure `.nbt`** を多数同梱（`data/shioh/structures/...`）。**ライセンス注意**: これは他者のデータパック。**ブロック配置(=形状)を参照して我々のブロックで作り直す**範囲に留め、アセットそのものを再配布しない（`.nbt`/zipはコミットしない＝`.tmp`/scratchpadのみ）。
+- **ダウンロード**: CurseForge内部API（`https://www.curseforge.com/api/v1/mods/<id>/files` → `/files/<fileId>/download`）を **PowerShell `Invoke-WebRequest` + ブラウザUA** で取得（Bash curl はサンドボックスSSL不可）。データ専用zip（id 5500618, 10MB）を採用。
+- **パイプライン（再利用可能・コミット済み）**:
+  - `scripts/nbt-structure.mjs`: vanilla `.nbt`（gzip+NBTバイナリ）を `{size, palette, blocks:[[x,y,z,stateIdx]]}` にパース。
+  - `scripts/import-daibutsu.mjs`: `buddah3.nbt`(73×80×41, 11.8万ブロック・stone系のみ) を占有グリッド化→**内部を中空化（表面のみ＝1.43万）**→bbox 73×76×41→**base64ビットマスク**で書き出し。
+  - 生成データを `src/game/parts/19-daibutsu-data.js`（`DAIBUTSU_DIMS`/`DAIBUTSU_B64`/`daibutsuVoxels()`、38KB base64）に**埋め込み**。`atob`で復号しキャッシュ。
+  - `scripts/structure-audit.mjs`: パーツ19を読んで `daibutsuVoxels` を供給し、配置後の姿を front/iso PNG で検証できるよう更新。
+- **大仏ビルダー**（`addGiantDaibutsu` を全面置換）: 取り込んだ表面ボクセルを **石系→青銅(BRONZE) にリマップ**して配置＋石レンガ基壇＋**頭部背面の金のサンバースト光背**＋前の石灯籠/賽銭箱。向きは顔=低z=‐Z前面（確認済み）。
+- **世界の縦拡張**: 高さ80の像を収めるため `24-instanced-meshes.js` の **`CHUNK_Y_MAX` 80→104**。富士山が `CHUNK_Y_MAX-4` を上限にしていたので、波及しないよう `32-world-window.js:130` を **literal 76 に固定**（富士山は従来どおり）。
+- daibutsu のサイズ `[27,23]→[75,43]`、`structureBase` 平坦許容 `5→8`、`clearTop` `base+28→base+86`。`49-debug-mode.js` の `0` 移動は巨大像の全身が入るよう正面48マス後方・y+22・pitch-0.30へ。
+- 確認: `npm.cmd run check` 成功（40ファイル）。`scripts/structure-audit.mjs . daibutsu` の front/iso で巨大な青銅座像＋金光背を確認。**実ブラウザでの最終確認はユーザー画面でリロード後に推奨**（生成時に約2万ブロック配置＝一瞬の負荷あり、レアなランドマークなので許容）。
+- **今後の方針**: 他のランドマーク/構造物/自然物も、まず良い構造データ（Sengokuの pagoda/castle/shrine 等、または無料schematic/datapack）を探して `nbt-structure.mjs` で取り込み→我々のブロックにリマップ→配置、を基本にする。手彫りはデータが無い時のフォールバック。
+
+
 ## 2026-06-30 追記: 日本ランドマークを参照画像と見比べて作り直し（第1弾）
 
 - ユーザー指示「今まで作った構造物を、Minecraftの作例を画像検索で見比べながら作り直す。必要なら新ブロックも追加してよい」を受け、まず日本ランドマークを再構築。音楽会場系は触っていない。

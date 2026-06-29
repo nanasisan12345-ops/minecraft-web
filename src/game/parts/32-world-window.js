@@ -127,7 +127,7 @@
     let h = terrainHeightRawCached(x, z);
     h = Math.round(THREE.MathUtils.clamp(h, 3, 32));
     const lm = landmarkHeightAt(x, z);
-    if (lm > h) h = Math.min(lm, CHUNK_Y_MAX - 4);
+    if (lm > h) h = Math.min(lm, 76); // 富士山の高さは従来どおり（CHUNK_Y_MAX拡張の影響を受けない）
     HEIGHT_CACHE.set(id, h);
     if (HEIGHT_CACHE.size > 90000) HEIGHT_CACHE.clear();
     return h;
@@ -430,7 +430,7 @@
       type === 'pagoda' ? [15, 15] :
       type === 'teahouse' ? [9, 7] :
       type === 'castle' ? [13, 13] :
-      type === 'daibutsu' ? [27, 23] :
+      type === 'daibutsu' ? [75, 43] :
       type === 'riceTerrace' ? (dir === 'x' ? [15, 11] : [11, 15]) :
       type === 'tokyoTower' ? [9, 9] :
       type === 'ruin' ? [8, 7] : [7, 6];
@@ -473,7 +473,7 @@
     const limit =
       plan.type === 'riceTerrace' ? 5 :
       plan.type === 'tower' || plan.type === 'antenna' || plan.type === 'observatory' || plan.type === 'outpost' || plan.type === 'tokyoTower' ? 4 :
-      plan.type === 'daibutsu' ? 5 :
+      plan.type === 'daibutsu' ? 8 :
       plan.type === 'ruin' || plan.type === 'shrine' || plan.type === 'torii' || plan.type === 'waterTorii' || plan.type === 'castle' ? 3 : 2;
     if (hi - lo > limit) return null;
     return hi + 1;
@@ -777,90 +777,35 @@
   // Giant seated Daibutsu. The large footprint is intentional: with Minecraft-scale blocks,
   // a small statue collapses before the face, ears, knees, and halo can read clearly.
   function addGiantDaibutsu(plan, base, minX, maxX, minZ, maxZ, put) {
-    // 鎌倉/奈良の大仏を参照した青銅の座像。正面は -Z 側。
-    const cx = plan.x, cz = plan.z, B = BRONZE, D = BRONZE_DARK;
-    const oval = (y, mx, mz, rx, rz, mat = B, bias = 1.05) => {
-      for (let x = mx - rx; x <= mx + rx; x++) for (let z = mz - rz; z <= mz + rz; z++) {
-        if (((x - mx) / Math.max(1, rx)) ** 2 + ((z - mz) / Math.max(1, rz)) ** 2 <= bias) put(x, y, z, mat);
-      }
-    };
-    const ball = (cy, mx, mz, r, mat = B, bias = 1.12) => {
-      for (let y = cy - r; y <= cy + r; y++) for (let x = mx - r; x <= mx + r; x++) for (let z = mz - r; z <= mz + r; z++) {
-        if (((x - mx) / r) ** 2 + ((y - cy) / r) ** 2 + ((z - mz) / r) ** 2 <= bias) put(x, y, z, mat);
-      }
-    };
-
-    // 石の基壇（2段）
+    // Sengoku データパック(buddah3)を取り込んだ巨大な青銅の大仏。石系→青銅にリマップ。正面は -Z 側。
+    const cx = plan.x;
+    const vox = daibutsuVoxels();
+    const [W, H, D] = DAIBUTSU_DIMS;
+    const ox = minX + Math.floor((plan.w - W) / 2);
+    const oz = minZ + Math.floor((plan.d - D) / 2);
+    const sy = base + 1; // 石基壇の上に立てる
+    // 石レンガの基壇（footprint を均す）
     for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK);
-    for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) put(x, base + 1, z, STONE);
-
-    // 蓮華座（下に広い二段の蓮弁＋白い弁先）。膝が一回り外へ出るよう控えめに。
-    oval(base + 2, cx, cz + 1, 10, 7, STONE);
-    oval(base + 3, cx, cz + 1, 9, 6, STONE);
-    for (let a = 0; a < 18; a++) { const t = a / 18 * Math.PI * 2; put(cx + Math.round(Math.cos(t) * 9), base + 3, cz + 1 + Math.round(Math.sin(t) * 6), PLASTER); }
-
-    // 金の光背（後光）。像体の背面に大きなサンバーストの円盤＋放射光を立てる。
-    // 参照作例どおり「大仏だと一発で分かる」最大の記号。正面からは像のまわりを縁取る。
-    const zHalo = cz + 7, hcy = base + 14, hr = 10;
-    for (let y = hcy - hr; y <= hcy + hr; y++) for (let x = cx - hr; x <= cx + hr; x++) {
-      const d = Math.hypot(x - cx, y - hcy);
-      if (d <= hr) put(x, y, zHalo, GOLD_BLOCK);                  // 円盤
+    // 取り込んだ像体（青銅）
+    for (let i = 0; i < vox.length; i++) { const v = vox[i]; put(ox + v[0], sy + v[1], oz + v[2], BRONZE); }
+    // 金の光背（頭の背面に大きなサンバースト）
+    const headY = sy + H - 13, backZ = oz + D + 1, hr = 17;
+    for (let yy = headY - hr; yy <= headY + hr; yy++) for (let xx = cx - hr; xx <= cx + hr; xx++) {
+      const d = Math.hypot(xx - cx, yy - headY);
+      if (d >= hr - 2 && d <= hr) put(xx, yy, backZ, GOLD_BLOCK);  // 円環
     }
-    for (let a = 0; a < 24; a++) {                                 // 放射光（とがった光条）
+    for (let a = 0; a < 24; a++) {                                  // 放射光
       const t = a / 24 * Math.PI * 2;
-      for (let rr = hr; rr <= hr + (a % 2 ? 3 : 2); rr++) put(cx + Math.round(Math.cos(t) * rr), hcy + Math.round(Math.sin(t) * rr), zHalo, GOLD_BLOCK);
+      for (let rr = hr; rr <= hr + 3; rr++) put(cx + Math.round(Math.cos(t) * rr), headY + Math.round(Math.sin(t) * rr), backZ, GOLD_BLOCK);
     }
-
-    // 像体は「正面の輪郭(半幅) × 奥行き」で中身を詰めて造形する。
-    // 膝の棚・腰のくびれ・張った肩・首のくびれ・大きな丸頭をはっきり出す。
-    const fb = base + 4;                 // 像体の底（蓮華座の上）
-    // [半幅, 前方の張り出し(z-), 後方(z+)]
-    const profile = [
-      [9, 7, 5], [9, 7, 5], [9, 6, 5],   // 0-2 結跏趺坐の脚（膝＝最も広い棚）
-      [7, 4, 5],                          // 3 腿
-      [4, 3, 5], [5, 3, 5], [6, 3, 5],   // 4-6 腰のくびれ→腹→胸
-      [7, 3, 5], [6, 3, 4],               // 7-8 丸い肩（上半身で最も広い）
-      [3, 2, 3], [2, 2, 3],               // 9-10 首（はっきりくびれ）
-      [4, 3, 4], [5, 3, 4], [5, 3, 4],   // 11-13 頭（丸く膨らむ）
-      [4, 2, 3], [3, 2, 2],               // 14-15 頭頂
-      [2, 2, 2], [1, 1, 1],               // 16-17 肉髻
-    ];
-    for (let r = 0; r < profile.length; r++) {
-      const [hw, fd, bd] = profile[r], y = fb + r;
-      for (let x = cx - hw; x <= cx + hw; x++) for (let z = cz - fd; z <= cz + bd; z++) put(x, y, z, B);
-    }
-    const headBase = fb + 11;            // 顔の下端（あご）付近
-
-    // 衣の襞（縦の流れ）。胸〜膝にかけて陰の縦線を数本入れて布らしく。
-    for (const dx of [-4, -1, 2]) for (let y = fb + 1; y <= fb + 6; y++) put(cx + dx, y, cz - (y <= fb + 2 ? 6 : 3), D);
-    // 定印の手（膝中央で椀状に重ねる）
-    for (let x = cx - 3; x <= cx + 3; x++) put(x, fb + 1, cz - 7, D);
-    for (let x = cx - 2; x <= cx + 2; x++) put(x, fb + 2, cz - 7, B);
-    // 胸元の衣（偏袒右肩・陰のV字）
-    put(cx, fb + 8, cz - 3, D); put(cx - 1, fb + 7, cz - 3, D); put(cx + 1, fb + 7, cz - 3, D);
-    put(cx - 2, fb + 6, cz - 3, D); put(cx + 2, fb + 6, cz - 3, D);
-
-    // 長い耳たぶ（頭の左右に密着させて穴を作らない）
-    for (let y = headBase - 1; y <= headBase + 3; y++) { put(cx - 5, y, cz - 1, B); put(cx + 5, y, cz - 1, B); }
-    // 螺髪の生え際（額の上を一段濃く）
-    for (let x = cx - 3; x <= cx + 3; x++) put(x, headBase + 4, cz - 1, D);
-
-    // 顔（前面 z=cz-3）
-    const fz = cz - 3;
-    put(cx - 1, headBase + 1, fz, D); put(cx + 1, headBase + 1, fz, D); // 伏し目
-    put(cx, headBase + 2, fz, PLASTER);                                  // 白毫
-    put(cx, headBase, fz - 1, B);                                        // 鼻（前へ1マス）
-    put(cx, headBase - 1, fz, D);                                        // 口
-
-    // 基壇前の灯籠と賽銭箱
+    // 前の石灯籠と賽銭箱
     for (const sx of [-1, 1]) {
-      const lx = cx + sx * 9;
-      put(lx, base + 2, minZ + 2, STONE_BRICK);
-      for (let y = base + 3; y <= base + 4; y++) put(lx, y, minZ + 2, STONE);
-      put(lx, base + 5, minZ + 2, LANTERN);
+      const lx = cx + sx * Math.floor(W / 2 - 2);
+      put(lx, base + 1, minZ + 2, STONE_BRICK);
+      for (let y = base + 2; y <= base + 3; y++) put(lx, y, minZ + 2, STONE);
+      put(lx, base + 4, minZ + 2, LANTERN);
     }
-    for (let z = minZ; z <= minZ + 4; z++) put(cx, base + 2, z, STONE_BRICK);
-    put(cx, base + 3, minZ + 1, CHEST);
+    put(cx, base + 1, minZ + 1, CHEST);
   }
 
   // 棚田。地形を大きく変えず、段々の水田と小さな案山子を作る。
@@ -1093,7 +1038,7 @@
     const air = (x, y, z) => { if (inWin(x, z)) world.delete(key(x, y, z)); };
     const clearTop =
       plan.type === 'tokyoTower' ? base + 36 :
-      plan.type === 'daibutsu' ? base + 28 :
+      plan.type === 'daibutsu' ? base + 86 :
       plan.type === 'pagoda' ? base + 34 :
       plan.type === 'castle' ? base + 24 :
       plan.type === 'antenna' ? base + 15 :

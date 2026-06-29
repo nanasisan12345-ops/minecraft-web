@@ -1,5 +1,5 @@
   /* ============== チャンク化ブロックメッシュ（見える面だけを結合） ============== */
-  const CHUNK_SIZE = 24, CHUNK_Y_MIN = 0, CHUNK_Y_MAX = 80;
+  const CHUNK_SIZE = 24, CHUNK_Y_MIN = 0, CHUNK_Y_MAX = 104; // 大仏など高層ランドマークを収めるため拡張
   const terrainChunks = new Map();
   const drawCountsByType = TYPES.map(() => 0);
   const chunkKey = (cx, cz) => cx + ',' + cz;

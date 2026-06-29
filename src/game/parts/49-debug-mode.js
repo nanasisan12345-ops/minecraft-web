@@ -146,9 +146,10 @@
     if (!best) { setDebugToast(`近くに${JP_LABEL[type]}が見つかりません（0でさらに次へ）`); return; }
     const { p, b } = best;
     if (type === 'daibutsu') {
-      player.pos.set(p.x + 0.5, b + 12, p.z - Math.floor(p.d / 2) - 10 + 0.5);
+      // 巨大な座像の全身が入るよう、正面へ大きく下がって少し見上げる
+      player.pos.set(p.x + 0.5, b + 22, p.z - Math.floor(p.d / 2) - 48 + 0.5);
       yaw = Math.PI;
-      pitch = -0.45;
+      pitch = -0.30;
     } else {
       const flyY = type === 'tokyoTower' ? b + 32 : b + 6;
       player.pos.set(p.x + 0.5, flyY, p.z + 0.5);
