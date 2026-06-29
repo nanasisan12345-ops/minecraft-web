@@ -46,6 +46,8 @@
     { name: '瓦', color: 0x44525c, icon: T.roofTile, mats: faceMats(T.roofTile, { shininess: 14, specular: 0x223344 }) }, // 30
     { name: '金ブロック', color: 0xe6c23a, icon: T.goldBlock, mats: faceMats(T.goldBlock, { shininess: 22, specular: 0x6a5400 }) }, // 31
     { name: '銅瓦', color: 0x4a9e86, icon: T.copperRoof, mats: faceMats(T.copperRoof, { shininess: 12, specular: 0x224433 }) }, // 32
+    { name: '青銅', color: 0x6f8472, icon: T.bronze, mats: faceMats(T.bronze, { shininess: 10, specular: 0x2a3a30 }) }, // 33
+    { name: '青銅(陰)', color: 0x47554b, icon: T.bronzeDark, mats: faceMats(T.bronzeDark, { shininess: 8, specular: 0x1f2a24 }) }, // 34
   ];
   const GRASS = 0, DIRT = 1, STONE = 2, LOG = 3, LEAVES = 4, SAND = 5, PLANKS = 6, BRICK = 7, GLASS = 8, WATER = 9, SNOW = 10;
   const COAL_ORE = 11, IRON_ORE = 12, GOLD_ORE = 13, DIAMOND_ORE = 14, TORCH = 15;
@@ -53,4 +55,5 @@
   const GLOW_CRYSTAL = 18, DRIPSTONE = 19;
   const STONE_BRICK = 20, MOSSY_BRICK = 21, CHEST = 22, LANTERN = 23, LAVA = 24, CACTUS = 25, OPEN_CHEST = 26, VILLAGE_SIGN = 27;
   const VERMILION = 28, PLASTER = 29, ROOF_TILE = 30, GOLD_BLOCK = 31, COPPER_ROOF = 32;
+  const BRONZE = 33, BRONZE_DARK = 34;
   const HOTBAR = [0, 1, 2, 10, 5, 3, 4, 6, 8, TORCH, CRAFTING_TABLE, FURNACE]; // 草 土 石 雪 砂 丸太 葉 板材 ガラス たいまつ 作業台 かまど

@@ -116,6 +116,16 @@
       for (let x = 0; x < S; x += S / 8) { g.fillStyle = tint(0x3a8a72, 0.95); g.fillRect(x, 0, 1, S); }
       dots(g, S, 0x7fd0b8, 0.04, 1.05);
     }),
+    bronze: makeTex((g, S) => {                            // 緑青の青銅（大仏の像体）
+      noise(g, S, 0x6f8472, 0.86, 1.08);
+      dots(g, S, 0x52685a, 0.10, 0.85);                     // 暗い鋳肌の斑
+      dots(g, S, 0x8fb39c, 0.05, 1.12);                     // 緑青のハイライト
+      g.fillStyle = 'rgba(40,54,46,0.22)'; g.fillRect(0, S - 3, S, 3);
+    }),
+    bronzeDark: makeTex((g, S) => {                        // 青銅の陰・面相（目鼻口・衣の襞）
+      noise(g, S, 0x47554b, 0.85, 1.08);
+      dots(g, S, 0x2f3a32, 0.10, 0.8);
+    }),
     glass: makeTex((g, S) => {
       g.clearRect(0, 0, S, S); g.fillStyle = 'rgba(180,232,255,0.2)'; g.fillRect(0, 0, S, S);
       g.fillStyle = 'rgba(225,247,255,0.85)'; g.fillRect(0, 0, S, 2); g.fillRect(0, S - 2, S, 2); g.fillRect(0, 0, 2, S); g.fillRect(S - 2, 0, 2, S);

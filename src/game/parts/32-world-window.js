@@ -425,9 +425,9 @@
       type === 'antenna' ? [7, 7] :
       type === 'tower' ? [5, 5] :
       type === 'temple' ? [9, 9] :
-      type === 'torii' ? (dir === 'x' ? [11, 3] : [3, 11]) :
-      type === 'waterTorii' ? (dir === 'x' ? [13, 9] : [9, 13]) :
-      type === 'pagoda' ? [9, 9] :
+      type === 'torii' ? (dir === 'x' ? [15, 3] : [3, 15]) :
+      type === 'waterTorii' ? (dir === 'x' ? [15, 11] : [11, 15]) :
+      type === 'pagoda' ? [15, 15] :
       type === 'teahouse' ? [9, 7] :
       type === 'castle' ? [13, 13] :
       type === 'daibutsu' ? [27, 23] :
@@ -580,43 +580,56 @@
     const P = alongX ? (u, y) => put(u, y, cz, VERMILION) : (u, y) => put(cx, y, u, VERMILION);
     const Pt = alongX ? (u, y, t) => put(u, y, cz, t) : (u, y, t) => put(cx, y, u, t);
     const c = alongX ? cx : cz;
-    // 柱 hashira（朱・7段）＋石の根巻
-    for (const s of [-1, 1]) { const u = c + 3 * s; Pt(u, base, STONE); for (let y = base + 1; y <= base + 7; y++) P(u, y); }
-    // 貫 nuki（朱・柱を1マス貫く下梁）
+    const H = 8; // 柱の高さ
+    // 柱 hashira（朱・8段）＋石の根巻
+    for (const s of [-1, 1]) { const u = c + 3 * s; Pt(u, base, STONE); for (let y = base + 1; y <= base + H; y++) P(u, y); }
+    // 貫 nuki（朱・柱を貫く下梁）＋吊り灯籠
     for (let u = c - 4; u <= c + 4; u++) P(u, base + 5);
+    Pt(c - 2, base + 4, LANTERN); Pt(c + 2, base + 4, LANTERN);
     // 扁額 gaku（金）＋束（朱）
     Pt(c, base + 6, GOLD_BLOCK); P(c, base + 7);
-    // 島木 shimaki（朱・柱より1マス外へ）
-    for (let u = c - 4; u <= c + 4; u++) P(u, base + 8);
-    // 笠木 kasagi（濃い木・最上段、さらに外へ張り出し、両端だけ1マス反る）
-    for (let u = c - 5; u <= c + 5; u++) Pt(u, base + 9, LOG);
-    Pt(c - 5, base + 10, LOG); Pt(c + 5, base + 10, LOG);
+    // 島木 shimaki（朱・柱より2マス外へ）
+    for (let u = c - 5; u <= c + 5; u++) P(u, base + H);
+    // 笠木 kasagi（濃い木・最上段、大きく張り出し、両端が2段反り上がる）
+    for (let u = c - 6; u <= c + 6; u++) Pt(u, base + H + 1, LOG);
+    for (const s of [-1, 1]) {
+      Pt(c + 6 * s, base + H + 2, LOG);
+      Pt(c + 7 * s, base + H + 1, LOG);
+      Pt(c + 7 * s, base + H + 2, LOG);
+      Pt(c + 7 * s, base + H + 3, LOG);
+    }
   }
 
   // 五重塔（参照: 朱壁＋軒下の白帯＋黒瓦の反り軒を5層、上ほど逓減、頂部に金の相輪）
   function addPagoda(plan, base, minX, maxX, minZ, maxZ, put) {
     const cx = plan.x, cz = plan.z;
-    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK); // 基壇
-    const halfs = [4, 3, 3, 2, 2], bodyH = 3;
-    let y = base + 1, topHalf = halfs[0];
+    // 二段の石基壇
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK);
+    for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) put(x, base + 1, z, STONE);
+    const halfs = [5, 4, 3, 2, 2], bodyH = 4;
+    let y = base + 2, topHalf = halfs[0];
     for (let i = 0; i < halfs.length; i++) {
       const hw = halfs[i]; topHalf = hw;
+      // 朱の胴体。柱＝丸太、窓＝ガラス、軒下に白帯、最上層以外は床下に欄干。
       for (let yy = y; yy <= y + bodyH - 1; yy++) for (let x = cx - hw; x <= cx + hw; x++) for (let z = cz - hw; z <= cz + hw; z++) {
         const edge = x === cx - hw || x === cx + hw || z === cz - hw || z === cz + hw;
         if (!edge) continue;
         const corner = (x === cx - hw || x === cx + hw) && (z === cz - hw || z === cz + hw);
         const frieze = yy === y + bodyH - 1;                       // 軒下の白帯（漆喰）
-        const window = !corner && yy === y + 1 && ((x === cx - hw || x === cx + hw) ? z === cz : x === cx);
+        const window = !corner && (yy === y + 1 || yy === y + 2) && ((x === cx - hw || x === cx + hw) ? (z - cz) % 2 === 0 : (x - cx) % 2 === 0);
         put(x, yy, z, corner ? LOG : frieze ? PLASTER : window ? GLASS : VERMILION); // 朱壁
       }
-      eaveSkirt(put, cx, cz, y + bodyH, hw, ROOF_TILE);            // 黒瓦の反り軒
+      if (i > 0) for (let x = cx - hw - 1; x <= cx + hw + 1; x++) for (let z = cz - hw - 1; z <= cz + hw + 1; z++) {
+        if (x === cx - hw - 1 || x === cx + hw + 1 || z === cz - hw - 1 || z === cz + hw + 1) put(x, y - 1, z, PLANKS); // 欄干（縁側）
+      }
+      eaveSkirt(put, cx, cz, y + bodyH, hw, COPPER_ROOF);          // 緑青の銅瓦の反り軒
       y = y + bodyH + 1;
     }
-    const peak = roofHip(put, cx, cz, y, topHalf + 1, ROOF_TILE);  // 最上層の宝形屋根
+    const peak = roofHip(put, cx, cz, y, topHalf + 1, COPPER_ROOF); // 最上層の宝形屋根
     for (let k = 1; k <= 4; k++) put(cx, peak + k, cz, GOLD_BLOCK); // 相輪（金の塔）
     put(cx, peak + 5, cz, GLOW_CRYSTAL);                            // 宝珠
-    put(cx - 2, base + 1, cz - 2, CHEST);
-    put(cx + 2, base + 1, cz + 2, LANTERN);
+    put(cx - 2, base + 2, cz - 2, CHEST);
+    put(cx + 2, base + 2, cz + 2, LANTERN);
   }
 
   // 茶屋・和風民家（縁側＋障子＝ガラス＋丸太の柱＋瓦の切妻屋根＋白漆喰の妻＋参道の石灯籠）
@@ -642,16 +655,22 @@
     const cx = plan.x, cz = plan.z;
     for (let lvl = 0; lvl < 3; lvl++) for (let x = minX + lvl; x <= maxX - lvl; x++) for (let z = minZ + lvl; z <= maxZ - lvl; z++) put(x, base + lvl, z, STONE); // 石垣
     const py = base + 3;                          // 天守の床
-    const halfs = [4, 3, 2], bodyH = 3;
+    const halfs = [4, 3, 2], bodyH = 5;
     let y = py, topHalf = halfs[0];
     for (let i = 0; i < halfs.length; i++) {
       const hw = halfs[i]; topHalf = hw;
+      // 縁側の欄干（上層は一回り張り出した板の縁を回す）
+      if (i > 0) for (let x = cx - hw - 1; x <= cx + hw + 1; x++) for (let z = cz - hw - 1; z <= cz + hw + 1; z++) {
+        if (x === cx - hw - 1 || x === cx + hw + 1 || z === cz - hw - 1 || z === cz + hw + 1) { put(x, y - 1, z, PLANKS); put(x, y, z, LOG); }
+      }
+      // 背の高い白漆喰の壁。角柱＝丸太、窓＝ガラス（2段・1つ飛ばし）、窓下に黒の連子。
       for (let yy = y; yy <= y + bodyH - 1; yy++) for (let x = cx - hw; x <= cx + hw; x++) for (let z = cz - hw; z <= cz + hw; z++) {
         const edge = x === cx - hw || x === cx + hw || z === cz - hw || z === cz + hw;
         if (!edge) continue;
         const corner = (x === cx - hw || x === cx + hw) && (z === cz - hw || z === cz + hw);
-        const window = !corner && yy === y + 1 && ((x === cx - hw || x === cx + hw) ? (z - cz) % 2 === 0 : (x - cx) % 2 === 0);
-        put(x, yy, z, corner ? LOG : window ? GLASS : PLASTER);   // 白漆喰の壁
+        const sill = yy === y + 3;
+        const window = !corner && (yy === y + 1 || yy === y + 2) && ((x === cx - hw || x === cx + hw) ? (z - cz) % 2 === 0 : (x - cx) % 2 === 0);
+        put(x, yy, z, corner ? LOG : window ? GLASS : sill ? ROOF_TILE : PLASTER);  // 白漆喰の壁
       }
       eaveSkirt(put, cx, cz, y + bodyH, hw, COPPER_ROOF);         // 緑青の銅瓦の反り軒
       chidoriGable(put, cx, cz - hw - 1, y + bodyH, Math.min(hw, 2), PLASTER, COPPER_ROOF, GOLD_BLOCK); // 正面の千鳥破風
@@ -758,74 +777,80 @@
   // Giant seated Daibutsu. The large footprint is intentional: with Minecraft-scale blocks,
   // a small statue collapses before the face, ears, knees, and halo can read clearly.
   function addGiantDaibutsu(plan, base, minX, maxX, minZ, maxZ, put) {
-    const cx = plan.x, cz = plan.z, bronze = COPPER_ROOF, dark = STONE_BRICK;
-    const oval = (y, mx, mz, rx, rz, mat = bronze, bias = 1.0) => {
+    // 鎌倉/奈良の大仏を参照した青銅の座像。正面は -Z 側。
+    const cx = plan.x, cz = plan.z, B = BRONZE, D = BRONZE_DARK;
+    const oval = (y, mx, mz, rx, rz, mat = B, bias = 1.05) => {
       for (let x = mx - rx; x <= mx + rx; x++) for (let z = mz - rz; z <= mz + rz; z++) {
         if (((x - mx) / Math.max(1, rx)) ** 2 + ((z - mz) / Math.max(1, rz)) ** 2 <= bias) put(x, y, z, mat);
       }
     };
-    const ellipsoid = (mx, my, mz, rx, ry, rz, mat = bronze, bias = 1.05) => {
-      for (let y = my - ry; y <= my + ry; y++) for (let x = mx - rx; x <= mx + rx; x++) for (let z = mz - rz; z <= mz + rz; z++) {
-        const q = ((x - mx) / Math.max(1, rx)) ** 2 + ((y - my) / Math.max(1, ry)) ** 2 + ((z - mz) / Math.max(1, rz)) ** 2;
-        if (q <= bias) put(x, y, z, mat);
+    const ball = (cy, mx, mz, r, mat = B, bias = 1.12) => {
+      for (let y = cy - r; y <= cy + r; y++) for (let x = mx - r; x <= mx + r; x++) for (let z = mz - r; z <= mz + r; z++) {
+        if (((x - mx) / r) ** 2 + ((y - cy) / r) ** 2 + ((z - mz) / r) ** 2 <= bias) put(x, y, z, mat);
       }
     };
 
+    // 石の基壇（2段）
     for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK);
     for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) put(x, base + 1, z, STONE);
-    for (let x = minX + 4; x <= maxX - 4; x++) for (let z = minZ + 4; z <= maxZ - 4; z++) put(x, base + 2, z, STONE);
 
-    oval(base + 3, cx, cz + 2, 11, 7, STONE);
-    oval(base + 4, cx, cz + 2, 10, 6, bronze);
-    for (let x = cx - 10; x <= cx + 10; x += 2) put(x, base + 5, minZ + 5, PLASTER);
+    // 蓮華座（下に広い二段の蓮弁＋白い弁先）。膝が一回り外へ出るよう控えめに。
+    oval(base + 2, cx, cz + 1, 10, 7, STONE);
+    oval(base + 3, cx, cz + 1, 9, 6, STONE);
+    for (let a = 0; a < 18; a++) { const t = a / 18 * Math.PI * 2; put(cx + Math.round(Math.cos(t) * 9), base + 3, cz + 1 + Math.round(Math.sin(t) * 6), PLASTER); }
 
-    oval(base + 6, cx - 6, minZ + 7, 6, 3, bronze);
-    oval(base + 6, cx + 6, minZ + 7, 6, 3, bronze);
-    oval(base + 7, cx - 6, minZ + 7, 5, 2, bronze);
-    oval(base + 7, cx + 6, minZ + 7, 5, 2, bronze);
-    oval(base + 7, cx, minZ + 9, 5, 3, bronze);
-
-    for (let y = base + 8; y <= base + 14; y++) {
-      const dy = y - (base + 8);
-      oval(y, cx, cz, dy < 2 ? 6 : dy < 5 ? 5 : 4, dy < 4 ? 4 : 3, bronze);
+    // 像体は「正面の輪郭(半幅) × 奥行き」で中身を詰めて造形する。
+    // これで先細りの塔ではなく、膝の棚・腰のくびれ・張った肩・大きな丸頭がはっきり出る。
+    const fb = base + 4;                 // 像体の底（蓮華座の上）
+    // [半幅, 前方の張り出し(z-), 後方(z+)]
+    const profile = [
+      [9, 7, 6], [9, 7, 6], [9, 6, 6],   // 0-2 結跏趺坐の脚（膝＝最も広い棚）
+      [7, 4, 6],                          // 3 腿
+      [4, 3, 6],                          // 4 腰のくびれ（最も細い）
+      [5, 3, 6], [6, 3, 6],               // 5-6 腹・胸
+      [7, 3, 6], [7, 3, 6],               // 7-8 丸い肩（上半身で最も広い）
+      [3, 2, 4],                          // 9 首のくびれ
+      [4, 3, 4], [5, 3, 4], [5, 3, 4], [5, 3, 4], // 10-13 頭（大きく丸い）
+      [4, 2, 3],                          // 14 頭頂
+      [2, 2, 2], [1, 1, 1],               // 15-16 肉髻
+    ];
+    for (let r = 0; r < profile.length; r++) {
+      const [hw, fd, bd] = profile[r], y = fb + r;
+      for (let x = cx - hw; x <= cx + hw; x++) for (let z = cz - fd; z <= cz + bd; z++) put(x, y, z, B);
     }
-    for (let x = cx - 8; x <= cx + 8; x++) for (let z = cz - 2; z <= cz + 2; z++) put(x, base + 13, z, bronze);
+    const headBase = fb + 10;            // 顔の基準高さ
 
-    for (let y = base + 9; y <= base + 12; y++) {
-      put(cx - 8, y, cz - 1, bronze); put(cx - 7, y, cz - 1, bronze); put(cx - 6, y - 1, minZ + 8, bronze);
-      put(cx + 8, y, cz - 1, bronze); put(cx + 7, y, cz - 1, bronze); put(cx + 6, y - 1, minZ + 8, bronze);
-    }
-    put(cx - 3, base + 9, minZ + 7, PLASTER); put(cx - 2, base + 9, minZ + 7, PLASTER);
-    put(cx + 2, base + 9, minZ + 7, PLASTER); put(cx + 3, base + 9, minZ + 7, PLASTER);
-    put(cx - 1, base + 10, minZ + 8, PLASTER); put(cx + 1, base + 10, minZ + 8, PLASTER);
+    // 膝前の衣の襞（陰）
+    for (let x = cx - 7; x <= cx + 7; x += 2) put(x, fb + 1, cz - 6, D);
+    // 定印の手（膝中央で椀状に重ねる）
+    for (let x = cx - 3; x <= cx + 3; x++) put(x, fb + 1, cz - 7, D);
+    for (let x = cx - 2; x <= cx + 2; x++) put(x, fb + 2, cz - 7, B);
+    // 胸元の衣（偏袒右肩・陰のV字）
+    put(cx, fb + 8, cz - 3, D); put(cx - 1, fb + 7, cz - 3, D); put(cx + 1, fb + 7, cz - 3, D);
+    put(cx - 2, fb + 6, cz - 3, D); put(cx + 2, fb + 6, cz - 3, D);
 
-    ellipsoid(cx, base + 18, minZ + 10, 4, 4, 3, bronze, 1.02);
-    for (let y = base + 16; y <= base + 20; y++) {
-      put(cx - 5, y, minZ + 10, bronze);
-      put(cx + 5, y, minZ + 10, bronze);
-    }
-    for (const [dx, yy] of [[0, 22], [-1, 21], [1, 21], [0, 21], [-2, 20], [2, 20]]) put(cx + dx, base + yy, minZ + 10, bronze);
-    for (const [dx, yy] of [[-2, 22], [2, 22], [0, 23], [-1, 23], [1, 23]]) put(cx + dx, base + yy, minZ + 10, MOSSY_BRICK);
+    // 長い耳たぶ（頭の左右に密着させて穴を作らない）
+    for (let y = headBase - 1; y <= headBase + 3; y++) { put(cx - 5, y, cz - 1, B); put(cx + 5, y, cz - 1, B); }
+    // 螺髪の生え際（額の上を一段濃く）＋肉髻の頂
+    for (let x = cx - 3; x <= cx + 3; x++) put(x, headBase + 4, cz - 1, D);
+    put(cx, fb + 16, cz, D);
 
-    const faceZ = minZ + 7;
-    put(cx - 1, base + 19, faceZ, STONE);
-    put(cx + 1, base + 19, faceZ, STONE);
-    put(cx, base + 18, faceZ, STONE);
+    // 顔（前面 z=cz-3）
+    const fz = cz - 3;
+    put(cx - 1, headBase + 1, fz, D); put(cx + 1, headBase + 1, fz, D); // 伏し目
+    put(cx, headBase + 2, fz, PLASTER);                                  // 白毫
+    put(cx, headBase, fz - 1, B);                                        // 鼻（前へ1マス）
+    put(cx, headBase - 1, fz, D);                                        // 口
 
-    const haloZ = minZ + 14;
-    for (let dx = -7; dx <= 7; dx++) for (let dy = 0; dy <= 10; dy++) {
-      const q = (dx / 7) ** 2 + ((dy - 4) / 6) ** 2;
-      if (q > 0.80 && q < 1.22) put(cx + dx, base + 15 + dy, haloZ, GOLD_BLOCK);
-    }
-
+    // 基壇前の灯籠と賽銭箱
     for (const sx of [-1, 1]) {
-      const lx = cx + sx * 10;
-      put(lx, base + 3, minZ + 3, STONE_BRICK);
-      for (let y = base + 4; y <= base + 5; y++) put(lx, y, minZ + 3, STONE);
-      put(lx, base + 6, minZ + 3, LANTERN);
+      const lx = cx + sx * 9;
+      put(lx, base + 2, minZ + 2, STONE_BRICK);
+      for (let y = base + 3; y <= base + 4; y++) put(lx, y, minZ + 2, STONE);
+      put(lx, base + 5, minZ + 2, LANTERN);
     }
-    for (let z = minZ; z <= minZ + 5; z++) put(cx, base + 2, z, STONE_BRICK);
-    put(cx, base + 3, minZ + 2, CHEST);
+    for (let z = minZ; z <= minZ + 4; z++) put(cx, base + 2, z, STONE_BRICK);
+    put(cx, base + 3, minZ + 1, CHEST);
   }
 
   // 棚田。地形を大きく変えず、段々の水田と小さな案山子を作る。
@@ -1059,7 +1084,8 @@
     const clearTop =
       plan.type === 'tokyoTower' ? base + 36 :
       plan.type === 'daibutsu' ? base + 28 :
-      plan.type === 'pagoda' || plan.type === 'castle' ? base + 16 :
+      plan.type === 'pagoda' ? base + 34 :
+      plan.type === 'castle' ? base + 24 :
       plan.type === 'antenna' ? base + 15 :
       base + 8;
     for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
