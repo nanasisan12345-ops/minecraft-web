@@ -799,29 +799,40 @@
     oval(base + 3, cx, cz + 1, 9, 6, STONE);
     for (let a = 0; a < 18; a++) { const t = a / 18 * Math.PI * 2; put(cx + Math.round(Math.cos(t) * 9), base + 3, cz + 1 + Math.round(Math.sin(t) * 6), PLASTER); }
 
+    // 金の光背（後光）。像体の背面に大きなサンバーストの円盤＋放射光を立てる。
+    // 参照作例どおり「大仏だと一発で分かる」最大の記号。正面からは像のまわりを縁取る。
+    const zHalo = cz + 7, hcy = base + 14, hr = 10;
+    for (let y = hcy - hr; y <= hcy + hr; y++) for (let x = cx - hr; x <= cx + hr; x++) {
+      const d = Math.hypot(x - cx, y - hcy);
+      if (d <= hr) put(x, y, zHalo, GOLD_BLOCK);                  // 円盤
+    }
+    for (let a = 0; a < 24; a++) {                                 // 放射光（とがった光条）
+      const t = a / 24 * Math.PI * 2;
+      for (let rr = hr; rr <= hr + (a % 2 ? 3 : 2); rr++) put(cx + Math.round(Math.cos(t) * rr), hcy + Math.round(Math.sin(t) * rr), zHalo, GOLD_BLOCK);
+    }
+
     // 像体は「正面の輪郭(半幅) × 奥行き」で中身を詰めて造形する。
-    // これで先細りの塔ではなく、膝の棚・腰のくびれ・張った肩・大きな丸頭がはっきり出る。
+    // 膝の棚・腰のくびれ・張った肩・首のくびれ・大きな丸頭をはっきり出す。
     const fb = base + 4;                 // 像体の底（蓮華座の上）
     // [半幅, 前方の張り出し(z-), 後方(z+)]
     const profile = [
-      [9, 7, 6], [9, 7, 6], [9, 6, 6],   // 0-2 結跏趺坐の脚（膝＝最も広い棚）
-      [7, 4, 6],                          // 3 腿
-      [4, 3, 6],                          // 4 腰のくびれ（最も細い）
-      [5, 3, 6], [6, 3, 6],               // 5-6 腹・胸
-      [7, 3, 6], [7, 3, 6],               // 7-8 丸い肩（上半身で最も広い）
-      [3, 2, 4],                          // 9 首のくびれ
-      [4, 3, 4], [5, 3, 4], [5, 3, 4], [5, 3, 4], // 10-13 頭（大きく丸い）
-      [4, 2, 3],                          // 14 頭頂
-      [2, 2, 2], [1, 1, 1],               // 15-16 肉髻
+      [9, 7, 5], [9, 7, 5], [9, 6, 5],   // 0-2 結跏趺坐の脚（膝＝最も広い棚）
+      [7, 4, 5],                          // 3 腿
+      [4, 3, 5], [5, 3, 5], [6, 3, 5],   // 4-6 腰のくびれ→腹→胸
+      [7, 3, 5], [6, 3, 4],               // 7-8 丸い肩（上半身で最も広い）
+      [3, 2, 3], [2, 2, 3],               // 9-10 首（はっきりくびれ）
+      [4, 3, 4], [5, 3, 4], [5, 3, 4],   // 11-13 頭（丸く膨らむ）
+      [4, 2, 3], [3, 2, 2],               // 14-15 頭頂
+      [2, 2, 2], [1, 1, 1],               // 16-17 肉髻
     ];
     for (let r = 0; r < profile.length; r++) {
       const [hw, fd, bd] = profile[r], y = fb + r;
       for (let x = cx - hw; x <= cx + hw; x++) for (let z = cz - fd; z <= cz + bd; z++) put(x, y, z, B);
     }
-    const headBase = fb + 10;            // 顔の基準高さ
+    const headBase = fb + 11;            // 顔の下端（あご）付近
 
-    // 膝前の衣の襞（陰）
-    for (let x = cx - 7; x <= cx + 7; x += 2) put(x, fb + 1, cz - 6, D);
+    // 衣の襞（縦の流れ）。胸〜膝にかけて陰の縦線を数本入れて布らしく。
+    for (const dx of [-4, -1, 2]) for (let y = fb + 1; y <= fb + 6; y++) put(cx + dx, y, cz - (y <= fb + 2 ? 6 : 3), D);
     // 定印の手（膝中央で椀状に重ねる）
     for (let x = cx - 3; x <= cx + 3; x++) put(x, fb + 1, cz - 7, D);
     for (let x = cx - 2; x <= cx + 2; x++) put(x, fb + 2, cz - 7, B);
@@ -831,9 +842,8 @@
 
     // 長い耳たぶ（頭の左右に密着させて穴を作らない）
     for (let y = headBase - 1; y <= headBase + 3; y++) { put(cx - 5, y, cz - 1, B); put(cx + 5, y, cz - 1, B); }
-    // 螺髪の生え際（額の上を一段濃く）＋肉髻の頂
+    // 螺髪の生え際（額の上を一段濃く）
     for (let x = cx - 3; x <= cx + 3; x++) put(x, headBase + 4, cz - 1, D);
-    put(cx, fb + 16, cz, D);
 
     // 顔（前面 z=cz-3）
     const fz = cz - 3;
