@@ -6,7 +6,9 @@
   let heldViewKey = '';
   let heldSwing = 0;
   function heldMat(color) {
-    if (!heldMats.has(color)) heldMats.set(color, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }));
+    // transparent:true で半透明パスに乗せ、renderOrder:1000 で水/ガラスより後に・depthTest:false で最前面に描く
+    // （不透明パスのままだと、後から描かれる水が手を上書きしてしまう）
+    if (!heldMats.has(color)) heldMats.set(color, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false, transparent: true }));
     return heldMats.get(color);
   }
   function heldBox(parent, sx, sy, sz, color, x, y, z, rx = 0, ry = 0, rz = 0) {

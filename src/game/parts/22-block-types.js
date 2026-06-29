@@ -40,10 +40,17 @@
     { name: '溶岩', color: 0xff6a1a, icon: T.lava, mats: faceMats(T.lava, { transparent: true, depthWrite: false, opacity: 0.94, emissive: 0xff5a18, emissiveIntensity: 0.9, shininess: 40, specular: 0x552200 }), transparent: true, solid: false }, // 24
     { name: 'サボテン', color: 0x4f8f3a, icon: T.cactus, mats: faceMats(T.cactus) }, // 25
     { name: '開いた宝箱', color: 0x9a7038, icon: T.chestOpen, mats: faceMats(T.chestOpen, { shininess: 8, specular: 0x332100 }) }, // 26
+    { name: '村の看板', color: 0xb5824a, icon: T.villageSign, mats: faceMats(T.villageSign, { shininess: 5, specular: 0x221400 }) }, // 27
+    { name: '朱の木', color: 0xcf3b1e, icon: T.vermilion, mats: faceMats(T.vermilion, { shininess: 5, specular: 0x331008 }) }, // 28
+    { name: '白漆喰', color: 0xeae3d2, icon: T.plaster, mats: faceMats(T.plaster) }, // 29
+    { name: '瓦', color: 0x44525c, icon: T.roofTile, mats: faceMats(T.roofTile, { shininess: 14, specular: 0x223344 }) }, // 30
+    { name: '金ブロック', color: 0xe6c23a, icon: T.goldBlock, mats: faceMats(T.goldBlock, { shininess: 22, specular: 0x6a5400 }) }, // 31
+    { name: '銅瓦', color: 0x4a9e86, icon: T.copperRoof, mats: faceMats(T.copperRoof, { shininess: 12, specular: 0x224433 }) }, // 32
   ];
   const GRASS = 0, DIRT = 1, STONE = 2, LOG = 3, LEAVES = 4, SAND = 5, PLANKS = 6, BRICK = 7, GLASS = 8, WATER = 9, SNOW = 10;
   const COAL_ORE = 11, IRON_ORE = 12, GOLD_ORE = 13, DIAMOND_ORE = 14, TORCH = 15;
   const CRAFTING_TABLE = 16, FURNACE = 17;
   const GLOW_CRYSTAL = 18, DRIPSTONE = 19;
-  const STONE_BRICK = 20, MOSSY_BRICK = 21, CHEST = 22, LANTERN = 23, LAVA = 24, CACTUS = 25, OPEN_CHEST = 26;
+  const STONE_BRICK = 20, MOSSY_BRICK = 21, CHEST = 22, LANTERN = 23, LAVA = 24, CACTUS = 25, OPEN_CHEST = 26, VILLAGE_SIGN = 27;
+  const VERMILION = 28, PLASTER = 29, ROOF_TILE = 30, GOLD_BLOCK = 31, COPPER_ROOF = 32;
   const HOTBAR = [0, 1, 2, 10, 5, 3, 4, 6, 8, TORCH, CRAFTING_TABLE, FURNACE]; // 草 土 石 雪 砂 丸太 葉 板材 ガラス たいまつ 作業台 かまど

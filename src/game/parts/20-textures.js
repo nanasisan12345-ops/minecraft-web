@@ -90,6 +90,32 @@
         for (let x = off; x < S; x += S / 2) g.fillRect(x, y, 2, r);
       }
     }),
+    vermilion: makeTex((g, S) => {                         // 朱塗りの木（鳥居用）
+      noise(g, S, 0xcf3b1e, 0.95, 1.06);
+      for (let x = 0; x < S; x += S / 4) { g.fillStyle = tint(0x9c2810, 0.95); g.fillRect(x, 0, 1, S); }
+      g.fillStyle = 'rgba(255,150,110,0.16)'; g.fillRect(2, 0, 2, S);
+    }),
+    plaster: makeTex((g, S) => {                           // 白漆喰（城壁・民家）
+      noise(g, S, 0xeae3d2, 0.97, 1.03);
+      dots(g, S, 0xcfc6b0, 0.04, 0.95);
+    }),
+    roofTile: makeTex((g, S) => {                          // いぶし瓦（屋根）
+      noise(g, S, 0x44525c, 0.9, 1.08); const r = S / 8;
+      for (let row = 0; row * r < S; row++) { const y = row * r; g.fillStyle = tint(0x222c33, 0.9); g.fillRect(0, y, S, 1); }
+      for (let x = 0; x < S; x += S / 8) { g.fillStyle = tint(0x2b353d, 0.92); g.fillRect(x, 0, 1, S); }
+      g.fillStyle = 'rgba(150,180,200,0.10)'; for (let row = 0; row * r < S; row++) g.fillRect(0, row * r + 1, S, 1);
+    }),
+    goldBlock: makeTex((g, S) => {                         // 金（鯱・相輪）
+      noise(g, S, 0xe6c23a, 0.92, 1.08);
+      g.fillStyle = 'rgba(255,245,180,0.35)'; g.fillRect(0, 0, S, 2); g.fillRect(0, 0, 2, S);
+      dots(g, S, 0xfff0a0, 0.05, 1.1);
+    }),
+    copperRoof: makeTex((g, S) => {                        // 緑青の銅瓦（天守の屋根）
+      noise(g, S, 0x4a9e86, 0.9, 1.08); const r = S / 8;
+      for (let row = 0; row * r < S; row++) { const y = row * r; g.fillStyle = tint(0x2f7a64, 0.92); g.fillRect(0, y, S, 1); }
+      for (let x = 0; x < S; x += S / 8) { g.fillStyle = tint(0x3a8a72, 0.95); g.fillRect(x, 0, 1, S); }
+      dots(g, S, 0x7fd0b8, 0.04, 1.05);
+    }),
     glass: makeTex((g, S) => {
       g.clearRect(0, 0, S, S); g.fillStyle = 'rgba(180,232,255,0.2)'; g.fillRect(0, 0, S, S);
       g.fillStyle = 'rgba(225,247,255,0.85)'; g.fillRect(0, 0, S, 2); g.fillRect(0, S - 2, S, 2); g.fillRect(0, 0, 2, S); g.fillRect(S - 2, 0, 2, S);
@@ -202,9 +228,20 @@
       g.fillStyle = '#e0bd52'; g.fillRect(S / 2 - 3, 16, 6, 4);
       dots(g, S, 0x6d4c1b, 0.05, 0.75);
     }),
+    villageSign: makeTex((g, S) => {
+      noise(g, S, 0xb5824a, 0.92, 1.08);
+      g.fillStyle = tint(0x5a361a, 0.85);
+      g.fillRect(0, 4, S, 2); g.fillRect(0, S - 6, S, 2);
+      g.fillRect(3, 0, 2, S); g.fillRect(S - 5, 0, 2, S);
+      g.fillStyle = '#f0d39a';
+      g.fillRect(7, 8, 18, 2); g.fillRect(6, 14, 20, 2); g.fillRect(9, 20, 14, 2);
+      g.fillStyle = '#3a2412';
+      g.fillRect(8, 9, 16, 1); g.fillRect(7, 15, 18, 1); g.fillRect(10, 21, 12, 1);
+      dots(g, S, 0x6d4c1b, 0.04, 0.76);
+    }),
   };
   TX.lava.wrapS = TX.lava.wrapT = THREE.RepeatWrapping;
   TX.cactus.userData.normalMap = normalFromCanvas(TX.cactus.image, 2.2);
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
-  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest'])
+  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign'])
     TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);

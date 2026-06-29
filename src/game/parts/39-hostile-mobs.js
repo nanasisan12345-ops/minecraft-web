@@ -1,6 +1,7 @@
   /* ============== 敵Mob（夜の小型スライム） ============== */
   const HOSTILES = [];
   const HOSTILE_MAX = 10, HOSTILE_SPAWN_R = 46, HOSTILE_DESPAWN_R = 86;
+  const HOSTILE_SPAWNING_ENABLED = false; // 倒す手段が入るまで敵Mobは出さない。
   const hostileGeo = new THREE.BoxGeometry(0.72, 0.56, 0.72);
   const hostileEyeGeo = new THREE.BoxGeometry(0.08, 0.08, 0.03);
   const hostileMat = new THREE.MeshLambertMaterial({ color: 0x4ca044, transparent: true, opacity: 0.88 });
@@ -27,6 +28,7 @@
     return true;
   }
   function spawnHostileNearPlayer() {
+    if (!HOSTILE_SPAWNING_ENABLED) return;
     if (!started || RAVE.on || !DAY || DAY.label !== '夜' || HOSTILES.length >= HOSTILE_MAX) return;
     for (let tries = 0; tries < 10; tries++) {
       const a = Math.random() * Math.PI * 2, r = rnd(18, HOSTILE_SPAWN_R);
@@ -39,6 +41,11 @@
     }
   }
   function updateHostileMobs(dt) {
+    if (!HOSTILE_SPAWNING_ENABLED) {
+      for (let i = HOSTILES.length - 1; i >= 0; i--) scene.remove(HOSTILES[i]);
+      HOSTILES.length = 0;
+      return;
+    }
     hostileSpawnClock -= dt;
     if (hostileSpawnClock <= 0) { spawnHostileNearPlayer(); hostileSpawnClock = rnd(3.5, 8.0); }
     for (let i = HOSTILES.length - 1; i >= 0; i--) {

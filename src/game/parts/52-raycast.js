@@ -22,6 +22,7 @@
     if (type === DIAMOND_ORE) return 'diamond';
     if (type === GLOW_CRYSTAL) return 'glowShard';
     if (type === OPEN_CHEST) return PLANKS;
+    if (type === VILLAGE_SIGN) return PLANKS;
     return type;
   }
   // 宝箱の中身（地下遺跡の探索報酬）。石炭は確定、残りはプールから2〜4種を抽選。
@@ -39,9 +40,94 @@
     }
     return out;
   }
+  const CHEST_STORAGE_KEY = `mc_chests_${WORLD_SEED}`;
+  const CHEST_LOOT = new Map();
+  function chestItemKey(k) {
+    if (typeof k === 'number') return k;
+    if (typeof k === 'string' && /^-?\d+$/.test(k)) return +k;
+    return k;
+  }
+  function normalizeChestLoot(loot) {
+    const out = [];
+    if (!Array.isArray(loot)) return out;
+    for (const e of loot) {
+      const item = Array.isArray(e) ? e[0] : e && e.item;
+      const count = Array.isArray(e) ? e[1] : e && e.count;
+      const n = Math.floor(+count);
+      if (item == null || !Number.isFinite(n) || n <= 0) continue;
+      out.push({ item: chestItemKey(item), count: Math.min(999, n) });
+    }
+    return out;
+  }
+  function loadChestLootState() {
+    try {
+      const raw = localStorage.getItem(CHEST_STORAGE_KEY);
+      if (!raw) return;
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return;
+      for (const [id, loot] of arr) {
+        if (typeof id !== 'string') continue;
+        const normalized = normalizeChestLoot(loot);
+        if (normalized.length) CHEST_LOOT.set(id, normalized);
+      }
+    } catch (e) {}
+  }
+  function saveChestLootSoon() {
+    clearTimeout(saveChestLootSoon.t);
+    saveChestLootSoon.t = setTimeout(() => {
+      try {
+        const arr = [...CHEST_LOOT].map(([id, loot]) => [id, loot.map(e => [e.item, e.count])]);
+        localStorage.setItem(CHEST_STORAGE_KEY, JSON.stringify(arr));
+      } catch (e) {}
+    }, 180);
+  }
+  function chestLootFor(id) {
+    let loot = CHEST_LOOT.get(id);
+    if (!loot) {
+      loot = normalizeChestLoot(rollChestLoot());
+      CHEST_LOOT.set(id, loot);
+      saveChestLootSoon();
+    }
+    return loot;
+  }
+  function chestLootForPanel(id) {
+    const loot = CHEST_LOOT.get(id);
+    return loot ? loot.map(e => ({ item: e.item, count: e.count })) : [];
+  }
+  function markChestEmpty(id) {
+    CHEST_LOOT.delete(id);
+    saveChestLootSoon();
+    if (world.get(id) === CHEST) {
+      const [x, y, z] = id.split(',').map(Number);
+      edits.set(id, OPEN_CHEST);
+      saveEditsSoon();
+      setBlock(x, y, z, OPEN_CHEST);
+      requestEditedBlockRebuild(x, y, z);
+      burst(x, y, z, TYPES[CHEST].color);
+    }
+  }
+  function takeChestStack(id, slotIndex) {
+    const loot = CHEST_LOOT.get(id);
+    if (!loot || !loot[slotIndex]) return false;
+    const entry = loot.splice(slotIndex, 1)[0];
+    addInventory(entry.item, entry.count);
+    if (!loot.length) markChestEmpty(id);
+    else { CHEST_LOOT.set(id, loot); saveChestLootSoon(); }
+    thock(320);
+    return true;
+  }
+  function takeAllChestLoot(id) {
+    const loot = CHEST_LOOT.get(id) || chestLootFor(id);
+    if (!loot.length) return false;
+    for (const entry of loot) addInventory(entry.item, entry.count);
+    markChestEmpty(id);
+    thock(440);
+    return true;
+  }
+  loadChestLootState();
   function blockPreferredTool(type) {
-    if ([STONE, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK].includes(type)) return 'pickaxe';
-    if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, CACTUS].includes(type)) return 'axe';
+    if ([STONE, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF].includes(type)) return 'pickaxe';
+    if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, CACTUS, VILLAGE_SIGN, VERMILION].includes(type)) return 'axe';
     if ([DIRT, GRASS, SAND, SNOW].includes(type)) return 'shovel';
     return null;
   }
@@ -51,7 +137,8 @@
     [STONE, 1.45], [BRICK, 1.85], [FURNACE, 1.9],
     [COAL_ORE, 1.7], [IRON_ORE, 2.05], [GOLD_ORE, 2.25], [DIAMOND_ORE, 2.55],
     [GLASS, 0.28], [GLOW_CRYSTAL, 0.9], [DRIPSTONE, 0.72],
-    [STONE_BRICK, 1.85], [MOSSY_BRICK, 1.7], [CHEST, 1.15], [OPEN_CHEST, 0.85], [LANTERN, 0.3], [CACTUS, 0.4],
+    [STONE_BRICK, 1.85], [MOSSY_BRICK, 1.7], [CHEST, 1.15], [OPEN_CHEST, 0.85], [LANTERN, 0.3], [CACTUS, 0.4], [VILLAGE_SIGN, 0.45],
+    [VERMILION, 0.85], [PLASTER, 0.9], [ROOF_TILE, 1.45], [GOLD_BLOCK, 1.7], [COPPER_ROOF, 1.45],
   ]);
   const breakMeter = document.createElement('div');
   breakMeter.id = 'breakMeter';
@@ -78,7 +165,10 @@
     if (t === LEAVES && Math.random() < 0.22) addInventory('apple', 1);
     if ((t === GRASS || t === LEAVES) && Math.random() < 0.12) addInventory('berries', 1);
     if (t === CHEST) {
-      for (const [item, n] of rollChestLoot()) addInventory(item, n);
+      const id = key(x, y, z);
+      for (const entry of chestLootFor(id)) addInventory(entry.item, entry.count);
+      CHEST_LOOT.delete(id);
+      saveChestLootSoon();
       thock(440);
     } else {
       const bonus = held && held.tier >= 2 && (t === COAL_ORE || t === DIAMOND_ORE) && Math.random() < 0.18 ? 1 : 0;
@@ -109,20 +199,27 @@
   }
   function openChest(block) {
     const [x, y, z] = block;
-    if (world.get(key(x, y, z)) !== CHEST) return;
-    const got = [];
-    for (const [item, n] of rollChestLoot()) { addInventory(item, n); got.push(`${itemLabel(item)}x${n}`); }
-    edits.set(key(x, y, z), OPEN_CHEST); saveEditsSoon(); setBlock(x, y, z, OPEN_CHEST); requestEditedBlockRebuild(x, y, z);
-    burst(x, y, z, TYPES[CHEST].color); thock(440);
-    if (typeof setDebugToast === 'function') setDebugToast('宝箱: ' + got.join(' / '), 3.0);
+    const id = key(x, y, z), t = world.get(id);
+    if (t !== CHEST && t !== OPEN_CHEST) return;
+    if (t === CHEST) chestLootFor(id);
+    if (typeof openChestPanel === 'function') openChestPanel(id);
+    else if (t === CHEST) takeAllChestLoot(id);
+    thock(t === CHEST ? 360 : 120);
   }
   function placeBlock() {
+    const traveler = typeof pickTravelerTarget === 'function' ? pickTravelerTarget() : null;
+    if (traveler) {
+      if (typeof openTravelerPanel === 'function') openTravelerPanel(traveler);
+      else if (typeof setDebugToast === 'function') setDebugToast('村人: またあとで話そう', 1.6);
+      thock(180);
+      return;
+    }
     const tg = pickTarget(); if (!tg) return;
     const hitType = world.get(key(tg.block[0], tg.block[1], tg.block[2]));
     if (hitType === CRAFTING_TABLE) { toggleCraftPanel('craft'); return; }
     if (hitType === FURNACE) { toggleCraftPanel('smelt'); return; }
     if (hitType === CHEST) { openChest(tg.block); return; }
-    if (hitType === OPEN_CHEST) { thock(120); return; }
+    if (hitType === OPEN_CHEST) { openChest(tg.block); return; }
     const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
     if (isSolid(x, y, z) || overlapsPlayer(x, y, z)) return;
     const ty = currentPlaceType(); if (!consumeInventory(ty, 1)) { thock(90); return; }

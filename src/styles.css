@@ -87,6 +87,53 @@
   #inventoryPanel .inventory-item.selected small { color: rgba(170,240,170,.95); }
   #inventoryPanel .inventory-empty { padding: 22px 10px; text-align: center; color: rgba(255,255,255,.68); font-size: 13px; }
 
+  #chestPanel { position: fixed; left: 50%; top: 50%; z-index: 35; width: min(430px, calc(100vw - 24px));
+    transform: translate(-50%, -50%); display: none; color: #fff; background: rgba(22,20,18,.95);
+    border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 16px 34px rgba(0,0,0,.42);
+    overflow: hidden; }
+  #chestPanel.show { display: block; }
+  #chestPanel .chest-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+    background: rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.12); }
+  #chestPanel .chest-head b { font-size: 15px; }
+  #chestPanel button { color: #fff; border: 1px solid rgba(255,255,255,.16); border-radius: 5px;
+    background: rgba(255,255,255,.08); padding: 5px 8px; cursor: pointer; font: inherit; }
+  #chestPanel button:hover:not(:disabled) { background: rgba(255,255,255,.16); }
+  #chestPanel button:disabled { opacity: .42; cursor: default; }
+  #chestPanel .chest-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; padding: 12px; }
+  #chestPanel .chest-slot { position: relative; aspect-ratio: 1 / 1; min-width: 0; padding: 5px; display: grid;
+    place-items: center; background: rgba(0,0,0,.28); border-color: rgba(255,255,255,.14); }
+  #chestPanel .chest-slot:not(:disabled):hover { border-color: rgba(255,220,120,.75); background: rgba(100,78,38,.46); }
+  #chestPanel .chest-icon { width: 34px; height: 34px; display: block; color: rgba(255,255,255,.82);
+    font-size: 18px; font-weight: 850; line-height: 34px; text-align: center; background-size: cover;
+    image-rendering: pixelated; border: 1px solid rgba(0,0,0,.28); border-radius: 4px; background-color: rgba(0,0,0,.24); }
+  #chestPanel .chest-slot em { position: absolute; right: 4px; bottom: 3px; font-style: normal; font-size: 11px;
+    font-weight: 850; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #000; }
+  #chestPanel .chest-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px;
+    border-top: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.16); }
+  #chestPanel .chest-status { color: rgba(255,255,255,.72); font-size: 12px; font-weight: 750; }
+
+  #travelerPanel { position: fixed; left: 50%; top: 50%; z-index: 35; width: min(460px, calc(100vw - 24px));
+    transform: translate(-50%, -50%); display: none; color: #fff; background: rgba(18,24,22,.95);
+    border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 16px 34px rgba(0,0,0,.42);
+    overflow: hidden; }
+  #travelerPanel.show { display: block; }
+  #travelerPanel .traveler-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+    background: rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.12); }
+  #travelerPanel .traveler-head b { display: block; font-size: 15px; }
+  #travelerPanel .traveler-head small { display: block; margin-top: 2px; color: rgba(255,255,255,.66); font-size: 11px; }
+  #travelerPanel button { color: #fff; border: 1px solid rgba(255,255,255,.16); border-radius: 5px;
+    background: rgba(255,255,255,.08); padding: 5px 8px; cursor: pointer; font: inherit; }
+  #travelerPanel button:hover:not(:disabled) { background: rgba(255,255,255,.16); }
+  #travelerPanel button:disabled { opacity: .42; cursor: default; }
+  #travelerPanel .traveler-line { padding: 10px 12px; color: rgba(255,245,215,.9); font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(180,150,70,.12); }
+  #travelerPanel .traveler-trades { display: grid; gap: 7px; padding: 10px 12px 12px; }
+  #travelerPanel .traveler-trade { width: 100%; display: block; text-align: left; padding: 8px 9px; }
+  #travelerPanel .traveler-trade span { display: block; font-size: 13px; font-weight: 800; }
+  #travelerPanel .traveler-trade small, #travelerPanel .traveler-trade em { display: block; margin-top: 3px;
+    color: rgba(255,255,255,.72); font-size: 11px; font-style: normal; line-height: 1.35; }
+  #travelerPanel .traveler-trade em { color: rgba(165,230,185,.9); }
+
   #stats { position: fixed; left: 10px; top: 10px; z-index: 10; color: #fff; font-size: 12px;
     line-height: 1.5; text-shadow: 0 1px 2px rgba(0,0,0,0.85); pointer-events: none; font-variant-numeric: tabular-nums; }
   #settingsButton { position: fixed; right: 12px; top: 10px; z-index: 35; width: 34px; height: 34px;

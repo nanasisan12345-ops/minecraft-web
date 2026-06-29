@@ -77,6 +77,16 @@
     if (started && document.pointerLockElement !== canvas) pause();
   });
   addEventListener('keydown', e => {
+    if (typeof isTravelerPanelOpen === 'function' && isTravelerPanelOpen()) {
+      if (e.code === 'Escape' || e.code === 'Tab') setTravelerPanelOpen(false);
+      e.preventDefault();
+      return;
+    }
+    if (typeof isChestPanelOpen === 'function' && isChestPanelOpen()) {
+      if (e.code === 'Escape' || e.code === 'Tab') setChestPanelOpen(false);
+      e.preventDefault();
+      return;
+    }
     keys[e.code] = true;
     if (e.code === 'Escape') pause();
     if (e.code === 'F3') { toggleDebugFly(); e.preventDefault(); }
@@ -86,6 +96,8 @@
     if (e.code === 'F8') { teleportToNearbyMineshaft(); e.preventDefault(); }
     if (e.code === 'F9') { teleportToNearbyLake(); e.preventDefault(); }
     if (e.code === 'F10') { teleportToNearbyCanyon(); e.preventDefault(); }
+    if (e.code === 'F11') { teleportToFuji(); e.preventDefault(); }
+    if (e.code === 'Digit0' && DEBUG.fly) { teleportToNearbyJapanese(); e.preventDefault(); }
     if (e.code === 'Comma') { updateSettingsPanel(); setSettingsPanelOpen(!settingsPanel.classList.contains('show')); e.preventDefault(); }
     const venueKey = RAVE_KEY_BINDINGS.find(v => v.code === e.code) || RAVE_ALT_KEYS.find(v => v.code === e.code);
     if (venueKey) { raveToggle(venueKey.kind); e.preventDefault(); }

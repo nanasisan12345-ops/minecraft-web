@@ -1,6 +1,6 @@
 # HANDOFF
 
-最終更新: 2026-06-27
+最終更新: 2026-06-29
 
 ---
 
@@ -10,28 +10,124 @@
 - ブランチ `main`。**2026-06-27: Vite移行＋全機能＋ `music/` を初コミット＆push 済み**（commit `dc3a03e`）。これで **GitHub Pages の公開サイトが単一HTML版 → Viteビルド版（GitHub Actions deploy）へ切替**。デプロイ成功確認済み。以降は通常どおり機能ごとにコミット/push してよい。
 - **⚠️ GitHub Pages の配信元は必ず「GitHub Actions」（API上 `build_type: workflow`）にすること。** 初回は「ブランチ main /（legacy）」のままで、ビルド前の素の `index.html`（`/src/styles.css`・`/src/main.js` を絶対パス参照、しかも `game.generated.js` は未コミット）を配信してしまい、全アセット404で公開サイトが真っ白/素テキスト表示になった。`gh api -X PUT repos/<owner>/minecraft-web/pages -f build_type=workflow` で切替→`gh workflow run "Deploy GitHub Pages"` で再デプロイして復旧。配信HTMLが `./assets/...`（相対）を参照していればOK。`vite.config.js` の `base: './'` がサブパス配信の肝。
 - `.gitignore` で `gikopoi2/` `hallucinate/` `textures/` `*.url` `suno生成プロンプト.txt` を除外（巨大/対象外のため）。`music/`（mp3 計~153MB・最大7MB）はPages BGM用にコミット済み。
-- ビルドは通る: `npm.cmd run check` 成功（37パーツ）。`npm run dev`（127.0.0.1:5173）でロード時 `__mcReady=true`・console error/warnなし。
+- ビルドは通る: `npm.cmd run check` 成功（39パーツ）。`npm.cmd run dev -- --port 5190` で HTTP 200、ブラウザ上で `#travelerPanel` / `#chestPanel` 生成・console error/warnなし。
+- **小型スライム敵Mobは出現停止中**。倒す方法が未実装のため、`src/game/parts/39-hostile-mobs.js` の `HOSTILE_SPAWNING_ENABLED=false` でスポーンを止め、既存 `HOSTILES` も更新時に除去する。攻撃/敵HP/撃破報酬などを入れてから再有効化する。
 - 既知の軽微事項: `.github/workflows/deploy-pages.yml` の actions が Node20非推奨警告（Node24で強制実行されるため動作はする）。v5系へ更新推奨。
 
 ### 開発・確認の鉄則
 - 編集対象は `src/game/parts/*.js` と `src/styles.css`。`src/game.generated.js` は `npm run assemble` が結合する自動生成物（直接編集しない）。パーツはファイル名のアルファベット順で結合され、**module直下スコープを全パーツで共有**（関数宣言は巻き上げで前後参照OK、const/letはTDZあり＝トップレベルで後方の値を参照しない）。
 - **プレビューはタブがバックグラウンドでrAFが止まり、マップ生成（`processWorldJob`）が進まない**。動きの目視は不可。よって生成系の検証は「①`npm run check`成功 ②ロードで`__mcReady`・エラーなし ③依存をスタブしたNode単体ハーネスでジオメトリ検証」で担保してきた（このやり方を踏襲）。
+- **構造物を追加・修正するときは、必ず先にネット画像検索でMinecraft作例/実物写真を複数見て、共通するシルエット・比率・特徴部位をメモしてから実装する。実装後は実ブラウザで該当構造物へ移動してスクリーンショットを撮り、参照画像と見比べて「名前を伏せても何に見えるか」を確認する。ビルド成功・ブロック数・undefinedなしだけでは完了扱いにしない。**
 - 音楽会場系（`60-rave-venues.js`/`70-music.js` 等）はユーザー指示でこのセッション中は触っていない。通常ワールド側のみ対象。
 - `gikopoi2/` `hallucinate/` は対象外。
 
 ### 今セッションで追加したもの（通常ワールド「マップ拡張」一式）
-- 地下遺跡ダンジョン / 村クラスタ（井戸・家・畑・道・街灯＋鍛冶屋・市場）/ 廃坑 / 地下湖（水・溶岩）/ 新バイオーム3種（沼地・ジャングル・火山＋溶岩クレーター）/ 自然ディテール（岩・倒木・枯れ木・サボテン・水草）/ 村人の村定住 / 夜の蛍 / 宝箱の右クリック開封 / 溶岩・サボテンの接触ダメージ / 深層鉱石ブースト。
-- 新ブロック（index）: 石レンガ20, 苔石レンガ21, 宝箱22, ランタン23, 溶岩24, サボテン25, 開いた宝箱26。
+- 地下遺跡ダンジョン / 村クラスタ（井戸・家・畑・道・街灯＋鍛冶屋・市場・教会・見張り塔・図書館・畜舎・村名看板）/ マップ全体に散る人工構造物（小屋、廃墟、石塔、砂漠神殿、道路、店、バス停、太陽光施設、アンテナ、休憩所、倉庫、作業小屋、小祠、監視拠点、観測所）/ 廃坑 / 地下湖（水・溶岩）/ 新バイオーム3種（沼地・ジャングル・火山＋溶岩クレーター）/ 自然ディテール（岩・倒木・枯れ木・サボテン・水草）/ 村人の村定住＋会話/簡易取引 / 夜の蛍 / 宝箱の右クリックグリッドUI / 溶岩・サボテンの接触ダメージ / 深層鉱石ブースト。
+- 新ブロック（index）: 石レンガ20, 苔石レンガ21, 宝箱22, ランタン23, 溶岩24, サボテン25, 開いた宝箱26, 村の看板27。
 - 生成は `32-world-window.js` の **ビルドキュー方式**（`collectBuilders()` が 建物/遺跡/村/廃坑/地下湖 のビルダー関数を1キューに集約し、pregen/移動窓の構造物フェーズで順次実行）。地下構造の地上階段は共通の `carveStairUp()`。
-- 確認用デバッグ移動: `F3`飛行 / `F4`洞窟 / `F6`地下遺跡 / `F7`村 / `F8`廃坑 / `F9`地下湖 / `F10`峡谷。
+- 確認用デバッグ移動: `F3`飛行 / `F4`洞窟 / `F6`地下遺跡 / `F7`村 / `F8`廃坑 / `F9`地下湖 / `F10`峡谷 / `F11`富士山 / `0`和風建築順送り（飛行中）。
 
 ### 次の候補（ユーザーの「どんどん実装」継続用）
-- 海岸線・島（川/峡谷/滝は実装済み）。
-- 村人の取引/会話、村の名前看板、教会/見張り塔など建物バリエーション。
-- 宝箱を本物のグリッドUIで開く（現状は右クリックで中身を一括入手し「開いた宝箱」へ変化）。
-- 採掘した新ブロック（石レンガ等）はインベントリに入るが**ホットバー枠が固定12のため設置不可** → クラフト追加 or ホットバー拡張で設置可能にする（番号キー1〜8は会場用なので競合注意）。
+- 村人の生活スケジュール、評判、構造物別の専用取引。
+- 敵Mobを再有効化するための攻撃/敵HP/撃破報酬/ノックバック。
+- 宝箱報酬を構造物別テーブルに分ける、罠つき宝箱などを追加する。
+- 海岸線・島（川/峡谷/滝は実装済み）。ただし地形高さの大改修で世界の見た目が一変するため重め。
 
 ---
+
+## 2026-06-29 追記: 日本ランドマーク第三弾（水上鳥居・大仏・棚田・東京タワー風）
+
+- `HANDOFF.md` を読んで継続。音楽会場系（`60-rave-venues.js` / `70-music.js`）は触らず、通常ワールドのランドマーク追加のみ。
+- `src/game/parts/32-world-window.js`:
+  - `structurePlanForCell()` の和風抽選を `jp<0.40` に拡張し、`waterTorii` / `daibutsu` / `riceTerrace` / `tokyoTower` を追加。草原/森林に出現。
+  - `addWaterTorii()`: 厳島風。浅い池、砂の岸、石畳の参道、中央の朱鳥居、石灯籠。
+  - `addDaibutsu()`: 緑青の銅瓦ブロックをブロンズに見立てた座像。台座、膝、肩、頭、耳、白毫、宝箱/灯り。
+  - `addRiceTerrace()`: 段ごとの水田、畦、木道、案山子、石灯籠。
+  - `addTokyoTower()`: 赤白ラチス脚、リング梁、展望台、アンテナ、頂部発光結晶。高いので構造物クリア高さを `base+36` に拡張。
+  - `structureBase()` の地形差許容と `addStructurePlan()` のdispatch/clear高さを各typeに合わせて更新。
+- `src/game/parts/49-debug-mode.js`: `0` の和風建築順送りに `waterTorii` / `daibutsu` / `riceTerrace` / `tokyoTower` を追加。
+- `README.md` / `MINECRAFT_GAP_PLAN.md` を同期。
+- 確認: `npm.cmd run assemble` 成功。`npm.cmd run check` 成功（39ファイル結合・Vite build・35 runtime asset copy）。Node単体ハーネスで実ビルダー抽出実行: 水上鳥居=231ブロック/maxY20/水・朱・石レンガ・ランタン、大仏=378ブロック/maxY22/銅瓦・ガラス・金・宝箱、棚田=561ブロック/maxY14/水・村看板・板材・石レンガ、東京タワー風=341ブロック/maxY45/朱・雪・ガラス・発光結晶、いずれもundefined配置なし。`npm.cmd run dev -- --port 5190` を起動し `http://127.0.0.1:5190/` HTTP 200、アプリ内ブラウザでcanvas 1280x720・地形チャンク49・console error/warnなし、スクリーンショットサンプル1620点中 nonWhite=1584 / nonBlack=1614 / uniqueColors=920。
+- **次の候補**: 町家/神社の参道/大きな寺、既存散在構造物（shop/depot/restStop 等）の新ヘルパー化、構造物別の宝箱報酬。
+
+## 2026-06-30 追記: 大仏を巨大ランドマーク枠へ修正
+
+- ユーザー指摘「大仏っぽくない」「ブロックが大きいから作るのが難しい」を受け、小型散在構造物のまま似せる方針を撤回。`src/game/parts/32-world-window.js` の `daibutsu` を 27x23 の巨大枠に拡大し、地形差許容と上空クリア高さも専用化した。
+- `addGiantDaibutsu()` を追加し、広い基壇、蓮華座、座禅の膝、胴体、丸頭、細い長耳、控えめな光背、膝上の手を優先。黒い目や白い横帯がロボット顔に見えたため、顔のコントラストを落として伏し目寄りに調整した。
+- `src/game/parts/49-debug-mode.js`: `0` キーの大仏移動は像の中心ではなく正面の鑑賞位置へ飛び、`yaw/pitch` も大仏へ向けるよう修正。
+- 確認: `npm.cmd run check` 成功。実ビルダー抽出の正面プレビューを `.tmp/structure-audit/daibutsu-revised-front.png` に生成して確認。実ブラウザ確認は一度ブラウザ制御側がタイムアウトしたため、ユーザー画面でリロード後に再確認が必要。
+
+## 2026-06-29 追記: 共通建築ヘルパー＋和風建築（鳥居・五重塔・茶屋）
+
+- 富士山に続く日本ランドマーク第二弾。音楽会場系は触らず通常ワールドのみ。公開Minecraft系の「テンプレ配置」手法を参考に、まず**再利用可能な建築ヘルパー**を入れて品質の土台を作った（既存の村建物 `buildHouse`/`buildChurch` の作り込みを汎用化）。
+- `src/game/parts/32-world-window.js` に共通ヘルパーを追加:
+  - `roofGabledX/Z()`: 軒を1ブロック張り出し、妻側の三角壁を塞ぐ**切妻屋根**（棟がX/Z方向）。`mat`/`ridgeMat`/`gableMat` を指定。
+  - `framedWalls()`: 角柱＋窓＋出入口の壁（`opts.door='minZ'|...`、`opts.win`/`winY`）。
+  - `stoneLantern()`: 竿(石レンガ)＋火袋(ランタン)＋笠(石)の石灯籠。
+- 和風ビルダー追加: `addTorii()`（朱＝レンガの鳥居、笠木の反り上がり、x/z両向き）、`addPagoda()`（段ごとに縮む3層の屋根＋心柱＋相輪＝発光結晶、内部に宝箱）、`addTeahouse()`（縁側＋障子＝ガラス＋丸太柱＋瓦＝石の切妻屋根＋参道の石灯籠、内部に宝箱/作業台）、`addCastle()`（**天守閣／姫路城風**＝石垣の3段台座＋白壁＝雪＋反り屋根の3層＋金の鯱＝金鉱石、内部に宝箱2/ランタン。13×13でレア）。
+- `structurePlanForCell()`: 草原/森林で `jp<0.34` のとき和風に割当（天守閣4%レア / 鳥居 / 五重塔 / 茶屋）。size表・`structureBase` のlimit（鳥居・天守閣は3まで許容）・`addStructurePlan` のdispatch・五重塔/天守閣のプリクリア高さ(+15)を追加。
+- 確認: `npm.cmd run check` 成功（39ファイル結合・Vite build）。**Node単体ハーネスで実コードを抽出実行**: 鳥居=笠木全幅＋反り端＋柱（x/z両向き）／五重塔=342ブロック・maxY24・相輪(発光結晶)・宝箱・段の縮小／茶屋=入口開口・障子ガラス・作業台・宝箱／天守閣=795ブロック・maxY26・石垣底面full・金の鯱・白壁・障子・宝箱、いずれも天井76未満・例外なし・undefined配置なし。
+- **次の候補**: 町家/神社の参道/大きな寺、既存散在構造物（shop/depot/restStop 等）も新ヘルパーで作り直して高品質化する。
+
+## 2026-06-29 追記: 自然ランドマーク「富士山」を追加
+
+- ユーザー要望「自然の山も作り直して、富士山があるといい」「日本各地のランドマークもどんどん追加」を受けた第一弾。音楽会場系は触らず通常ワールドのみ。
+- **公開Minecraft系の調査結果**: 高品質な構造物は「テンプレ/スキマティックをデータで持って配置する」方式（本家の村のNBT+ジグソー、Hunternif/VoxelArchitecture など）。地形は座標シードノイズ。コード流用はせず手法のみ参照。
+- `src/game/parts/32-world-window.js`: 富士山を**高さオーバーライド型のランドマーク**として実装。`fujiCenter()` がシード決定の中心（スポーンから距離168）を返し、`landmarkHeightAt(x,z)` が反った円錐＋放射尾根＋碗状火口の高さを返す。`heightAt()` で通常地形を上書き（`Math.min(lm, CHUNK_Y_MAX-4)` で描画天井 80 直下にキャップ）。**通常の高さ上限 clamp(…,3,32) を超える**のがポイント。
+- `topTypeAt()`: 富士山の列だけ、上部=雪冠(SNOW)、中腹=火山岩(STONE)、裾野=森(GRASS) の3層に。`generateTerrainColumn()`: 富士山の列は洞窟くり抜きをスキップしてクリーンな山体を保つ。
+- `src/game/parts/49-debug-mode.js` / `54-input.js`: 確認用に `F11`=富士山頂へ移動（飛行ON）。デバッグHUDにも追記。
+- 確認: `npm.cmd run check` 成功（39ファイル結合・Vite build・35 asset copy）。**Node単体ハーネスで高さ式を検証**: 中心 y55 < 火口の縁 y60（碗状火口）／縁60>中腹35>裾野12（外側へ低下）／描画天井76未満／雪冠(縁)・火山岩(中腹)・森(裾野)の帯が成立。ノイズ0の最悪ケースでも碗形が保たれる。プレビューはrAFが止まり生成が進まないため目視不可、この手法で担保（鉄則を踏襲）。
+- **次の候補（日本ランドマーク継続）**: 共通建築ヘルパー（傾斜屋根・軒・柱フレーム・内装）を作って既存散在構造物を高品質化 → 鳥居/五重塔/天守閣/大仏/茶屋・町家/石灯籠の参道/棚田/東京タワー風。建物は `structurePlanForCell` のtype追加＋ビルダー関数＋size表＋`structureBase` のlimit＋dispatchをセットで更新する（既存の `addObservatory` 等が雛形）。
+
+## 2026-06-29 追記: マップ全体の人工構造物を追加
+
+- ユーザー補足「村じゃなくて、マップ全体的に人工の建物を増やしたい」を受け、村ではなく `structurePlanForCell()` 側の全体散布構造物を拡張。敵系は触っていない。
+- `src/game/parts/32-world-window.js`: 構造物テーブルに `restStop`（休憩所）、`depot`（倉庫）、`workshop`（作業小屋）、`shrine`（小祠）、`outpost`（監視拠点）、`observatory`（観測所）を追加。バイオームに応じて、砂漠/高地/森林/雪原/平地に散る。
+- 同ファイルに `addRestStop()` / `addDepot()` / `addWorkshop()` / `addShrine()` / `addOutpost()` / `addObservatory()` を追加。宝箱、ランタン、作業台、かまど、発光結晶など既存ブロックを使って内装差を出す。
+- 直前に村側へ広げかけた宿屋/倉庫/木工小屋の追加は、ユーザー意図に合わせて戻し、村は図書館・畜舎までの状態に維持。
+- `README.md` / `MINECRAFT_GAP_PLAN.md` も同期。
+- 確認: `npm.cmd run check` 成功（39ファイル結合、Vite build、35 runtime asset copy）。
+
+## 2026-06-29 追記: 村の図書館・畜舎を追加
+
+- ユーザー指示「村の畜舎・図書館などの建物追加」を受け、通常ワールド側の村建物バリエーションを追加。音楽会場/BGM系は触っていない。
+- `src/game/parts/32-world-window.js`: 村のスロット数を7〜9へ増やし、固定スロットとして `library` と `stable` を追加。`buildLibrary()` は本棚風の壁、閲覧机、ランタン、資料用宝箱を生成。`buildStable()` は屋根付き小屋、丸太の囲い、飼い葉桶、干し草風の積み荷を生成。
+- `src/game/parts/38-travelers.js`: 図書館付近の村人を **司書**、畜舎付近の村人を **牧場係** に割り当てるよう追加。司書はガラス/ランタン、牧場係はベリー/板材の簡易取引を持つ。
+- `README.md` / `MINECRAFT_GAP_PLAN.md` も同期。
+- 確認: `npm.cmd run check` 成功（39ファイル結合、Vite build、35 runtime asset copy）。
+
+## 2026-06-29 追記: スライム敵Mobの出現停止
+
+- ユーザー指示「スライムの敵がいるけど、今は倒す方法がないので出現させないようにして」を受け、小型スライム敵Mobを一時停止。
+- `src/game/parts/39-hostile-mobs.js`: `HOSTILE_SPAWNING_ENABLED=false` を追加。`spawnHostileNearPlayer()` は即returnし、`updateHostileMobs()` は既存 `HOSTILES` を `scene` から除去して配列を空にする。
+- `MINECRAFT_GAP_PLAN.md`: 敵Mobを `[paused]` に変更。再開条件はプレイヤー攻撃、敵HP、撃破報酬、ノックバックなど、倒す手段の実装後。
+- 確認: `npm.cmd run check` 成功（39ファイル結合、Vite build、35 runtime asset copy）。
+
+## 2026-06-29 追記: 村名と名前看板
+
+- 前回候補どおり、通常ワールド側に村名と村名看板を追加。音楽会場/BGM系は触っていない。
+- `src/game/parts/32-world-window.js`: セル座標から決定的な村名を作る `villageNameForCell()`、現在地付近の村名を返す `villageLabelAt()`、入口側に村名看板を立てる `buildVillageSign()` を追加。`addVillagePlan()` で各村の看板を生成する。
+- `src/game/parts/20-textures.js` / `22-block-types.js`: 村の看板ブロック `VILLAGE_SIGN=27` を追加。`src/game/parts/52-raycast.js` では板材ドロップ、斧優先、軽めの硬さに設定。
+- `src/game/parts/82-weather-and-loop.js`: 村の近くにいる間、左上ステータスへ `村: <name>` を表示。`README.md` / `MINECRAFT_GAP_PLAN.md` も同期。
+
+## 2026-06-29 追記: 村人の会話/簡易取引
+
+- ユーザー指示「次の実装を行って」を受け、前回候補どおり通常ワールド側の村人会話/取引を実装。音楽会場/BGM系は触っていない。
+- `src/game/parts/38-travelers.js`: 村人に `role` を追加。村スロットの近くでスポーンした場合、畑=農家、鍛冶屋=鍛冶屋、市場=商人、教会=聖職者、見張り塔=見張りへ割り当て、その他は旅人/商人寄り。視線上の近い村人を拾う `pickTravelerTarget()` を追加。
+- 同ファイルに簡易取引定義を追加。農家はベリー/リンゴ、鍛冶屋は粗鉄/鉄道具、商人はたいまつ/ガラス、聖職者はランタン/食料、見張りは石レンガ/石斧、旅人は板材/たいまつを交換する。`canDoTravelerTrade()` / `doTravelerTrade()` でインベントリ消費と入手を処理。
+- 新規 `src/game/parts/56-traveler-panel.js`: 村人パネルを追加。役割名、一言、取引リスト、現在所持数つきコスト、受取アイテムを表示し、足りない取引は無効化。`Esc`/`Tab` で閉じられるよう `src/game/parts/54-input.js` にガードを追加。
+- `src/game/parts/52-raycast.js`: 右クリック時、ブロック操作より先に視線上の村人を確認し、見つかったら会話/取引パネルを開く。`src/styles.css` に村人パネルCSSを追加。`README.md` / `MINECRAFT_GAP_PLAN.md` も同期。
+- 確認: `npm.cmd run check` 成功（39ファイル結合、Vite build、35 runtime asset copy）。`http://127.0.0.1:5190/` HTTP 200。ブラウザで `#travelerPanel` / `#chestPanel` DOM生成、地形生成完了後に「クリックして開始」、console error/warnなし。
+- 次に順番で進めるなら、**村人の生活スケジュール/評判**、または**敵Mobを再有効化するための攻撃/撃破システム**。
+
+## 2026-06-29 追記: README同期と宝箱グリッドUI
+
+- ユーザー指示「順番に実装して」の1番目として、READMEの古い単一HTML/Web Audioシンセ説明を Vite 分割構成・mp3専用会場BGM・数字キー会場操作に同期。`npm.cmd run check` を確認コマンドとして記載。
+- `src/game/parts/52-raycast.js`: 宝箱の中身を `mc_chests_<seed>` に座標キーで保存。右クリック時に一度だけ `rollChestLoot()` で中身を作り、閉じても再抽選しない。スタック単位取得/一括取得でインベントリへ入り、空になると既存どおり `OPEN_CHEST` へ変化して編集保存する。宝箱を採掘した場合は保存済み中身（未生成なら新規中身）を入手してから壊れる。
+- 新規 `src/game/parts/56-chest-panel.js`: 中央に開く宝箱パネルを追加。18枠グリッド、スタック取得、すべて取る、閉じる、空状態を表示。`Esc`/`Tab` で閉じられるよう `src/game/parts/54-input.js` にガードを追加。
+- `src/styles.css`: 宝箱パネル/グリッド/スロットのCSSを追加。`README.md` と `MINECRAFT_GAP_PLAN.md` も同期。
+- 確認: `npm.cmd run check` 成功（38ファイル結合、Vite build、35 runtime asset copy）。`npm.cmd run dev -- --port 5190` で HTTP 200、ブラウザで `#chestPanel` DOM 生成と console error/warn なしを確認。ブラウザ制御環境では `window.__mcReady` が未取得だったが、画面は「クリックして開始」まで到達。
+- 次に順番で進めるなら、**村人の会話/簡易取引**から。宝箱UIが入ったので、村探索の報酬導線は一段落。
 
 ## 2026-06-27 追記: 採掘/略奪した新ブロックを設置可能に（インベントリ画面から選択）
 
@@ -42,6 +138,12 @@
 - `src/game/parts/58-third-person-view.js` / `82-weather-and-loop.js`: 三人称の持ち物と左上「選択:」表示も現在の設置ブロックを反映。`src/styles.css`: 選択行のハイライトCSS。
 - 確認: `npm.cmd run check` 成功。**実ブラウザ（dev `127.0.0.1:5174`）でDOM検証**: ロードで `__mcReady=true`・console error/warnなし。localStorageに石レンガ(20)/ランタン(23)を仕込んでリロード→Tabのブロックタブに出現→クリックで `selected` 化＋「✓設置中」、ホットバー枠クリックで override 解除（枠ブロックが選択）まで確認。
 - 補足: 真のオーシャン/海岸線/島は別途。**現状この世界は海面(SEA=8)以下の地形がほぼ皆無**（52万列中1列）で、海を作るには `terrainHeightRaw` の大改修が要る＝世界の見た目が一変するため、腰を据えてやる方が良い。
+
+## 2026-06-27 追記: 村の教会・見張り塔を追加
+
+- ユーザー指示により、音楽会場系は触らず通常ワールド側のみ。
+- `src/game/parts/32-world-window.js`: `villagePlanForCell` の4番目/5番目の村スロットを **教会** と **見張り塔** に割り当て。`buildChurch` は石レンガ壁、切妻屋根、十字付き尖塔、祭壇、ランタン、献金箱。`buildTower` は細い石レンガ塔、矢狭間、胸壁、ランタンビーコン、基部宝箱。
+- 確認: `npm.cmd run check` 成功。`npm run dev -- --port 5185` でローカルロード、canvas表示、console error/warnなし、スクリーンショット取得成功。依存スタブのNode単体ハーネスで、村候補に `farm/blacksmith/market/church/tower/...` が入ることを確認。
 
 ## 2026-06-27 追記: 川の連続性・峡谷・滝（地形拡張）
 
@@ -253,7 +355,7 @@
 
 - `src/game/parts/51-survival.js` を追加。体力、空腹度、落下ダメージ、死亡時の自動リスポーン、体力/空腹HUDを実装。
 - `src/game/parts/46-day-night.js` を追加。昼/朝/夕方/夜の時間を進め、太陽位置と明るさを変える。夜は暗くなり、左上ステータスに時間帯を表示する。
-- `src/game/parts/39-hostile-mobs.js` を追加。夜だけ小型スライム風Mobがスポーンし、近づくとプレイヤーへダメージを与える。
+- `src/game/parts/39-hostile-mobs.js` を追加。夜だけ小型スライム風Mobがスポーンし、近づくとプレイヤーへダメージを与える。現在は倒す方法が未実装のため、2026-06-29追記どおり出現停止中。
 - 食べ物の入口として、葉ブロックを壊すと一定確率でリンゴ相当の空腹回復が入るようにした。
 - `src/game/parts/53-inventory.js` を追加。ホットバーの所持数を管理し、ブロック破壊で増え、設置で減る。`56-hotbar-ui.js` と `styles.css` で個数表示も追加。
 - `src/game/parts/30-noise.js` / `32-world-window.js` / `52-raycast.js`: ワールドシード、編集済みブロック、インベントリを `localStorage` に保存/読み込みするようにした。

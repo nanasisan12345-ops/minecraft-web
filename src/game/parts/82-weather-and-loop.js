@@ -157,8 +157,10 @@
     clouds.position.x = camera.position.x; clouds.position.z = camera.position.z;
     TX.water.offset.x += dt * 0.02; TX.water.offset.y -= dt * 0.03; // 水面の流れ
 
-    const biomeLabel = biomeLabelAt(Math.floor(player.pos.x), Math.floor(player.pos.z));
-    stats.textContent = `XYZ ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}　　選択: ${currentPlaceName()}　　地形チャンク: ${terrainChunkCount()}　　バイオーム: ${biomeLabel}${RAVE.on ? '' : '　　時間: ' + DAY.label + '　　天候: ' + weatherLabel}${raveStatsText()}`;
+    const px = Math.floor(player.pos.x), pz = Math.floor(player.pos.z);
+    const biomeLabel = biomeLabelAt(px, pz);
+    const villageLabel = typeof villageLabelAt === 'function' ? villageLabelAt(px, pz) : '';
+    stats.textContent = `XYZ ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}　　選択: ${currentPlaceName()}　　地形チャンク: ${terrainChunkCount()}　　バイオーム: ${biomeLabel}${villageLabel ? '　　村: ' + villageLabel : ''}${RAVE.on ? '' : '　　時間: ' + DAY.label + '　　天候: ' + weatherLabel}${raveStatsText()}`;
     renderer.render(scene, camera);
   }
   regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z)); // 初期生成

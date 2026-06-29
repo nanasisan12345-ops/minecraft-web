@@ -113,6 +113,52 @@
     setDebugToast(`峡谷へ移動: ${c.x}, ${c.z}`);
   }
 
+  function teleportToFuji() {
+    const f = fujiCenter();
+    const x = f.x, z = f.z, y = heightAt(x, z) + 3;
+    player.pos.set(x + 0.5, y, z + 0.5);
+    player.vel.set(0, 0, 0); player.onGround = false;
+    if (!DEBUG.fly) DEBUG.fly = true;   // 山頂は宙に浮くので飛行ONにする
+    regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z));
+    setDebugToast(`富士山頂へ移動: ${x}, ${z}`);
+  }
+
+  const JP_ORDER = ['torii', 'waterTorii', 'pagoda', 'teahouse', 'castle', 'daibutsu', 'riceTerrace', 'tokyoTower'];
+  const JP_LABEL = { torii: '鳥居', waterTorii: '水上鳥居', pagoda: '五重塔', teahouse: '茶屋', castle: '天守閣', daibutsu: '大仏', riceTerrace: '棚田', tokyoTower: '東京タワー風タワー' };
+  let jpCycleIdx = 0;
+  // 0キーを押すたびに和風ランドマークの種類を切り替えて最寄りへ飛ぶ。
+  function teleportToNearbyJapanese() {
+    const type = JP_ORDER[jpCycleIdx % JP_ORDER.length];
+    jpCycleIdx++;
+    const px = Math.floor(player.pos.x), pz = Math.floor(player.pos.z);
+    const c0x = Math.floor(px / STRUCT_CELL), c0z = Math.floor(pz / STRUCT_CELL);
+    let best = null, bestD = Infinity;
+    for (let r = 0; r <= 40 && !best; r++) {              // レアな建物用に広めに探索
+      for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; // リング状に外へ
+        const p = structurePlanForCell(c0x + dx, c0z + dz);
+        if (!p || p.type !== type) continue;
+        const b = structureBase(p); if (b == null) continue;      // 実際に建つ場所だけ
+        const d = Math.hypot(p.x - px, p.z - pz);
+        if (d < bestD) { bestD = d; best = { p, b }; }
+      }
+    }
+    if (!best) { setDebugToast(`近くに${JP_LABEL[type]}が見つかりません（0でさらに次へ）`); return; }
+    const { p, b } = best;
+    if (type === 'daibutsu') {
+      player.pos.set(p.x + 0.5, b + 12, p.z - Math.floor(p.d / 2) - 10 + 0.5);
+      yaw = Math.PI;
+      pitch = -0.45;
+    } else {
+      const flyY = type === 'tokyoTower' ? b + 32 : b + 6;
+      player.pos.set(p.x + 0.5, flyY, p.z + 0.5);
+    }
+    player.vel.set(0, 0, 0); player.onGround = false;
+    if (!DEBUG.fly) DEBUG.fly = true;
+    regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z));
+    setDebugToast(`${JP_LABEL[type]}へ移動: ${p.x}, ${p.z}`);
+  }
+
   function teleportToNearbyLake() {
     const found = nearestLake(Math.floor(player.pos.x), Math.floor(player.pos.z));
     if (!found) { setDebugToast('近くに地下湖が見つかりません'); return; }
@@ -129,7 +175,7 @@
     debugHud.classList.toggle('show', show);
     if (!show) return;
     const lines = [];
-    if (DEBUG.fly) lines.push('DEBUG FLY: ON  F3解除 / F4洞窟 / F6地下遺跡 / F7村 / F8廃坑 / F9地下湖 / F10峡谷 / Space上昇 / Shift下降');
+    if (DEBUG.fly) lines.push('DEBUG FLY: ON  F3解除 / F4洞窟 / F6地下遺跡 / F7村 / F8廃坑 / F9地下湖 / F10峡谷 / F11富士山 / 0和風建築(順送り) / Space上昇 / Shift下降');
     if (DEBUG.toastClock > 0 && DEBUG.toast) lines.push(DEBUG.toast);
     debugHud.textContent = lines.join('　');
   }

@@ -126,14 +126,48 @@
     if (cached !== undefined) return cached;
     let h = terrainHeightRawCached(x, z);
     h = Math.round(THREE.MathUtils.clamp(h, 3, 32));
+    const lm = landmarkHeightAt(x, z);
+    if (lm > h) h = Math.min(lm, CHUNK_Y_MAX - 4);
     HEIGHT_CACHE.set(id, h);
     if (HEIGHT_CACHE.size > 90000) HEIGHT_CACHE.clear();
     return h;
   }
 
+  /* ---- 自然ランドマーク: 富士山（雪冠＋火口＋森の裾野の大円錐火山） ---- */
+  let _fuji = null;
+  function fujiCenter() {
+    if (_fuji) return _fuji;
+    const ang = hash2(7.77, 3.33) * Math.PI * 2;
+    const dist = 168;
+    _fuji = { x: Math.round(Math.cos(ang) * dist), z: Math.round(Math.sin(ang) * dist), R: 92, peak: 58 };
+    return _fuji;
+  }
+  function inFuji(x, z) { const f = fujiCenter(); return Math.hypot(x - f.x, z - f.z) < f.R; }
+  // 富士山の高さ（裾野=地表 .. 山頂=peak）。範囲外は 0 を返し既存地形を使う。
+  function landmarkHeightAt(x, z) {
+    const f = fujiCenter();
+    const dx = x - f.x, dz = z - f.z;
+    const d = Math.hypot(dx, dz);
+    if (d >= f.R) return 0;
+    const t = d / f.R;                                  // 0=山頂 .. 1=裾野
+    let cone = f.peak * Math.pow(1 - t, 1.32);          // ゆるく反った円錐
+    // 放射状のうっすらした尾根（山頂へ向かって消える）でのっぺり感をなくす
+    const ang = Math.atan2(dz, dx);
+    cone += (1 - t) * (Math.sin(ang * 8) * 0.5 + 0.5) * 2.0 * ((fbm(x * 0.06, z * 0.06, 2, 0.5) + 1) / 2);
+    let y = SPAWN_GROUND_Y + cone;
+    if (t < 0.14) y -= ((0.14 - t) / 0.14) * 16;         // 山頂に碗状の火口（中心を縁より低くする）
+    return Math.round(y);
+  }
+
   function topTypeAt(x, z, h) {
     const biome = biomeAt(x, z);
     if (inSpawnClearing(x, z, SPAWN_FLAT_R)) return GRASS;
+    if (inFuji(x, z)) {
+      const f = fujiCenter();
+      if (h >= SPAWN_GROUND_Y + f.peak * 0.66) return SNOW;   // 上部は雪冠
+      if (h >= SPAWN_GROUND_Y + f.peak * 0.30) return STONE;  // 中腹は火山岩
+      return GRASS;                                           // 裾野は森
+    }
     if (h <= SEA + 1) return SAND;
     if (biome.id === 'snowfield' || h >= SNOW_LINE) return SNOW;
     if (biome.id === 'desert') return SAND;
@@ -236,6 +270,7 @@
   }
 
   function waterFeatureAt(x, z, h) {
+    if (inFuji(x, z)) return null;   // 富士山の山体には川・峡谷・滝を出さない
     return valleyAt(x, z, h) || pondFeatureAt(x, z, h) || streamFeatureAt(x, z, h);
   }
 
@@ -355,29 +390,49 @@
   const STRUCT_CELL = 38;
   function structurePlanForCell(cx, cz) {
     const chance = hash2(cx * 19.17 + 4.3, cz * 23.71 - 8.1);
-    if (chance > 0.52) return null;
+    if (chance > 0.48) return null;
     const x = cx * STRUCT_CELL + 8 + (hash2(cx + 0.23, cz - 0.13) * (STRUCT_CELL - 16) | 0);
     const z = cz * STRUCT_CELL + 8 + (hash2(cx - 0.41, cz + 0.37) * (STRUCT_CELL - 16) | 0);
     if (distFromSpawn(x, z) < SPAWN_CLEAR_R + 34) return null;
     const biome = biomeAt(x, z);
     const modern = hash2(cx * 41.7 - 2.1, cz * 37.9 + 9.4);
+    const utility = hash2(cx * 29.3 + 11.4, cz * 31.9 - 4.6);
+    const jp = hash2(cx * 53.3 - 7.7, cz * 47.1 + 5.5);
     let type = 'cabin', dir = hash2(cx + 8.8, cz - 4.4) < 0.5 ? 'x' : 'z';
-    if (modern < 0.72 && biome.id !== 'snowfield') {
-      if (biome.id === 'desert') type = modern < 0.34 ? 'solar' : modern < 0.52 ? 'shop' : 'road';
-      else if (biome.id === 'highlands') type = modern < 0.36 ? 'antenna' : modern < 0.52 ? 'shop' : 'road';
-      else if (biome.id === 'forest') type = modern < 0.28 ? 'busStop' : modern < 0.48 ? 'shop' : 'road';
-      else type = modern < 0.28 ? 'shop' : modern < 0.46 ? 'busStop' : 'road';
+    if ((biome.id === 'plains' || biome.id === 'forest') && jp < 0.40) {
+      // 和風: 東京タワー風(レア) / 天守閣 / 大仏 / 水上鳥居 / 鳥居 / 五重塔 / 茶屋 / 棚田
+      type = jp < 0.025 ? 'tokyoTower' : jp < 0.055 ? 'castle' : jp < 0.080 ? 'daibutsu' : jp < 0.130 ? 'waterTorii' : jp < 0.210 ? 'torii' : jp < 0.285 ? 'pagoda' : jp < 0.345 ? 'teahouse' : 'riceTerrace';
+    } else if (modern < 0.78 && biome.id !== 'snowfield') {
+      if (biome.id === 'desert') type = modern < 0.30 ? 'solar' : modern < 0.45 ? 'depot' : modern < 0.60 ? 'shop' : 'road';
+      else if (biome.id === 'highlands') type = modern < 0.26 ? 'antenna' : modern < 0.43 ? 'observatory' : modern < 0.58 ? 'outpost' : 'road';
+      else if (biome.id === 'forest') type = modern < 0.22 ? 'restStop' : modern < 0.38 ? 'workshop' : modern < 0.53 ? 'shrine' : modern < 0.66 ? 'busStop' : 'road';
+      else type = modern < 0.18 ? 'depot' : modern < 0.34 ? 'workshop' : modern < 0.50 ? 'restStop' : modern < 0.63 ? 'shop' : modern < 0.72 ? 'busStop' : 'road';
     } else if (biome.id === 'desert') type = 'temple';
-    else if (biome.id === 'highlands' || chance < 0.055) type = chance < 0.035 ? 'tower' : 'ruin';
-    else if (biome.id === 'snowfield') type = 'ruin';
+    else if (biome.id === 'highlands' || chance < 0.055) type = chance < 0.035 ? 'tower' : utility < 0.45 ? 'outpost' : 'ruin';
+    else if (biome.id === 'snowfield') type = utility < 0.32 ? 'outpost' : utility < 0.58 ? 'shrine' : 'ruin';
+    else if (utility < 0.22) type = 'shrine';
     const size =
       type === 'road' ? (dir === 'x' ? [23, 5] : [5, 23]) :
       type === 'solar' ? [13, 9] :
       type === 'shop' ? [11, 9] :
       type === 'busStop' ? [9, 6] :
+      type === 'depot' ? [10, 8] :
+      type === 'workshop' ? [9, 7] :
+      type === 'restStop' ? [9, 7] :
+      type === 'shrine' ? [7, 7] :
+      type === 'outpost' ? [7, 7] :
+      type === 'observatory' ? [9, 9] :
       type === 'antenna' ? [7, 7] :
       type === 'tower' ? [5, 5] :
       type === 'temple' ? [9, 9] :
+      type === 'torii' ? (dir === 'x' ? [11, 3] : [3, 11]) :
+      type === 'waterTorii' ? (dir === 'x' ? [13, 9] : [9, 13]) :
+      type === 'pagoda' ? [9, 9] :
+      type === 'teahouse' ? [9, 7] :
+      type === 'castle' ? [13, 13] :
+      type === 'daibutsu' ? [27, 23] :
+      type === 'riceTerrace' ? (dir === 'x' ? [15, 11] : [11, 15]) :
+      type === 'tokyoTower' ? [9, 9] :
       type === 'ruin' ? [8, 7] : [7, 6];
     return { x, z, type, w: size[0], d: size[1], dir };
   }
@@ -415,9 +470,417 @@
       if (h <= SEA + 1) return null;
       lo = Math.min(lo, h); hi = Math.max(hi, h);
     }
-    const limit = plan.type === 'tower' || plan.type === 'antenna' ? 4 : plan.type === 'ruin' ? 3 : 2;
+    const limit =
+      plan.type === 'riceTerrace' ? 5 :
+      plan.type === 'tower' || plan.type === 'antenna' || plan.type === 'observatory' || plan.type === 'outpost' || plan.type === 'tokyoTower' ? 4 :
+      plan.type === 'daibutsu' ? 5 :
+      plan.type === 'ruin' || plan.type === 'shrine' || plan.type === 'torii' || plan.type === 'waterTorii' || plan.type === 'castle' ? 3 : 2;
     if (hi - lo > limit) return null;
     return hi + 1;
+  }
+
+  /* ===== 共通建築ヘルパー（傾斜屋根・軒・柱フレーム壁・石灯籠） ===== */
+  // 切妻屋根（棟がX方向、Z方向に傾斜）。eaveY=軒の高さ。1ブロック軒を張り出し、妻側の三角壁を gableMat で塞ぐ。
+  function roofGabledX(put, minX, maxX, minZ, maxZ, eaveY, mat, ridgeMat, gableMat) {
+    for (let x = minX - 1; x <= maxX + 1; x++) { put(x, eaveY, minZ - 1, mat); put(x, eaveY, maxZ + 1, mat); }
+    for (let z = minZ; z <= maxZ; z++) { put(minX - 1, eaveY, z, mat); put(maxX + 1, eaveY, z, mat); }
+    const steps = Math.floor((maxZ - minZ) / 2) + 1;
+    for (let s = 0; s < steps; s++) {
+      const y = eaveY + s, zA = minZ + s, zB = maxZ - s;
+      const ridge = zA >= zB;
+      for (let x = minX; x <= maxX; x++) {
+        put(x, y, zA, ridge && ridgeMat != null ? ridgeMat : mat);
+        if (zB !== zA) put(x, y, zB, mat);
+      }
+      if (gableMat != null) for (let z = zA + 1; z < zB; z++) { put(minX, y, z, gableMat); put(maxX, y, z, gableMat); }
+    }
+  }
+  // 切妻屋根（棟がZ方向、X方向に傾斜）
+  function roofGabledZ(put, minX, maxX, minZ, maxZ, eaveY, mat, ridgeMat, gableMat) {
+    for (let z = minZ - 1; z <= maxZ + 1; z++) { put(minX - 1, eaveY, z, mat); put(maxX + 1, eaveY, z, mat); }
+    for (let x = minX; x <= maxX; x++) { put(x, eaveY, minZ - 1, mat); put(x, eaveY, maxZ + 1, mat); }
+    const steps = Math.floor((maxX - minX) / 2) + 1;
+    for (let s = 0; s < steps; s++) {
+      const y = eaveY + s, xA = minX + s, xB = maxX - s;
+      const ridge = xA >= xB;
+      for (let z = minZ; z <= maxZ; z++) {
+        put(xA, y, z, ridge && ridgeMat != null ? ridgeMat : mat);
+        if (xB !== xA) put(xB, y, z, mat);
+      }
+      if (gableMat != null) for (let x = xA + 1; x < xB; x++) { put(x, y, minZ, gableMat); put(x, y, maxZ, gableMat); }
+    }
+  }
+  // 角柱フレーム＋窓＋出入口の壁。opts.door: 'minZ'|'maxZ'|'minX'|'maxX'
+  function framedWalls(put, air, minX, maxX, minZ, maxZ, base, h, wall, post, opts) {
+    opts = opts || {};
+    const winY = opts.winY != null ? opts.winY : base + 2;
+    const win = opts.win === undefined ? GLASS : opts.win;
+    const cx = Math.round((minX + maxX) / 2), cz = Math.round((minZ + maxZ) / 2);
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const edge = x === minX || x === maxX || z === minZ || z === maxZ;
+      if (!edge) continue;
+      const corner = (x === minX || x === maxX) && (z === minZ || z === maxZ);
+      for (let y = base + 1; y <= base + h; y++) {
+        const onX = x === minX || x === maxX;
+        const window = win != null && !corner && y === winY && (onX ? z === cz : x === cx);
+        put(x, y, z, corner ? post : window ? win : wall);
+      }
+    }
+    const d = opts.door;
+    if (d === 'minZ') for (let y = base + 1; y <= base + 2; y++) air(cx, y, minZ);
+    else if (d === 'maxZ') for (let y = base + 1; y <= base + 2; y++) air(cx, y, maxZ);
+    else if (d === 'minX') for (let y = base + 1; y <= base + 2; y++) air(minX, y, cz);
+    else if (d === 'maxX') for (let y = base + 1; y <= base + 2; y++) air(maxX, y, cz);
+  }
+  // 石灯籠（竿＋火袋＋笠）
+  function stoneLantern(put, x, base, z) {
+    put(x, base + 1, z, STONE_BRICK);
+    put(x, base + 2, z, LANTERN);
+    put(x, base + 3, z, STONE);
+  }
+  // 反り屋根の軒（外へ張り出し、外周ほど一段下がって垂れ、四隅が反り上がる）。和瓦の深い軒を表現。
+  function eaveSkirt(put, cx, cz, eaveY, bodyHalf, tile) {
+    const inner = bodyHalf + 1, outer = bodyHalf + 2;
+    for (let x = cx - inner; x <= cx + inner; x++) for (let z = cz - inner; z <= cz + inner; z++) {
+      if (x === cx - inner || x === cx + inner || z === cz - inner || z === cz + inner) put(x, eaveY, z, tile);
+    }
+    for (let x = cx - outer; x <= cx + outer; x++) for (let z = cz - outer; z <= cz + outer; z++) {
+      if (x === cx - outer || x === cx + outer || z === cz - outer || z === cz + outer) put(x, eaveY - 1, z, tile);
+    }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(cx + outer * sx, eaveY, cz + outer * sz, tile); // 反り（四隅を持ち上げ）
+  }
+  // 寄棟風の反り屋根（最上層の屋根。緩い勾配で頂部まで葺き、四隅を反らせる）。頂部のyを返す。
+  function roofHip(put, cx, cz, eaveY, eaveHalf, tile) {
+    let y = eaveY;
+    for (let inset = 0; inset <= eaveHalf; inset++) {
+      const hw = eaveHalf - inset;
+      for (let x = cx - hw; x <= cx + hw; x++) for (let z = cz - hw; z <= cz + hw; z++) {
+        if (hw === 0 || x === cx - hw || x === cx + hw || z === cz - hw || z === cz + hw) put(x, y, z, tile);
+      }
+      if (inset % 2 === 1) y++;
+    }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(cx + eaveHalf * sx, eaveY + 1, cz + eaveHalf * sz, tile);
+    return y;
+  }
+  // 千鳥破風（屋根正面の三角破風）。z=gz の面に、白漆喰の三角＋縁取り屋根＋頂部に金。
+  function chidoriGable(put, cx, gz, baseY, half, wall, roof, gold) {
+    for (let lvl = 0; lvl <= half; lvl++) {
+      const w = half - lvl;
+      for (let dx = -w; dx <= w; dx++) put(cx + dx, baseY + lvl, gz, (dx === -w || dx === w) ? roof : wall);
+    }
+    put(cx, baseY + half + 1, gz, gold);
+  }
+
+  /* ===== 和風建築: 鳥居 / 五重塔 ===== */
+  // 鳥居（明神鳥居）。柱・貫・島木＝朱、最上の笠木＝濃い木、中央に金の扁額。
+  // 参考画像: 笠木はほぼ水平に長く張り出し、両端が「1マスだけ」反る（角にしない）。
+  function addTorii(plan, base, minX, maxX, minZ, maxZ, put) {
+    const alongX = plan.dir === 'x';
+    const cx = plan.x, cz = plan.z;
+    const P = alongX ? (u, y) => put(u, y, cz, VERMILION) : (u, y) => put(cx, y, u, VERMILION);
+    const Pt = alongX ? (u, y, t) => put(u, y, cz, t) : (u, y, t) => put(cx, y, u, t);
+    const c = alongX ? cx : cz;
+    // 柱 hashira（朱・7段）＋石の根巻
+    for (const s of [-1, 1]) { const u = c + 3 * s; Pt(u, base, STONE); for (let y = base + 1; y <= base + 7; y++) P(u, y); }
+    // 貫 nuki（朱・柱を1マス貫く下梁）
+    for (let u = c - 4; u <= c + 4; u++) P(u, base + 5);
+    // 扁額 gaku（金）＋束（朱）
+    Pt(c, base + 6, GOLD_BLOCK); P(c, base + 7);
+    // 島木 shimaki（朱・柱より1マス外へ）
+    for (let u = c - 4; u <= c + 4; u++) P(u, base + 8);
+    // 笠木 kasagi（濃い木・最上段、さらに外へ張り出し、両端だけ1マス反る）
+    for (let u = c - 5; u <= c + 5; u++) Pt(u, base + 9, LOG);
+    Pt(c - 5, base + 10, LOG); Pt(c + 5, base + 10, LOG);
+  }
+
+  // 五重塔（参照: 朱壁＋軒下の白帯＋黒瓦の反り軒を5層、上ほど逓減、頂部に金の相輪）
+  function addPagoda(plan, base, minX, maxX, minZ, maxZ, put) {
+    const cx = plan.x, cz = plan.z;
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK); // 基壇
+    const halfs = [4, 3, 3, 2, 2], bodyH = 3;
+    let y = base + 1, topHalf = halfs[0];
+    for (let i = 0; i < halfs.length; i++) {
+      const hw = halfs[i]; topHalf = hw;
+      for (let yy = y; yy <= y + bodyH - 1; yy++) for (let x = cx - hw; x <= cx + hw; x++) for (let z = cz - hw; z <= cz + hw; z++) {
+        const edge = x === cx - hw || x === cx + hw || z === cz - hw || z === cz + hw;
+        if (!edge) continue;
+        const corner = (x === cx - hw || x === cx + hw) && (z === cz - hw || z === cz + hw);
+        const frieze = yy === y + bodyH - 1;                       // 軒下の白帯（漆喰）
+        const window = !corner && yy === y + 1 && ((x === cx - hw || x === cx + hw) ? z === cz : x === cx);
+        put(x, yy, z, corner ? LOG : frieze ? PLASTER : window ? GLASS : VERMILION); // 朱壁
+      }
+      eaveSkirt(put, cx, cz, y + bodyH, hw, ROOF_TILE);            // 黒瓦の反り軒
+      y = y + bodyH + 1;
+    }
+    const peak = roofHip(put, cx, cz, y, topHalf + 1, ROOF_TILE);  // 最上層の宝形屋根
+    for (let k = 1; k <= 4; k++) put(cx, peak + k, cz, GOLD_BLOCK); // 相輪（金の塔）
+    put(cx, peak + 5, cz, GLOW_CRYSTAL);                            // 宝珠
+    put(cx - 2, base + 1, cz - 2, CHEST);
+    put(cx + 2, base + 1, cz + 2, LANTERN);
+  }
+
+  // 茶屋・和風民家（縁側＋障子＝ガラス＋丸太の柱＋瓦の切妻屋根＋白漆喰の妻＋参道の石灯籠）
+  function addTeahouse(plan, base, minX, maxX, minZ, maxZ, put, air) {
+    const cx = plan.x;
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) {
+      const g = heightAt(x, z);
+      for (let yy = g + 1; yy < base; yy++) put(x, yy, z, STONE);
+      for (let yy = base + 1; yy <= base + 7; yy++) air(x, yy, z);
+      put(x, base, z, PLANKS);                                    // 縁側付きの床
+    }
+    framedWalls(put, air, minX, maxX, minZ, maxZ, base, 3, PLANKS, LOG, { winY: base + 2, win: GLASS, door: 'minZ' });
+    roofGabledX(put, minX, maxX, minZ, maxZ, base + 4, ROOF_TILE, ROOF_TILE, PLASTER);
+    put(minX + 1, base + 1, minZ + 1, LANTERN);
+    put(maxX - 1, base + 1, maxZ - 1, CHEST);
+    put(maxX - 1, base + 1, minZ + 1, CRAFTING_TABLE);
+    stoneLantern(put, cx - 2, base, minZ - 1);
+    stoneLantern(put, cx + 2, base, minZ - 1);
+  }
+
+  // 天守閣（参照: 石垣＋白漆喰の壁＋緑青の銅瓦の反り屋根を多層＋各層正面に千鳥破風＋金の鯱）
+  function addCastle(plan, base, minX, maxX, minZ, maxZ, put) {
+    const cx = plan.x, cz = plan.z;
+    for (let lvl = 0; lvl < 3; lvl++) for (let x = minX + lvl; x <= maxX - lvl; x++) for (let z = minZ + lvl; z <= maxZ - lvl; z++) put(x, base + lvl, z, STONE); // 石垣
+    const py = base + 3;                          // 天守の床
+    const halfs = [4, 3, 2], bodyH = 3;
+    let y = py, topHalf = halfs[0];
+    for (let i = 0; i < halfs.length; i++) {
+      const hw = halfs[i]; topHalf = hw;
+      for (let yy = y; yy <= y + bodyH - 1; yy++) for (let x = cx - hw; x <= cx + hw; x++) for (let z = cz - hw; z <= cz + hw; z++) {
+        const edge = x === cx - hw || x === cx + hw || z === cz - hw || z === cz + hw;
+        if (!edge) continue;
+        const corner = (x === cx - hw || x === cx + hw) && (z === cz - hw || z === cz + hw);
+        const window = !corner && yy === y + 1 && ((x === cx - hw || x === cx + hw) ? (z - cz) % 2 === 0 : (x - cx) % 2 === 0);
+        put(x, yy, z, corner ? LOG : window ? GLASS : PLASTER);   // 白漆喰の壁
+      }
+      eaveSkirt(put, cx, cz, y + bodyH, hw, COPPER_ROOF);         // 緑青の銅瓦の反り軒
+      chidoriGable(put, cx, cz - hw - 1, y + bodyH, Math.min(hw, 2), PLASTER, COPPER_ROOF, GOLD_BLOCK); // 正面の千鳥破風
+      y = y + bodyH + 1;
+    }
+    const peak = roofHip(put, cx, cz, y, topHalf + 1, COPPER_ROOF);
+    put(cx, peak + 1, cz, GOLD_BLOCK);                            // 金の鯱
+    put(cx - 1, peak, cz, GOLD_BLOCK); put(cx + 1, peak, cz, GOLD_BLOCK);
+    put(cx - 3, py + 1, cz - 3, CHEST); put(cx + 3, py + 1, cz + 3, CHEST);
+    put(cx, py + 1, cz, LANTERN);
+  }
+
+  // 厳島風の水上鳥居。人工の浅い池を掘り、中央に鳥居と石畳の参道を通す。
+  function addWaterTorii(plan, base, minX, maxX, minZ, maxZ, put) {
+    const cx = plan.x, cz = plan.z, alongX = plan.dir === 'x';
+    const rx = Math.max(4, Math.floor(plan.w / 2) - 1), rz = Math.max(4, Math.floor(plan.d / 2) - 1);
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const d = ((x - cx) / rx) ** 2 + ((z - cz) / rz) ** 2;
+      if (d <= 1.0) {
+        put(x, base - 1, z, SAND);
+        put(x, base, z, WATER);
+      } else {
+        put(x, base, z, d < 1.20 ? SAND : GRASS);
+      }
+    }
+    if (alongX) for (let x = minX; x <= maxX; x++) put(x, base, cz, STONE_BRICK);
+    else for (let z = minZ; z <= maxZ; z++) put(cx, base, z, STONE_BRICK);
+    addTorii(plan, base, minX, maxX, minZ, maxZ, put);
+    if (alongX) {
+      stoneLantern(put, minX + 1, base, cz - 2);
+      stoneLantern(put, maxX - 1, base, cz + 2);
+    } else {
+      stoneLantern(put, cx - 2, base, minZ + 1);
+      stoneLantern(put, cx + 2, base, maxZ - 1);
+    }
+  }
+
+  // 大仏（緑青のブロンズ座像）。参照作例に寄せ、低く広い蓮華座・膝・肩・大耳・光背で「座像」として読ませる。
+  function addDaibutsu(plan, base, minX, maxX, minZ, maxZ, put) {
+    const cx = plan.x, cz = plan.z, bronze = COPPER_ROOF;
+    const oval = (y, mx, mz, rx, rz, mat = bronze) => {
+      for (let x = mx - rx; x <= mx + rx; x++) for (let z = mz - rz; z <= mz + rz; z++) {
+        if (((x - mx) / Math.max(1, rx)) ** 2 + ((z - mz) / Math.max(1, rz)) ** 2 <= 1.08) put(x, y, z, mat);
+      }
+    };
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK);
+    for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) put(x, base + 1, z, STONE);
+
+    // 蓮華座: 横に広い二段の楕円。ここが細いと像ではなく塔に見える。
+    oval(base + 2, cx, cz + 1, 6, 4, STONE);
+    for (let x = cx - 6; x <= cx + 6; x += 2) put(x, base + 3, minZ + 2, PLASTER);
+    oval(base + 3, cx, cz + 1, 5, 3, bronze);
+
+    // 結跏趺坐の膝。正面側へ大きく張らせ、座像の横長シルエットを作る。
+    oval(base + 4, cx - 3, minZ + 4, 3, 2, bronze);
+    oval(base + 4, cx + 3, minZ + 4, 3, 2, bronze);
+    oval(base + 5, cx - 3, minZ + 4, 2, 1, bronze);
+    oval(base + 5, cx + 3, minZ + 4, 2, 1, bronze);
+    for (let x = cx - 2; x <= cx + 2; x++) put(x, base + 5, minZ + 3, bronze);
+
+    // 胴体と肩。下を広く、上を少し絞る。
+    oval(base + 5, cx, cz, 3, 2, bronze);
+    oval(base + 6, cx, cz, 3, 2, bronze);
+    oval(base + 7, cx, cz, 2, 2, bronze);
+    for (let x = cx - 5; x <= cx + 5; x++) put(x, base + 7, cz, bronze);
+
+    // 腕と手。左右から膝上へ降りる形にして、胸の変な金塊を消す。
+    for (let i = 0; i <= 3; i++) {
+      put(cx - 5 + i, base + 6 - (i > 1 ? 1 : 0), cz - 1, bronze);
+      put(cx + 5 - i, base + 6 - (i > 1 ? 1 : 0), cz - 1, bronze);
+    }
+    put(cx - 1, base + 5, minZ + 3, PLASTER);
+    put(cx, base + 5, minZ + 3, PLASTER);
+    put(cx + 1, base + 5, minZ + 3, PLASTER);
+
+    // 頭部・耳・顔。正面に顔面を作り、名前なしでも像の顔だと読めるようにする。
+    const faceZ = minZ + 4;
+    for (let y = base + 8; y <= base + 11; y++) for (let x = cx - 2; x <= cx + 2; x++) put(x, y, faceZ, bronze);
+    for (let y = base + 9; y <= base + 11; y++) {
+      put(cx - 3, y, faceZ, bronze);
+      put(cx + 3, y, faceZ, bronze);
+    }
+    put(cx - 1, base + 10, faceZ - 1, STONE_BRICK);              // 伏し目
+    put(cx + 1, base + 10, faceZ - 1, STONE_BRICK);
+    put(cx, base + 9, faceZ - 1, STONE);                         // 鼻
+    put(cx - 1, base + 8, faceZ - 1, STONE_BRICK);               // 口
+    put(cx, base + 8, faceZ - 1, STONE_BRICK);
+    put(cx + 1, base + 8, faceZ - 1, STONE_BRICK);
+    put(cx, base + 12, faceZ, bronze);                           // 丸い頭頂
+    put(cx - 1, base + 12, faceZ, bronze);
+    put(cx + 1, base + 12, faceZ, bronze);
+    put(cx, base + 13, faceZ, bronze);
+
+    // 光背。背面に大きめの金の円弧を置き、仏像らしい記号を加える。
+    const haloZ = faceZ + 2;
+    for (const [dx, yy] of [[0, 15], [-1, 14], [1, 14], [-2, 13], [2, 13], [-3, 12], [3, 12], [-4, 11], [4, 11], [-5, 10], [5, 10], [-5, 9], [5, 9], [-4, 8], [4, 8], [-3, 7], [3, 7]]) {
+      put(cx + dx, base + yy, haloZ, GOLD_BLOCK);
+    }
+    put(cx - 5, base + 3, minZ + 1, LANTERN);
+    put(cx + 5, base + 3, minZ + 1, LANTERN);
+    put(cx, base + 2, minZ + 2, CHEST);
+  }
+
+  // Giant seated Daibutsu. The large footprint is intentional: with Minecraft-scale blocks,
+  // a small statue collapses before the face, ears, knees, and halo can read clearly.
+  function addGiantDaibutsu(plan, base, minX, maxX, minZ, maxZ, put) {
+    const cx = plan.x, cz = plan.z, bronze = COPPER_ROOF, dark = STONE_BRICK;
+    const oval = (y, mx, mz, rx, rz, mat = bronze, bias = 1.0) => {
+      for (let x = mx - rx; x <= mx + rx; x++) for (let z = mz - rz; z <= mz + rz; z++) {
+        if (((x - mx) / Math.max(1, rx)) ** 2 + ((z - mz) / Math.max(1, rz)) ** 2 <= bias) put(x, y, z, mat);
+      }
+    };
+    const ellipsoid = (mx, my, mz, rx, ry, rz, mat = bronze, bias = 1.05) => {
+      for (let y = my - ry; y <= my + ry; y++) for (let x = mx - rx; x <= mx + rx; x++) for (let z = mz - rz; z <= mz + rz; z++) {
+        const q = ((x - mx) / Math.max(1, rx)) ** 2 + ((y - my) / Math.max(1, ry)) ** 2 + ((z - mz) / Math.max(1, rz)) ** 2;
+        if (q <= bias) put(x, y, z, mat);
+      }
+    };
+
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK);
+    for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) put(x, base + 1, z, STONE);
+    for (let x = minX + 4; x <= maxX - 4; x++) for (let z = minZ + 4; z <= maxZ - 4; z++) put(x, base + 2, z, STONE);
+
+    oval(base + 3, cx, cz + 2, 11, 7, STONE);
+    oval(base + 4, cx, cz + 2, 10, 6, bronze);
+    for (let x = cx - 10; x <= cx + 10; x += 2) put(x, base + 5, minZ + 5, PLASTER);
+
+    oval(base + 6, cx - 6, minZ + 7, 6, 3, bronze);
+    oval(base + 6, cx + 6, minZ + 7, 6, 3, bronze);
+    oval(base + 7, cx - 6, minZ + 7, 5, 2, bronze);
+    oval(base + 7, cx + 6, minZ + 7, 5, 2, bronze);
+    oval(base + 7, cx, minZ + 9, 5, 3, bronze);
+
+    for (let y = base + 8; y <= base + 14; y++) {
+      const dy = y - (base + 8);
+      oval(y, cx, cz, dy < 2 ? 6 : dy < 5 ? 5 : 4, dy < 4 ? 4 : 3, bronze);
+    }
+    for (let x = cx - 8; x <= cx + 8; x++) for (let z = cz - 2; z <= cz + 2; z++) put(x, base + 13, z, bronze);
+
+    for (let y = base + 9; y <= base + 12; y++) {
+      put(cx - 8, y, cz - 1, bronze); put(cx - 7, y, cz - 1, bronze); put(cx - 6, y - 1, minZ + 8, bronze);
+      put(cx + 8, y, cz - 1, bronze); put(cx + 7, y, cz - 1, bronze); put(cx + 6, y - 1, minZ + 8, bronze);
+    }
+    put(cx - 3, base + 9, minZ + 7, PLASTER); put(cx - 2, base + 9, minZ + 7, PLASTER);
+    put(cx + 2, base + 9, minZ + 7, PLASTER); put(cx + 3, base + 9, minZ + 7, PLASTER);
+    put(cx - 1, base + 10, minZ + 8, PLASTER); put(cx + 1, base + 10, minZ + 8, PLASTER);
+
+    ellipsoid(cx, base + 18, minZ + 10, 4, 4, 3, bronze, 1.02);
+    for (let y = base + 16; y <= base + 20; y++) {
+      put(cx - 5, y, minZ + 10, bronze);
+      put(cx + 5, y, minZ + 10, bronze);
+    }
+    for (const [dx, yy] of [[0, 22], [-1, 21], [1, 21], [0, 21], [-2, 20], [2, 20]]) put(cx + dx, base + yy, minZ + 10, bronze);
+    for (const [dx, yy] of [[-2, 22], [2, 22], [0, 23], [-1, 23], [1, 23]]) put(cx + dx, base + yy, minZ + 10, MOSSY_BRICK);
+
+    const faceZ = minZ + 7;
+    put(cx - 1, base + 19, faceZ, STONE);
+    put(cx + 1, base + 19, faceZ, STONE);
+    put(cx, base + 18, faceZ, STONE);
+
+    const haloZ = minZ + 14;
+    for (let dx = -7; dx <= 7; dx++) for (let dy = 0; dy <= 10; dy++) {
+      const q = (dx / 7) ** 2 + ((dy - 4) / 6) ** 2;
+      if (q > 0.80 && q < 1.22) put(cx + dx, base + 15 + dy, haloZ, GOLD_BLOCK);
+    }
+
+    for (const sx of [-1, 1]) {
+      const lx = cx + sx * 10;
+      put(lx, base + 3, minZ + 3, STONE_BRICK);
+      for (let y = base + 4; y <= base + 5; y++) put(lx, y, minZ + 3, STONE);
+      put(lx, base + 6, minZ + 3, LANTERN);
+    }
+    for (let z = minZ; z <= minZ + 5; z++) put(cx, base + 2, z, STONE_BRICK);
+    put(cx, base + 3, minZ + 2, CHEST);
+  }
+
+  // 棚田。地形を大きく変えず、段々の水田と小さな案山子を作る。
+  function addRiceTerrace(plan, base, minX, maxX, minZ, maxZ, put) {
+    const cx = plan.x, cz = plan.z, alongX = plan.dir === 'x', bandW = 3;
+    const bandAt = (x, z) => alongX ? Math.floor((z - minZ) / bandW) : Math.floor((x - minX) / bandW);
+    const localAt = (x, z) => alongX ? (z - minZ) % bandW : (x - minX) % bandW;
+    const terraceY = (x, z) => base + Math.min(4, bandAt(x, z));
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const y = terraceY(x, z);
+      for (let yy = base; yy <= y; yy++) put(x, yy, z, DIRT);
+      const outer = x === minX || x === maxX || z === minZ || z === maxZ;
+      const bank = outer || localAt(x, z) === 0;
+      put(x, y + 1, z, bank ? GRASS : WATER);
+      if (bank && bandAt(x, z) > 0) put(x, y, z, STONE_BRICK);
+    }
+    const pathLine = alongX ? minX + 1 : minZ + 1;
+    if (alongX) for (let z = minZ; z <= maxZ; z++) put(pathLine, terraceY(pathLine, z) + 1, z, PLANKS);
+    else for (let x = minX; x <= maxX; x++) put(x, terraceY(x, pathLine) + 1, pathLine, PLANKS);
+    const sy = terraceY(cx, cz) + 1;
+    put(cx, sy, cz, LOG);
+    put(cx, sy + 1, cz, LOG);
+    put(cx - 1, sy + 1, cz, PLANKS); put(cx + 1, sy + 1, cz, PLANKS);
+    put(cx, sy + 2, cz, VILLAGE_SIGN);
+    stoneLantern(put, alongX ? minX + 2 : cx - 2, base, alongX ? cz - 3 : minZ + 2);
+  }
+
+  // 東京タワー風タワー。赤白のラチス脚、展望台、細いアンテナを持つ高層ランドマーク。
+  function addTokyoTower(plan, base, minX, maxX, minZ, maxZ, put) {
+    const cx = plan.x, cz = plan.z;
+    const ring = (y, half, mat) => {
+      for (let x = cx - half; x <= cx + half; x++) { put(x, y, cz - half, mat); put(x, y, cz + half, mat); }
+      for (let z = cz - half + 1; z <= cz + half - 1; z++) { put(cx - half, y, z, mat); put(cx + half, y, z, mat); }
+    };
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK);
+    for (let y = 1; y <= 24; y++) {
+      const half = Math.max(1, 4 - Math.floor((y - 1) / 7));
+      const mat = y % 6 < 3 ? VERMILION : SNOW;
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(cx + sx * half, base + y, cz + sz * half, mat);
+      if (y % 2 === 0 && half > 1) {
+        put(cx, base + y, cz - half, mat); put(cx, base + y, cz + half, mat);
+        put(cx - half, base + y, cz, mat); put(cx + half, base + y, cz, mat);
+      }
+      if (y === 5 || y === 11 || y === 17 || y === 23) ring(base + y, half, y % 2 ? SNOW : VERMILION);
+    }
+    for (let x = cx - 2; x <= cx + 2; x++) for (let z = cz - 2; z <= cz + 2; z++) {
+      const edge = x === cx - 2 || x === cx + 2 || z === cz - 2 || z === cz + 2;
+      put(x, base + 18, z, STONE_BRICK);
+      put(x, base + 19, z, edge ? GLASS : LANTERN);
+      if (edge) put(x, base + 20, z, SNOW);
+    }
+    for (let y = base + 25; y <= base + 34; y++) put(cx, y, cz, y % 2 ? VERMILION : SNOW);
+    put(cx - 1, base + 28, cz, VERMILION); put(cx + 1, base + 28, cz, VERMILION);
+    put(cx, base + 35, cz, GLOW_CRYSTAL);
+    put(cx, base + 1, minZ + 1, CHEST);
   }
 
   function addStreetLight(put, x, base, z) {
@@ -506,22 +969,123 @@
     for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) if (x !== plan.x || z !== plan.z) put(x, base + 1, z, GLASS);
   }
 
+  function addRestStop(plan, base, minX, maxX, minZ, maxZ, put) {
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK);
+    for (const [px, pz] of [[minX, minZ], [maxX, minZ], [minX, maxZ], [maxX, maxZ]]) for (let y = base + 1; y <= base + 3; y++) put(px, y, pz, LOG);
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) put(x, base + 4, z, PLANKS);
+    for (let x = minX + 1; x <= maxX - 1; x += 2) { put(x, base + 1, minZ + 1, PLANKS); put(x, base + 1, maxZ - 1, PLANKS); }
+    put(plan.x, base + 1, plan.z, LANTERN);
+    if (hash2(plan.x * 2.1, plan.z * 2.7) < 0.45) put(maxX - 1, base + 1, maxZ - 1, CHEST);
+  }
+
+  function addDepot(plan, base, minX, maxX, minZ, maxZ, put, air) {
+    for (let x = minX - 2; x <= maxX + 2; x++) for (let z = minZ - 2; z <= maxZ + 2; z++) put(x, base, z, STONE);
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      put(x, base, z, STONE);
+      const edge = x === minX || x === maxX || z === minZ || z === maxZ;
+      if (!edge) continue;
+      for (let y = base + 1; y <= base + 4; y++) {
+        const dockDoor = z === minZ && Math.abs(x - plan.x) <= 1 && y <= base + 3;
+        if (dockDoor) { air(x, y, z); continue; }
+        const window = y === base + 3 && ((x === minX || x === maxX) ? z === plan.z : x === plan.x);
+        put(x, y, z, window ? GLASS : STONE_BRICK);
+      }
+    }
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) put(x, base + 5, z, STONE);
+    for (let x = minX - 1; x <= maxX + 1; x++) put(x, base + 1, minZ - 2, PLANKS);
+    for (let x = minX + 1; x <= maxX - 1; x += 2) { put(x, base + 1, maxZ - 1, SAND); put(x, base + 2, maxZ - 1, SAND); }
+    put(minX + 1, base + 1, minZ + 1, CHEST);
+    put(maxX - 1, base + 1, minZ + 1, CHEST);
+    put(plan.x, base + 4, plan.z, LANTERN);
+  }
+
+  function addWorkshop(plan, base, minX, maxX, minZ, maxZ, put) {
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) put(x, base, z, STONE_BRICK);
+    for (const [px, pz] of [[minX, minZ], [maxX, minZ], [minX, maxZ], [maxX, maxZ]]) for (let y = base + 1; y <= base + 3; y++) put(px, y, pz, LOG);
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) put(x, base + 4, z, PLANKS);
+    put(minX + 1, base + 1, minZ + 1, CRAFTING_TABLE);
+    put(minX + 2, base + 1, minZ + 1, FURNACE);
+    for (let x = plan.x - 2; x <= plan.x + 2; x++) put(x, base + 1, maxZ - 1, PLANKS);
+    for (let z = minZ + 1; z <= maxZ - 2; z += 2) { put(maxX - 1, base + 1, z, LOG); put(maxX - 1, base + 2, z, LOG); }
+    put(minX + 1, base + 1, maxZ - 1, CHEST);
+    put(maxX, base + 3, minZ, LANTERN);
+  }
+
+  function addShrine(plan, base, minX, maxX, minZ, maxZ, put, air) {
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK);
+    for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) if ((x + z) % 3 === 0) put(x, base, z, MOSSY_BRICK);
+    for (const [px, pz] of [[minX + 1, minZ + 1], [maxX - 1, minZ + 1], [minX + 1, maxZ - 1], [maxX - 1, maxZ - 1]]) for (let y = base + 1; y <= base + 3; y++) put(px, y, pz, STONE_BRICK);
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) if (x !== plan.x || z !== minZ) put(x, base + 4, z, BRICK);
+    for (let y = base + 1; y <= base + 2; y++) air(plan.x, y, minZ);
+    put(plan.x, base + 1, plan.z, LANTERN);
+    put(plan.x, base + 2, plan.z, GLOW_CRYSTAL);
+    if (hash2(plan.x * 1.3, plan.z * 1.9) < 0.35) put(plan.x, base + 1, maxZ - 1, CHEST);
+  }
+
+  function addOutpost(plan, base, minX, maxX, minZ, maxZ, put, air) {
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK);
+    for (let y = base + 1; y <= base + 6; y++) for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const edge = x === minX || x === maxX || z === minZ || z === maxZ;
+      if (!edge) continue;
+      const slit = (y === base + 3 || y === base + 5) && ((x === minX || x === maxX) ? z === plan.z : x === plan.x);
+      if (slit) air(x, y, z); else put(x, y, z, STONE_BRICK);
+    }
+    for (let y = base + 1; y <= base + 2; y++) air(plan.x, y, minZ);
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) put(x, base + 7, z, PLANKS);
+    put(plan.x, base + 6, plan.z, LANTERN);
+    put(minX + 1, base + 1, maxZ - 1, CHEST);
+  }
+
+  function addObservatory(plan, base, minX, maxX, minZ, maxZ, put, air) {
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE);
+    for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) put(x, base + 1, z, STONE_BRICK);
+    for (let y = base + 2; y <= base + 4; y++) for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) {
+      const edge = x === minX + 1 || x === maxX - 1 || z === minZ + 1 || z === maxZ - 1;
+      if (edge) put(x, y, z, y === base + 3 ? GLASS : STONE_BRICK);
+    }
+    for (let y = base + 2; y <= base + 3; y++) air(plan.x, y, minZ + 1);
+    for (let x = minX + 2; x <= maxX - 2; x++) for (let z = minZ + 2; z <= maxZ - 2; z++) put(x, base + 5, z, GLASS);
+    put(plan.x, base + 6, plan.z, GLOW_CRYSTAL);
+    put(plan.x, base + 2, plan.z, LANTERN);
+    put(maxX - 2, base + 2, maxZ - 2, CHEST);
+  }
+
   function addStructurePlan(plan, inWin) {
     const base = structureBase(plan); if (base == null) return;
     const minX = plan.x - Math.floor(plan.w / 2), maxX = minX + plan.w - 1;
     const minZ = plan.z - Math.floor(plan.d / 2), maxZ = minZ + plan.d - 1;
     const put = (x, y, z, type) => { if (inWin(x, z)) world.set(key(x, y, z), type); };
     const air = (x, y, z) => { if (inWin(x, z)) world.delete(key(x, y, z)); };
+    const clearTop =
+      plan.type === 'tokyoTower' ? base + 36 :
+      plan.type === 'daibutsu' ? base + 28 :
+      plan.type === 'pagoda' || plan.type === 'castle' ? base + 16 :
+      plan.type === 'antenna' ? base + 15 :
+      base + 8;
     for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
       const h = heightAt(x, z);
       for (let y = h + 1; y < base; y++) put(x, y, z, STONE);
-      for (let y = base; y <= base + (plan.type === 'antenna' ? 15 : 8); y++) air(x, y, z);
+      for (let y = base; y <= clearTop; y++) air(x, y, z);
     }
     if (plan.type === 'road') { addModernRoad(plan, base, minX, maxX, minZ, maxZ, put); return; }
     if (plan.type === 'busStop') { addBusStop(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
     if (plan.type === 'shop') { addShop(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
     if (plan.type === 'solar') { addSolarFarm(plan, base, minX, maxX, minZ, maxZ, put); return; }
     if (plan.type === 'antenna') { addAntenna(plan, base, minX, maxX, minZ, maxZ, put); return; }
+    if (plan.type === 'restStop') { addRestStop(plan, base, minX, maxX, minZ, maxZ, put); return; }
+    if (plan.type === 'depot') { addDepot(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
+    if (plan.type === 'workshop') { addWorkshop(plan, base, minX, maxX, minZ, maxZ, put); return; }
+    if (plan.type === 'shrine') { addShrine(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
+    if (plan.type === 'outpost') { addOutpost(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
+    if (plan.type === 'observatory') { addObservatory(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
+    if (plan.type === 'torii') { addTorii(plan, base, minX, maxX, minZ, maxZ, put); return; }
+    if (plan.type === 'waterTorii') { addWaterTorii(plan, base, minX, maxX, minZ, maxZ, put); return; }
+    if (plan.type === 'pagoda') { addPagoda(plan, base, minX, maxX, minZ, maxZ, put); return; }
+    if (plan.type === 'teahouse') { addTeahouse(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
+    if (plan.type === 'castle') { addCastle(plan, base, minX, maxX, minZ, maxZ, put); return; }
+    if (plan.type === 'daibutsu') { addGiantDaibutsu(plan, base, minX, maxX, minZ, maxZ, put); return; }
+    if (plan.type === 'riceTerrace') { addRiceTerrace(plan, base, minX, maxX, minZ, maxZ, put); return; }
+    if (plan.type === 'tokyoTower') { addTokyoTower(plan, base, minX, maxX, minZ, maxZ, put); return; }
     if (plan.type === 'tower') {
       for (let y = base; y <= base + 9; y++) for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
         const edge = x === minX || x === maxX || z === minZ || z === maxZ;
@@ -675,7 +1239,14 @@
   }
 
   /* ---- 地上の村クラスタ（井戸＋複数の家＋畑＋道＋ランタン街灯） ---- */
-  const VILLAGE_CELL = 150, VILLAGE_RADIUS = 22;
+  const VILLAGE_CELL = 150, VILLAGE_RADIUS = 24;
+  const VILLAGE_NAME_A = ['若草', '白樺', '灯火', '石畳', '青空', '小川', '夕星', '風見', '麦穂', '月見', '翠丘', '旅路'];
+  const VILLAGE_NAME_B = ['井戸村', '丘の村', '橋の村', '広場', '灯台村', '市場村', '森辺村', '風車村'];
+  function villageNameForCell(cx, cz) {
+    const a = VILLAGE_NAME_A[(hash2(cx * 2.17 + 0.3, cz * 3.11 - 0.8) * VILLAGE_NAME_A.length) | 0];
+    const b = VILLAGE_NAME_B[(hash2(cx * 5.41 - 1.7, cz * 4.23 + 0.6) * VILLAGE_NAME_B.length) | 0];
+    return `${a}${b}`;
+  }
   function villagePlanForCell(cx, cz) {
     const chance = hash2(cx * 13.71 + 2.9, cz * 17.33 - 6.1);
     if (chance > 0.10) return null;
@@ -693,7 +1264,7 @@
     }
     if (hi - lo > 4) return null;
     const base = hi + 1;
-    const n = 5 + (hash2(cx * 7.7 + 1.1, cz * 9.3 - 0.4) * 3 | 0);
+    const n = 7 + (hash2(cx * 7.7 + 1.1, cz * 9.3 - 0.4) * 3 | 0);
     const slots = [];
     for (let i = 0; i < n; i++) {
       const ang = (i / n) * Math.PI * 2 + (hash2(cx + i * 1.3, cz - i * 0.7) - 0.5) * 0.6;
@@ -701,10 +1272,10 @@
       const bx = x + Math.round(Math.cos(ang) * rr);
       const bz = z + Math.round(Math.sin(ang) * rr);
       const roll = hash2(cx * 3.1 + i * 2.2, cz * 2.3 - i * 1.7);
-      const kind = i === 0 ? 'farm' : i === 1 ? 'blacksmith' : i === 2 ? 'market' : (roll < 0.24 ? 'farm' : 'house');
+      const kind = i === 0 ? 'farm' : i === 1 ? 'blacksmith' : i === 2 ? 'market' : i === 3 ? 'church' : i === 4 ? 'tower' : i === 5 ? 'library' : i === 6 ? 'stable' : (roll < 0.24 ? 'farm' : 'house');
       slots.push({ bx, bz, kind, ang });
     }
-    return { x, z, base, slots };
+    return { x, z, base, slots, name: villageNameForCell(cx, cz) };
   }
 
   function nearestVillage(px, pz) {
@@ -728,6 +1299,11 @@
       if (Math.abs(x - p.x) <= R && Math.abs(z - p.z) <= R) return true;
     }
     return false;
+  }
+
+  function villageLabelAt(x, z) {
+    const v = nearestVillage(x, z);
+    return v && v.dd <= VILLAGE_RADIUS + 6 ? v.plan.name : '';
   }
 
   function collectVillagePlans(x0, x1, z0, z1) {
@@ -819,6 +1395,34 @@
     }
   }
 
+  function buildVillageSign(plan, put, air) {
+    const { x: cx, z: cz, base } = plan;
+    const ang = Math.atan2(-cz, -cx);
+    const sx = cx + Math.round(Math.cos(ang) * (VILLAGE_RADIUS - 5));
+    const sz = cz + Math.round(Math.sin(ang) * (VILLAGE_RADIUS - 5));
+    const px = Math.abs(Math.cos(ang)) > Math.abs(Math.sin(ang)) ? 0 : 1;
+    const pz = px ? 0 : 1;
+    for (let i = 0; i < 7; i++) {
+      const x = cx + Math.round((sx - cx) * i / 6), z = cz + Math.round((sz - cz) * i / 6);
+      const g = heightAt(x, z);
+      for (let y = g + 1; y < base; y++) put(x, y, z, DIRT);
+      put(x, base, z, STONE_BRICK);
+      for (let y = base + 1; y <= base + 3; y++) air(x, y, z);
+    }
+    for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) {
+      const x = sx + ox, z = sz + oz, g = heightAt(x, z);
+      for (let y = g + 1; y < base; y++) put(x, y, z, DIRT);
+      put(x, base, z, GRASS);
+      for (let y = base + 1; y <= base + 4; y++) air(x, y, z);
+    }
+    put(sx - px, base + 1, sz - pz, LOG);
+    put(sx + px, base + 1, sz + pz, LOG);
+    put(sx - px, base + 2, sz - pz, LOG);
+    put(sx + px, base + 2, sz + pz, LOG);
+    put(sx, base + 2, sz, VILLAGE_SIGN);
+    put(sx, base + 3, sz, LANTERN);
+  }
+
   function buildBlacksmith(bx, bz, base, dx, dz, put, air) {
     const w = 6, d = 6;
     const minX = bx - (w >> 1), maxX = minX + w - 1, minZ = bz - (d >> 1), maxZ = minZ + d - 1;
@@ -868,16 +1472,173 @@
     put(bx - r, base + 3, bz - r, LANTERN);
   }
 
+  // 教会: 高い壁＋切妻屋根＋十字とランタンの尖塔。内部に祭壇・献金箱。
+  function buildChurch(bx, bz, base, dx, dz, put, air) {
+    const w = 5, d = 7;
+    const minX = bx - (w >> 1), maxX = minX + w - 1, minZ = bz - (d >> 1), maxZ = minZ + d - 1;
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) {
+      const g = heightAt(x, z);
+      for (let y = g + 1; y < base; y++) put(x, y, z, STONE_BRICK);
+      for (let y = base + 1; y <= base + 11; y++) air(x, y, z);
+      if (x < minX || x > maxX || z < minZ || z > maxZ) put(x, base, z, STONE_BRICK);
+    }
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, PLANKS);
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const edge = x === minX || x === maxX || z === minZ || z === maxZ; if (!edge) continue;
+      const corner = (x === minX || x === maxX) && (z === minZ || z === maxZ);
+      for (let y = base + 1; y <= base + 4; y++) {
+        const window = (y === base + 2 || y === base + 3) && !corner && ((x === minX || x === maxX) ? z === bz : x === bx);
+        put(x, y, z, corner ? LOG : window ? GLASS : STONE_BRICK);
+      }
+    }
+    const doorX = Math.abs(dx) >= Math.abs(dz);
+    if (doorX) { const wx = dx < 0 ? minX : maxX; for (let y = base + 1; y <= base + 2; y++) air(wx, y, bz); put(wx, base + 3, bz, GLASS); }
+    else { const wz = dz < 0 ? minZ : maxZ; for (let y = base + 1; y <= base + 2; y++) air(bx, y, wz); put(bx, base + 3, wz, GLASS); }
+    // 切妻屋根（棟を高く）
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) put(x, base + 5, z, BRICK);
+    for (let x = minX; x <= maxX; x++) put(x, base + 6, bz, LOG);
+    // 尖塔（中央にランタンと十字）
+    for (let y = base + 6; y <= base + 8; y++) put(bx, y, bz, STONE_BRICK);
+    put(bx, base + 9, bz, LANTERN);
+    put(bx, base + 10, bz, LOG); put(bx, base + 11, bz, LOG);
+    put(bx - 1, base + 10, bz, LOG); put(bx + 1, base + 10, bz, LOG); // 十字の腕
+    // 内装: 祭壇・明かり・献金箱
+    const altZ = doorX ? bz : (dz < 0 ? maxZ - 1 : minZ + 1);
+    const altX = doorX ? (dx < 0 ? maxX - 1 : minX + 1) : bx;
+    put(altX, base + 1, altZ, STONE_BRICK); put(altX, base + 2, altZ, LANTERN);
+    put(minX + 1, base + 3, minZ + 1, LANTERN); put(maxX - 1, base + 3, maxZ - 1, LANTERN);
+    if (hash2(bx * 4.7 + 0.9, bz * 6.1 - 0.3) < 0.6) put(minX + 1, base + 1, maxZ - 1, CHEST);
+  }
+
+  // 図書館: 本棚の壁、閲覧机、ランタン、資料用の宝箱。
+  function buildLibrary(bx, bz, base, dx, dz, put, air) {
+    const w = 7, d = 6;
+    const minX = bx - (w >> 1), maxX = minX + w - 1, minZ = bz - (d >> 1), maxZ = minZ + d - 1;
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) {
+      const g = heightAt(x, z);
+      for (let y = g + 1; y < base; y++) put(x, y, z, DIRT);
+      for (let y = base + 1; y <= base + 7; y++) air(x, y, z);
+      if (x < minX || x > maxX || z < minZ || z > maxZ) put(x, base, z, GRASS);
+    }
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, PLANKS);
+    const doorX = Math.abs(dx) >= Math.abs(dz);
+    const doorWallX = doorX ? (dx < 0 ? minX : maxX) : null;
+    const doorWallZ = doorX ? null : (dz < 0 ? minZ : maxZ);
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const edge = x === minX || x === maxX || z === minZ || z === maxZ; if (!edge) continue;
+      const corner = (x === minX || x === maxX) && (z === minZ || z === maxZ);
+      for (let y = base + 1; y <= base + 3; y++) {
+        const door = doorX ? x === doorWallX && z === bz && y <= base + 2 : z === doorWallZ && x === bx && y <= base + 2;
+        if (door) { air(x, y, z); continue; }
+        const window = y === base + 2 && !corner && ((x === minX || x === maxX) ? z === bz : x === bx);
+        put(x, y, z, corner ? LOG : window ? GLASS : PLANKS);
+      }
+    }
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) put(x, base + 4, z, BRICK);
+    for (let z = minZ; z <= maxZ; z++) put(bx, base + 5, z, LOG);
+    const books = [BRICK, LEAVES, PLANKS, GLASS];
+    for (let z = minZ + 1; z <= maxZ - 1; z++) {
+      if (z === bz) continue;
+      put(minX + 1, base + 1, z, LOG);
+      put(minX + 1, base + 2, z, books[(z - minZ) & 3]);
+      put(maxX - 1, base + 1, z, LOG);
+      put(maxX - 1, base + 2, z, books[(z - minZ + 2) & 3]);
+    }
+    for (let x = minX + 2; x <= maxX - 2; x++) if (x !== bx) {
+      put(x, base + 1, minZ + 1, books[(x - minX) & 3]);
+      put(x, base + 1, maxZ - 1, books[(x - minX + 1) & 3]);
+    }
+    put(bx, base + 1, bz, PLANKS);
+    put(bx - 1, base + 1, bz, LOG); put(bx + 1, base + 1, bz, LOG);
+    put(bx, base + 3, minZ + 1, LANTERN); put(bx, base + 3, maxZ - 1, LANTERN);
+    if (hash2(bx * 6.3 - 0.8, bz * 4.9 + 0.1) < 0.7) put(maxX - 1, base + 1, maxZ - 1, CHEST);
+  }
+
+  // 畜舎: 屋根付きの小屋、丸太の囲い、飼い葉桶、干し草風の積み荷。
+  function buildStable(bx, bz, base, dx, dz, put, air) {
+    const w = 8, d = 7;
+    const minX = bx - (w >> 1), maxX = minX + w - 1, minZ = bz - (d >> 1), maxZ = minZ + d - 1;
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) {
+      const g = heightAt(x, z);
+      for (let y = g + 1; y < base; y++) put(x, y, z, DIRT);
+      for (let y = base + 1; y <= base + 6; y++) air(x, y, z);
+      put(x, base, z, GRASS);
+    }
+    const doorX = Math.abs(dx) >= Math.abs(dz);
+    const openX = doorX ? (dx < 0 ? minX : maxX) : null;
+    const openZ = doorX ? null : (dz < 0 ? minZ : maxZ);
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const edge = x === minX || x === maxX || z === minZ || z === maxZ;
+      const gate = doorX ? x === openX && Math.abs(z - bz) <= 1 : z === openZ && Math.abs(x - bx) <= 1;
+      if (edge && !gate) {
+        const post = ((x - minX + z - minZ) & 1) === 0 || (x === minX || x === maxX) && (z === minZ || z === maxZ);
+        put(x, base + 1, z, post ? LOG : PLANKS);
+        if (post) put(x, base + 2, z, LOG);
+      }
+      if (x > minX && x < maxX && z > minZ && z < maxZ && hash2(x * 2.7, z * 3.1) < 0.18) put(x, base + 1, z, LEAVES);
+    }
+    const roofMinZ = doorX ? minZ : (dz < 0 ? bz : minZ);
+    const roofMaxZ = doorX ? maxZ : (dz < 0 ? maxZ : bz);
+    const roofMinX = doorX ? (dx < 0 ? bx : minX) : minX;
+    const roofMaxX = doorX ? (dx < 0 ? maxX : bx) : maxX;
+    for (const [px, pz] of [[roofMinX, roofMinZ], [roofMaxX, roofMinZ], [roofMinX, roofMaxZ], [roofMaxX, roofMaxZ]]) {
+      for (let y = base + 1; y <= base + 3; y++) put(px, y, pz, LOG);
+    }
+    for (let x = roofMinX - 1; x <= roofMaxX + 1; x++) for (let z = roofMinZ - 1; z <= roofMaxZ + 1; z++) put(x, base + 4, z, PLANKS);
+    for (let x = roofMinX; x <= roofMaxX; x++) put(x, base + 5, Math.round((roofMinZ + roofMaxZ) / 2), LOG);
+    const troughZ = doorX ? bz : (dz < 0 ? maxZ - 1 : minZ + 1);
+    for (let x = bx - 1; x <= bx + 1; x++) put(x, base + 1, troughZ, PLANKS);
+    put(bx, base + 1, troughZ, WATER);
+    put(minX + 1, base + 1, minZ + 1, SAND); put(minX + 1, base + 2, minZ + 1, SAND);
+    put(maxX - 1, base + 1, maxZ - 1, SAND); put(maxX - 2, base + 1, maxZ - 1, SAND);
+    put(roofMinX, base + 3, roofMinZ, LANTERN);
+  }
+
+  // 見張り塔: 細く高い石レンガ塔＋矢狭間＋頂上の胸壁とランタンビーコン。基部に宝箱。
+  function buildTower(bx, bz, base, dx, dz, put, air) {
+    const minX = bx - 1, maxX = bx + 1, minZ = bz - 1, maxZ = bz + 1, top = base + 9;
+    for (let x = minX - 1; x <= maxX + 1; x++) for (let z = minZ - 1; z <= maxZ + 1; z++) {
+      const g = heightAt(x, z);
+      for (let y = g + 1; y < base; y++) put(x, y, z, STONE_BRICK);
+      for (let y = base + 1; y <= top + 2; y++) air(x, y, z);
+      if (x < minX || x > maxX || z < minZ || z > maxZ) put(x, base, z, STONE_BRICK);
+    }
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK);
+    for (let y = base + 1; y <= top; y++) for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const edge = x === minX || x === maxX || z === minZ || z === maxZ; if (!edge) continue;
+      const slit = (y === base + 3 || y === base + 6) && ((x === minX || x === maxX) ? z === bz : x === bx);
+      if (slit) { air(x, y, z); continue; }
+      put(x, y, z, STONE_BRICK);
+    }
+    const doorX = Math.abs(dx) >= Math.abs(dz);
+    if (doorX) { const wx = dx < 0 ? minX : maxX; for (let y = base + 1; y <= base + 2; y++) air(wx, y, bz); }
+    else { const wz = dz < 0 ? minZ : maxZ; for (let y = base + 1; y <= base + 2; y++) air(bx, y, wz); }
+    // 頂上プラットフォームと胸壁（クレネル）
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, top, z, STONE_BRICK);
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const edge = x === minX || x === maxX || z === minZ || z === maxZ; if (!edge) continue;
+      if (((x + z) & 1) === 0) put(x, top + 1, z, STONE_BRICK);
+    }
+    put(bx, top + 1, bz, LANTERN); // ビーコン
+    put(bx, base + 4, bz, LANTERN); put(bx, base + 7, bz, LANTERN); // 内部の吊りランタン
+    if (hash2(bx * 3.9 + 0.2, bz * 5.7 - 0.6) < 0.7) put(minX, base + 1, minZ, CHEST);
+  }
+
   function addVillagePlan(plan, inWin) {
     const { x: cx, z: cz, base, slots } = plan;
     const put = (x, y, z, t) => { if (inWin(x, z)) world.set(key(x, y, z), t); };
     const air = (x, y, z) => { if (inWin(x, z)) world.delete(key(x, y, z)); };
     for (const s of slots) buildPath(cx, cz, s.bx, s.bz, base, put, air);
     buildWell(cx, cz, base, put, air);
+    buildVillageSign(plan, put, air);
     for (const s of slots) {
       if (s.kind === 'farm') buildFarm(s.bx, s.bz, base, put, air);
       else if (s.kind === 'blacksmith') buildBlacksmith(s.bx, s.bz, base, cx - s.bx, cz - s.bz, put, air);
       else if (s.kind === 'market') buildMarket(s.bx, s.bz, base, put, air);
+      else if (s.kind === 'church') buildChurch(s.bx, s.bz, base, cx - s.bx, cz - s.bz, put, air);
+      else if (s.kind === 'tower') buildTower(s.bx, s.bz, base, cx - s.bx, cz - s.bz, put, air);
+      else if (s.kind === 'library') buildLibrary(s.bx, s.bz, base, cx - s.bx, cz - s.bz, put, air);
+      else if (s.kind === 'stable') buildStable(s.bx, s.bz, base, cx - s.bx, cz - s.bz, put, air);
       else buildHouse(s.bx, s.bz, base, cx - s.bx, cz - s.bz, put, air);
     }
     buildLamp(cx + 3, base, cz + 2, put, air);
@@ -1145,8 +1906,9 @@
     const bedType = waterFeature ? (waterFeature.bed || SAND) : SAND;
     const fillType = waterFeature ? (waterFeature.fill || WATER) : WATER;
     const lavaCap = biome.id === 'volcano' && h >= 27 && hash2(x * 1.3 + 4.1, z * 1.7 - 2.3) < 0.5;
+    const landmark = inFuji(x, z);
     for (let y = 0; y <= h; y++) {
-      if (y < h && (isCaveAt(x, y, z, h) || (mouth && y >= h - 4))) continue;
+      if (y < h && !landmark && (isCaveAt(x, y, z, h) || (mouth && y >= h - 4))) continue;
       let type;
       if (waterFeature && y >= waterFeature.level - waterFeature.deep && y <= waterFeature.level - 1) type = bedType;
       else if (y === h) type = waterFeature && waterFeature.shore ? SAND : lavaCap ? LAVA : top;
