@@ -209,6 +209,8 @@ const PLANS = {
   well:        {fn:'addImportedStructure', plan:{type:'well', w:16, d:17}, half:9, baseY:0},
   inari:       {fn:'addImportedStructure', plan:{type:'inari', w:8, d:20}, half:11, baseY:0},
   lighthouse:  {fn:'addImportedStructure', plan:{type:'lighthouse', w:13, d:13}, half:7, baseY:0},
+  jinja:       {fn:'addImportedStructure', plan:{type:'jinja', w:15, d:15}, half:8, baseY:0},
+  graveyard:   {fn:'addImportedStructure', plan:{type:'graveyard', w:15, d:15}, half:8, baseY:0},
   teahouse:    {fn:'addTeahouse',    plan:{}, half:5, baseY:1},
   castle:      {fn:'addCastle',      plan:{}, half:7, baseY:0},
   daibutsu:    {fn:'addGiantDaibutsu',plan:{w:29,d:19}, half:15, baseY:0},
