@@ -4,6 +4,8 @@
   const drawCountsByType = TYPES.map(() => 0);
   const chunkKey = (cx, cz) => cx + ',' + cz;
   const chunkCoord = (v) => Math.floor(v / CHUNK_SIZE);
+  // 構造物が書き込んだチャンク。窓移動時に重なり領域でも必ず再メッシュするため記録する。
+  const dirtyStructureChunks = new Set();
 
   const FACE_DEFS = [
     { n: [ 1,  0,  0], m: 0, v: [[1,0,0], [1,1,0], [1,1,1], [1,0,1]], uv: [0,0, 0,1, 1,1, 1,0] },

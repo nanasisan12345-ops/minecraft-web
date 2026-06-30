@@ -1049,8 +1049,8 @@
     const base = structureBase(plan); if (base == null) return;
     const minX = plan.x - Math.floor(plan.w / 2), maxX = minX + plan.w - 1;
     const minZ = plan.z - Math.floor(plan.d / 2), maxZ = minZ + plan.d - 1;
-    const put = (x, y, z, type) => { if (inWin(x, z)) world.set(key(x, y, z), type); };
-    const air = (x, y, z) => { if (inWin(x, z)) world.delete(key(x, y, z)); };
+    const put = (x, y, z, type) => { if (inWin(x, z)) { world.set(key(x, y, z), type); dirtyStructureChunks.add(chunkKey(chunkCoord(x), chunkCoord(z))); } };
+    const air = (x, y, z) => { if (inWin(x, z)) { world.delete(key(x, y, z)); dirtyStructureChunks.add(chunkKey(chunkCoord(x), chunkCoord(z))); } };
     const impData = importedCells(plan.type);
     const clearTop =
       impData ? base + impData.dims[1] + 8 :

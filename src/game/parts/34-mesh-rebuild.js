@@ -167,6 +167,7 @@
   }
 
   function requestRebuildAsync(x0, x1, z0, z1) {
+    dirtyStructureChunks.clear(); // 窓全体を再構築するので構造物ダーティは消化済み
     const keys = chunkKeysForArea(x0, x1, z0, z1);
     if (rebuildJob) {
       for (const id of keys) pendingChunkKeys.add(id);
@@ -178,7 +179,11 @@
   }
 
   function requestRebuildWindowMove(x0, x1, z0, z1, oldX0, oldX1, oldZ0, oldZ1) {
-    const keys = chunkKeysOutsideOldArea(x0, x1, z0, z1, oldX0, oldX1, oldZ0, oldZ1);
+    const keySet = new Set(chunkKeysOutsideOldArea(x0, x1, z0, z1, oldX0, oldX1, oldZ0, oldZ1));
+    // 構造物が書き込んだチャンクは重なり領域でも必ず再構築する（大型構造物が欠ける問題の対策）
+    for (const id of dirtyStructureChunks) keySet.add(id);
+    dirtyStructureChunks.clear();
+    const keys = [...keySet];
     if (!keys.length) { removeChunksOutside(x0, x1, z0, z1); return; }
     if (rebuildJob) {
       for (const id of keys) pendingChunkKeys.add(id);
