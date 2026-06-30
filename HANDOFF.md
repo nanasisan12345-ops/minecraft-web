@@ -30,6 +30,12 @@
 - 確認: `npm.cmd run check` 成功（41ファイル）。iso で本格的な五重塔を確認。
 - **次の候補（同方式で）**: `inari_shrine`/`shrine`(神社)・`bell`(梵鐘・鐘楼)・`shrine_tori`(鳥居)・`jungle_well`(井戸)・`tree1-7`(自然物)・`lighthouse`(灯台)・`grave/graveyard`(墓地)。小物は縮小しすぎると潰れるので scale は控えめ（神社/梵鐘は等倍〜2倍）。inari/bell は 2倍だと潰れたので 等倍推奨。
 
+### 2026-06-30 続き2: 取り込み構造物を4つ追加（鐘楼/井戸/稲荷/灯台）
+- 汎用方式で `bell`(鐘楼 等倍11×14×13)・`well`(屋根付き井戸 jungle_well 等倍13×12×14)・`inari`(稲荷神社 等倍5×15×17)・`lighthouse`(灯台 2倍10×20×10) を `18-imported-structures.js` に登録。`structurePlanForCell` の jp 分布を再配分（tokyoTower<.02/castle<.045/daibutsu<.065/lighthouse<.085/bell<.115/well<.150/inari<.195/waterTorii<.240/torii<.300/pagoda<.350/teahouse<.380/riceTerrace）。`49-debug-mode.js` の `0` 巡回(JP_ORDER/JP_LABEL)に4つ追加。
+- size/clearTop/dispatch は `importedCells(type)` で全自動なので、追加作業は「regdata 生成→part18 に行追加→jp 分布に type→debug ラベル」だけ。
+- 確認: `npm.cmd run check` 成功（41ファイル）。harness で4つとも配置レンダリング確認（鐘楼=木柱＋反り屋根、井戸=屋根付き、灯台=反り屋根の塔、稲荷=朱鳥居＋石祠）。dev サーバ `127.0.0.1:5190` で目視可。
+- まだ取り込んでいない良候補: `tree1-7`(自然物・別経路で植える必要)・`graveyard`(墓地)・`desert_temple`(砂漠)・`palace`(巨大)・`inn`/`barn`/`house`(村に組み込み)。
+
 
 ## 2026-06-30 追記: 日本ランドマークを参照画像と見比べて作り直し（第1弾）
 

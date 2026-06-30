@@ -123,8 +123,8 @@
     setDebugToast(`富士山頂へ移動: ${x}, ${z}`);
   }
 
-  const JP_ORDER = ['torii', 'waterTorii', 'pagoda', 'teahouse', 'castle', 'daibutsu', 'riceTerrace', 'tokyoTower'];
-  const JP_LABEL = { torii: '鳥居', waterTorii: '水上鳥居', pagoda: '五重塔', teahouse: '茶屋', castle: '天守閣', daibutsu: '大仏', riceTerrace: '棚田', tokyoTower: '東京タワー風タワー' };
+  const JP_ORDER = ['torii', 'waterTorii', 'pagoda', 'teahouse', 'castle', 'daibutsu', 'riceTerrace', 'tokyoTower', 'lighthouse', 'bell', 'well', 'inari'];
+  const JP_LABEL = { torii: '鳥居', waterTorii: '水上鳥居', pagoda: '五重塔', teahouse: '茶屋', castle: '天守閣', daibutsu: '大仏', riceTerrace: '棚田', tokyoTower: '東京タワー風タワー', lighthouse: '灯台', bell: '鐘楼', well: '屋根付き井戸', inari: '稲荷神社' };
   let jpCycleIdx = 0;
   // 0キーを押すたびに和風ランドマークの種類を切り替えて最寄りへ飛ぶ。
   function teleportToNearbyJapanese() {

@@ -400,8 +400,8 @@
     const jp = hash2(cx * 53.3 - 7.7, cz * 47.1 + 5.5);
     let type = 'cabin', dir = hash2(cx + 8.8, cz - 4.4) < 0.5 ? 'x' : 'z';
     if ((biome.id === 'plains' || biome.id === 'forest') && jp < 0.40) {
-      // 和風: 東京タワー風(レア) / 天守閣 / 大仏 / 水上鳥居 / 鳥居 / 五重塔 / 茶屋 / 棚田
-      type = jp < 0.025 ? 'tokyoTower' : jp < 0.055 ? 'castle' : jp < 0.080 ? 'daibutsu' : jp < 0.130 ? 'waterTorii' : jp < 0.210 ? 'torii' : jp < 0.285 ? 'pagoda' : jp < 0.345 ? 'teahouse' : 'riceTerrace';
+      // 和風: 東京タワー風(レア) / 天守閣 / 大仏 / 灯台 / 鐘楼 / 屋根付き井戸 / 稲荷神社 / 水上鳥居 / 鳥居 / 五重塔 / 茶屋 / 棚田
+      type = jp < 0.020 ? 'tokyoTower' : jp < 0.045 ? 'castle' : jp < 0.065 ? 'daibutsu' : jp < 0.085 ? 'lighthouse' : jp < 0.115 ? 'bell' : jp < 0.150 ? 'well' : jp < 0.195 ? 'inari' : jp < 0.240 ? 'waterTorii' : jp < 0.300 ? 'torii' : jp < 0.350 ? 'pagoda' : jp < 0.380 ? 'teahouse' : 'riceTerrace';
     } else if (modern < 0.78 && biome.id !== 'snowfield') {
       if (biome.id === 'desert') type = modern < 0.30 ? 'solar' : modern < 0.45 ? 'depot' : modern < 0.60 ? 'shop' : 'road';
       else if (biome.id === 'highlands') type = modern < 0.26 ? 'antenna' : modern < 0.43 ? 'observatory' : modern < 0.58 ? 'outpost' : 'road';
