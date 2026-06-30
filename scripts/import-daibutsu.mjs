@@ -1,19 +1,38 @@
 // Sengoku の buddah3.nbt を取り込み、石系→青銅にリマップ、内部を中空化して
 // 表面ボクセルだけを残し、ランタイム用の占有ビットマスク(base64)とビューア用JSONを書き出す。
-// 使い方: node scripts/import-daibutsu.mjs <buddah3.nbt> <outDir>
+// 使い方: node scripts/import-daibutsu.mjs <buddah3.nbt> <outDir> [scale=1] [thresh=0.25]
+//   scale>1 で 1/scale に縮小（scale^3 ブロックのうち thresh 以上が solid なら solid）。
 import fs from 'fs';
 import { loadStructure } from './nbt-structure.mjs';
 
 const NBT = process.argv[2], OUT = process.argv[3];
+const SCALE = Math.max(1, Math.floor(+(process.argv[4] || 1)));
+const THRESH = +(process.argv[5] || 0.25);
 const s = loadStructure(NBT);
-const [SX, SY, SZ] = s.size;
+let [SX, SY, SZ] = s.size;
 const isAir = (name) => /air|jigsaw|structure_void|barrier/.test(name);
-// 占有グリッド
-const grid = new Uint8Array(SX * SY * SZ);
-const idx = (x, y, z) => (y * SZ + z) * SX + x;
+// 占有グリッド（原寸）
+let grid = new Uint8Array(SX * SY * SZ);
+let idx = (x, y, z) => (y * SZ + z) * SX + x;
 for (const [x, y, z, st] of s.blocks) {
   if (x < 0 || y < 0 || z < 0 || x >= SX || y >= SY || z >= SZ) continue;
   if (!isAir(s.palette[st])) grid[idx(x, y, z)] = 1;
+}
+// 縮小（ダウンサンプリング）
+if (SCALE > 1) {
+  const nx = Math.ceil(SX / SCALE), ny = Math.ceil(SY / SCALE), nz = Math.ceil(SZ / SCALE);
+  const need = Math.max(1, Math.round(THRESH * SCALE * SCALE * SCALE));
+  const ng = new Uint8Array(nx * ny * nz);
+  const nidx = (x, y, z) => (y * nz + z) * nx + x;
+  for (let y = 0; y < ny; y++) for (let z = 0; z < nz; z++) for (let x = 0; x < nx; x++) {
+    let c = 0;
+    for (let dy = 0; dy < SCALE; dy++) for (let dz = 0; dz < SCALE; dz++) for (let dx = 0; dx < SCALE; dx++) {
+      const sx = x * SCALE + dx, sy = y * SCALE + dy, sz = z * SCALE + dz;
+      if (sx < SX && sy < SY && sz < SZ && grid[idx(sx, sy, sz)]) c++;
+    }
+    if (c >= need) ng[nidx(x, y, z)] = 1;
+  }
+  grid = ng; SX = nx; SY = ny; SZ = nz; idx = nidx;
 }
 let solid = 0; for (const v of grid) solid += v;
 

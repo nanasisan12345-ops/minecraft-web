@@ -193,7 +193,7 @@ const PLANS = {
   pagoda:      {fn:'addPagoda',      plan:{}, half:7, baseY:0},
   teahouse:    {fn:'addTeahouse',    plan:{}, half:5, baseY:1},
   castle:      {fn:'addCastle',      plan:{}, half:7, baseY:0},
-  daibutsu:    {fn:'addGiantDaibutsu',plan:{w:75,d:43}, half:38, baseY:0},
+  daibutsu:    {fn:'addGiantDaibutsu',plan:{w:29,d:19}, half:15, baseY:0},
   riceTerrace: {fn:'addRiceTerrace', plan:{dir:'x'}, half:9, baseY:0},
   tokyoTower:  {fn:'addTokyoTower',  plan:{}, half:6, baseY:0},
 };

@@ -127,7 +127,7 @@
     let h = terrainHeightRawCached(x, z);
     h = Math.round(THREE.MathUtils.clamp(h, 3, 32));
     const lm = landmarkHeightAt(x, z);
-    if (lm > h) h = Math.min(lm, 76); // 富士山の高さは従来どおり（CHUNK_Y_MAX拡張の影響を受けない）
+    if (lm > h) h = Math.min(lm, CHUNK_Y_MAX - 4);
     HEIGHT_CACHE.set(id, h);
     if (HEIGHT_CACHE.size > 90000) HEIGHT_CACHE.clear();
     return h;
@@ -430,7 +430,7 @@
       type === 'pagoda' ? [15, 15] :
       type === 'teahouse' ? [9, 7] :
       type === 'castle' ? [13, 13] :
-      type === 'daibutsu' ? [75, 43] :
+      type === 'daibutsu' ? [29, 19] :
       type === 'riceTerrace' ? (dir === 'x' ? [15, 11] : [11, 15]) :
       type === 'tokyoTower' ? [9, 9] :
       type === 'ruin' ? [8, 7] : [7, 6];
@@ -473,7 +473,7 @@
     const limit =
       plan.type === 'riceTerrace' ? 5 :
       plan.type === 'tower' || plan.type === 'antenna' || plan.type === 'observatory' || plan.type === 'outpost' || plan.type === 'tokyoTower' ? 4 :
-      plan.type === 'daibutsu' ? 8 :
+      plan.type === 'daibutsu' ? 5 :
       plan.type === 'ruin' || plan.type === 'shrine' || plan.type === 'torii' || plan.type === 'waterTorii' || plan.type === 'castle' ? 3 : 2;
     if (hi - lo > limit) return null;
     return hi + 1;
@@ -788,19 +788,19 @@
     for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK);
     // 取り込んだ像体（青銅）
     for (let i = 0; i < vox.length; i++) { const v = vox[i]; put(ox + v[0], sy + v[1], oz + v[2], BRONZE); }
-    // 金の光背（頭の背面に大きなサンバースト）
-    const headY = sy + H - 13, backZ = oz + D + 1, hr = 17;
+    // 金の光背（頭の背面にサンバースト）
+    const headY = sy + H - 5, backZ = oz + D + 1, hr = 8;
     for (let yy = headY - hr; yy <= headY + hr; yy++) for (let xx = cx - hr; xx <= cx + hr; xx++) {
       const d = Math.hypot(xx - cx, yy - headY);
-      if (d >= hr - 2 && d <= hr) put(xx, yy, backZ, GOLD_BLOCK);  // 円環
+      if (d >= hr - 1 && d <= hr) put(xx, yy, backZ, GOLD_BLOCK);  // 円環
     }
-    for (let a = 0; a < 24; a++) {                                  // 放射光
-      const t = a / 24 * Math.PI * 2;
-      for (let rr = hr; rr <= hr + 3; rr++) put(cx + Math.round(Math.cos(t) * rr), headY + Math.round(Math.sin(t) * rr), backZ, GOLD_BLOCK);
+    for (let a = 0; a < 16; a++) {                                  // 放射光
+      const t = a / 16 * Math.PI * 2;
+      for (let rr = hr; rr <= hr + 2; rr++) put(cx + Math.round(Math.cos(t) * rr), headY + Math.round(Math.sin(t) * rr), backZ, GOLD_BLOCK);
     }
     // 前の石灯籠と賽銭箱
     for (const sx of [-1, 1]) {
-      const lx = cx + sx * Math.floor(W / 2 - 2);
+      const lx = cx + sx * Math.floor(W / 2 + 1);
       put(lx, base + 1, minZ + 2, STONE_BRICK);
       for (let y = base + 2; y <= base + 3; y++) put(lx, y, minZ + 2, STONE);
       put(lx, base + 4, minZ + 2, LANTERN);
@@ -1038,7 +1038,7 @@
     const air = (x, y, z) => { if (inWin(x, z)) world.delete(key(x, y, z)); };
     const clearTop =
       plan.type === 'tokyoTower' ? base + 36 :
-      plan.type === 'daibutsu' ? base + 86 :
+      plan.type === 'daibutsu' ? base + 34 :
       plan.type === 'pagoda' ? base + 34 :
       plan.type === 'castle' ? base + 24 :
       plan.type === 'antenna' ? base + 15 :
