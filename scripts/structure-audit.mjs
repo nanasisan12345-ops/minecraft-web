@@ -66,13 +66,27 @@ try {
   }
 } catch (e) {}
 
+// 取り込み構造物レジストリ（パーツ18）を読み込んで importedCells を供給する。
+let importedCells = () => null;
+try {
+  const d = fs.readFileSync(path.join(ROOT, 'src/game/parts/18-imported-structures.js'), 'utf8');
+  const reg = {};
+  const re = /(\w+): \{ dims: \[(\d+), (\d+), (\d+)\], b64: "([^"]+)" \}/g;
+  let m;
+  while ((m = re.exec(d))) {
+    const dims = [+m[2], +m[3], +m[4]], bin = Buffer.from(m[5], 'base64');
+    reg[m[1]] = { dims, cells: bin };
+  }
+  importedCells = (name) => reg[name] || null;
+} catch (e) {}
+
 // --- サンドボックス実行 ---
 function buildStructure(name, plan, box) {
   const blocks = new Map();
   const put = (x, y, z, t) => { if (t != null) blocks.set(`${x},${y},${z}`, t); };
   const air = (x, y, z) => { blocks.delete(`${x},${y},${z}`); };
   const heightAt = () => box.base - 1; // 平地扱い（base 未満の埋めは発生しない）
-  const ctx = { ...NAMES, put, air, heightAt, Math, plan, box, DAIBUTSU_DIMS, daibutsuVoxels };
+  const ctx = { ...NAMES, put, air, heightAt, Math, plan, box, DAIBUTSU_DIMS, daibutsuVoxels, importedCells };
   const argNames = Object.keys(ctx);
   const body = `${fnSrc}\n; return ${name}(plan, box.base, box.minX, box.maxX, box.minZ, box.maxZ, put, air);`;
   const fn = new Function(...argNames, body);
@@ -190,7 +204,7 @@ function renderIso(blocks, name) {
 const PLANS = {
   torii:       {fn:'addTorii',       plan:{dir:'x'}, half:7, baseY:0},
   waterTorii:  {fn:'addWaterTorii',  plan:{dir:'x',w:15,d:11}, half:7, baseY:1},
-  pagoda:      {fn:'addPagoda',      plan:{}, half:7, baseY:0},
+  pagoda:      {fn:'addImportedStructure', plan:{type:'pagoda', w:11, d:11}, half:6, baseY:0},
   teahouse:    {fn:'addTeahouse',    plan:{}, half:5, baseY:1},
   castle:      {fn:'addCastle',      plan:{}, half:7, baseY:0},
   daibutsu:    {fn:'addGiantDaibutsu',plan:{w:29,d:19}, half:15, baseY:0},

@@ -411,7 +411,9 @@
     else if (biome.id === 'highlands' || chance < 0.055) type = chance < 0.035 ? 'tower' : utility < 0.45 ? 'outpost' : 'ruin';
     else if (biome.id === 'snowfield') type = utility < 0.32 ? 'outpost' : utility < 0.58 ? 'shrine' : 'ruin';
     else if (utility < 0.22) type = 'shrine';
+    const imp = importedCells(type);
     const size =
+      imp ? [imp.dims[0] + 3, imp.dims[2] + 3] :
       type === 'road' ? (dir === 'x' ? [23, 5] : [5, 23]) :
       type === 'solar' ? [13, 9] :
       type === 'shop' ? [11, 9] :
@@ -1030,13 +1032,28 @@
     put(maxX - 2, base + 2, maxZ - 2, CHEST);
   }
 
+  // 取り込み構造物（パーツ18のレジストリ）を配置する汎用ビルダー。
+  // セル配列(0=空気, それ以外は ourBlockId+1)を石レンガ基壇の上に積み、正面=-Z側に向ける。
+  function addImportedStructure(plan, base, minX, maxX, minZ, maxZ, put) {
+    const e = importedCells(plan.type); if (!e) return;
+    const [W, H, D] = e.dims, cells = e.cells;
+    const ox = minX + Math.floor((plan.w - W) / 2), oz = minZ + Math.floor((plan.d - D) / 2);
+    const sy = base + 1;
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) put(x, base, z, STONE_BRICK); // 石基壇
+    let bi = 0;
+    for (let y = 0; y < H; y++) for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) { const v = cells[bi++]; if (v) put(ox + x, sy + y, oz + z, v - 1); }
+    put(plan.x, base + 1, minZ + 1, CHEST); // 参拝者の宝箱
+  }
+
   function addStructurePlan(plan, inWin) {
     const base = structureBase(plan); if (base == null) return;
     const minX = plan.x - Math.floor(plan.w / 2), maxX = minX + plan.w - 1;
     const minZ = plan.z - Math.floor(plan.d / 2), maxZ = minZ + plan.d - 1;
     const put = (x, y, z, type) => { if (inWin(x, z)) world.set(key(x, y, z), type); };
     const air = (x, y, z) => { if (inWin(x, z)) world.delete(key(x, y, z)); };
+    const impData = importedCells(plan.type);
     const clearTop =
+      impData ? base + impData.dims[1] + 8 :
       plan.type === 'tokyoTower' ? base + 36 :
       plan.type === 'daibutsu' ? base + 34 :
       plan.type === 'pagoda' ? base + 34 :
@@ -1048,6 +1065,7 @@
       for (let y = h + 1; y < base; y++) put(x, y, z, STONE);
       for (let y = base; y <= clearTop; y++) air(x, y, z);
     }
+    if (impData) { addImportedStructure(plan, base, minX, maxX, minZ, maxZ, put); return; }
     if (plan.type === 'road') { addModernRoad(plan, base, minX, maxX, minZ, maxZ, put); return; }
     if (plan.type === 'busStop') { addBusStop(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
     if (plan.type === 'shop') { addShop(plan, base, minX, maxX, minZ, maxZ, put, air); return; }

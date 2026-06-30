@@ -20,6 +20,16 @@
 - 確認: `npm.cmd run check` 成功（40ファイル）。`scripts/structure-audit.mjs . daibutsu` の front/iso で巨大な青銅座像＋金光背を確認。**実ブラウザでの最終確認はユーザー画面でリロード後に推奨**（生成時に約2万ブロック配置＝一瞬の負荷あり、レアなランドマークなので許容）。
 - **今後の方針**: 他のランドマーク/構造物/自然物も、まず良い構造データ（Sengokuの pagoda/castle/shrine 等、または無料schematic/datapack）を探して `nbt-structure.mjs` で取り込み→我々のブロックにリマップ→配置、を基本にする。手彫りはデータが無い時のフォールバック。
 
+### 2026-06-30 続き: 汎用取り込み方式を確立し五重塔を差し替え
+- 大仏を1/3に縮小（`import-daibutsu.mjs` に scale 引数追加。25×26×14＝約1500ブロック、データ1.5KB）。`CHUNK_Y_MAX` は 80 に戻した（高い像が不要になったため）。
+- **汎用多素材インポータ `scripts/import-structure.mjs`**: 任意の `.nbt` の各 Minecraft ブロックを `mapBlock()` で我々のパレットへ対応（crimson→朱VERMILION / deepslate_tile→瓦ROOF_TILE / quartz→白漆喰PLASTER / *_log→丸太 / *_planks/slab/stairs/fence→板材 / leaves→葉 / cobble/andesite/stone→石 など）。任意倍率で縮小＋中空化し、**byte/セル(0=空気, 値=ourId+1)の base64** を出力。
+- **レジストリ `src/game/parts/18-imported-structures.js`**: `IMPORTED[name]={dims,b64}` ＋ `importedCells(name)`（atob でデコード・キャッシュ）。
+- **汎用配置 `addImportedStructure`**（`32-world-window.js`）: レジストリのセルを石レンガ基壇の上に積み、宝箱を1つ置く。`structurePlanForCell` の size／`addStructurePlan` の clearTop／dispatch は **`importedCells(type)` があれば最優先で自動処理**（size=`[W+3,D+3]`, clearTop=`base+H+8`）。新構造物は IMPORTED に足して `structurePlanForCell` の type 選択に入れるだけ。
+- **五重塔(pagoda)を取り込み版に差し替え**: Sengoku `outcast_villager/pagoda.nbt`(23×90×23) を 1/3 で 8×24×8。瓦屋根＋朱の差し色＋相輪＋石基壇の本格五重塔に。手彫り `addPagoda` は未使用で残置（castle がヘルパーを共用するため helper は残す）。
+- `scripts/structure-audit.mjs` はパーツ18も読んで `importedCells` を供給。PLANS の pagoda は `addImportedStructure`(type:'pagoda') を呼ぶ。
+- 確認: `npm.cmd run check` 成功（41ファイル）。iso で本格的な五重塔を確認。
+- **次の候補（同方式で）**: `inari_shrine`/`shrine`(神社)・`bell`(梵鐘・鐘楼)・`shrine_tori`(鳥居)・`jungle_well`(井戸)・`tree1-7`(自然物)・`lighthouse`(灯台)・`grave/graveyard`(墓地)。小物は縮小しすぎると潰れるので scale は控えめ（神社/梵鐘は等倍〜2倍）。inari/bell は 2倍だと潰れたので 等倍推奨。
+
 
 ## 2026-06-30 追記: 日本ランドマークを参照画像と見比べて作り直し（第1弾）
 
