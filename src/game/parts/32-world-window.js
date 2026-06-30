@@ -401,7 +401,7 @@
     let type = 'cabin', dir = hash2(cx + 8.8, cz - 4.4) < 0.5 ? 'x' : 'z';
     if ((biome.id === 'plains' || biome.id === 'forest') && jp < 0.40) {
       // 和風: 東京タワー風(レア) / 天守閣 / 大仏 / 灯台 / 鐘楼 / 屋根付き井戸 / 稲荷神社 / 神社 / 墓地 / 水上鳥居 / 鳥居 / 五重塔 / 茶屋 / 棚田
-      type = jp < 0.020 ? 'tokyoTower' : jp < 0.040 ? 'castle' : jp < 0.060 ? 'daibutsu' : jp < 0.080 ? 'lighthouse' : jp < 0.105 ? 'bell' : jp < 0.135 ? 'well' : jp < 0.165 ? 'inari' : jp < 0.205 ? 'jinja' : jp < 0.235 ? 'graveyard' : jp < 0.270 ? 'waterTorii' : jp < 0.320 ? 'torii' : jp < 0.360 ? 'pagoda' : jp < 0.385 ? 'teahouse' : 'riceTerrace';
+      type = jp < 0.020 ? 'tokyoTower' : jp < 0.040 ? 'castle' : jp < 0.058 ? 'daibutsu' : jp < 0.076 ? 'lighthouse' : jp < 0.100 ? 'bell' : jp < 0.128 ? 'well' : jp < 0.156 ? 'inari' : jp < 0.192 ? 'jinja' : jp < 0.220 ? 'graveyard' : jp < 0.246 ? 'watchtower' : jp < 0.280 ? 'waterTorii' : jp < 0.325 ? 'torii' : jp < 0.362 ? 'pagoda' : jp < 0.386 ? 'teahouse' : 'riceTerrace';
     } else if (modern < 0.78 && biome.id !== 'snowfield') {
       if (biome.id === 'desert') type = modern < 0.30 ? 'solar' : modern < 0.45 ? 'depot' : modern < 0.60 ? 'shop' : 'road';
       else if (biome.id === 'highlands') type = modern < 0.26 ? 'antenna' : modern < 0.43 ? 'observatory' : modern < 0.58 ? 'outpost' : 'road';
