@@ -64,6 +64,10 @@
 - **小型スライム敵Mobは出現停止中**。倒す方法が未実装のため、`src/game/parts/39-hostile-mobs.js` の `HOSTILE_SPAWNING_ENABLED=false` でスポーンを止め、既存 `HOSTILES` も更新時に除去する。攻撃/敵HP/撃破報酬などを入れてから再有効化する。
 - 既知の軽微事項: `.github/workflows/deploy-pages.yml` の actions が Node20非推奨警告（Node24で強制実行されるため動作はする）。v5系へ更新推奨。
 
+### ⚠️ 大型構造物の落とし穴（2026-06-30 修正済み）
+- 窓移動時の再メッシュは「新しく現れた帯のチャンク」だけ（`requestRebuildWindowMove`→`chunkKeysOutsideOldArea`）。一方で構造物フェーズは窓全体に構造物を再配置する。**1チャンク(24×24)を超える大型構造物が、既メッシュ済みの重なり領域にブロックを置くと、そのチャンクが再構築されず欠ける**（屋根だけ浮く等）。
+- 対策として `dirtyStructureChunks`(24-instanced-meshes.js) に構造物 `put`/`air` が触れたチャンクを記録し、`requestRebuildWindowMove` で必ず再構築している。**新しく大型の配置系を足すときは、必ず `addStructurePlan` の `put` 経由（dirtyStructureチャンク記録あり）で置くこと。** 独自に `world.set` するとこの保護が効かない。
+
 ### 開発・確認の鉄則
 - 編集対象は `src/game/parts/*.js` と `src/styles.css`。`src/game.generated.js` は `npm run assemble` が結合する自動生成物（直接編集しない）。パーツはファイル名のアルファベット順で結合され、**module直下スコープを全パーツで共有**（関数宣言は巻き上げで前後参照OK、const/letはTDZあり＝トップレベルで後方の値を参照しない）。
 - **プレビューはタブがバックグラウンドでrAFが止まり、マップ生成（`processWorldJob`）が進まない**。動きの目視は不可。よって生成系の検証は「①`npm run check`成功 ②ロードで`__mcReady`・エラーなし ③依存をスタブしたNode単体ハーネスでジオメトリ検証」で担保してきた（このやり方を踏襲）。
