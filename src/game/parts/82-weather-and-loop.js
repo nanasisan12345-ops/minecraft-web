@@ -117,7 +117,7 @@
         player.onGround = false;
         const fallVel = player.vel.y;
         if (moveAxis('y', player.vel.y * dt)) { if (player.vel.y < 0) { player.onGround = true; applyFallDamage(fallVel); } player.vel.y = 0; }
-        if (player.pos.y < -40) damagePlayer(999);
+        if (player.pos.y < CHUNK_Y_MIN - 40) damagePlayer(999);
         updateSurvival(dt, len > 0.05 || Math.abs(player.vel.y) > 0.1);
       }
     }
@@ -143,6 +143,7 @@
 
     processWorldJob();
     processRebuildJob();
+    processPlantJob();
     updateAnimals(dt);
     updateTravelers(dt);
     updateFireflies(dt);

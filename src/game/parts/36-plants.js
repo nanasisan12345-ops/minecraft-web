@@ -38,17 +38,38 @@
     if (r < 0.20 * Math.max(0.18, flowerScale)) return 0;
     return -1;
   }
-  function rebuildPlants(x0, x1, z0, z1) {
-    const pm = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), eu = new THREE.Euler();
-    const cnt = [0, 0, 0];
-    for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
-      const h = heightAt(x, z);
-      if (topTypeAt(x, z, h) !== GRASS) continue;
-      if (world.get(key(x, h, z)) !== GRASS || world.has(key(x, h + 1, z))) continue;
-      const pi = plantKind(x, z); if (pi < 0 || cnt[pi] >= PLANTS[pi].max) continue;
-      pv.set(x + 0.5, h + 1, z + 0.5); eu.set(0, hash2(x * 3, z * 3) * Math.PI, 0); q.setFromEuler(eu);
-      const sc = pi === 0 ? 0.8 + hash2(x, z) * 0.35 : 1; sv.set(sc, sc, sc);
-      pm.compose(pv, q, sv); plantMeshes[pi].setMatrixAt(cnt[pi]++, pm);
-    }
-    plantMeshes.forEach((m, i) => { m.count = cnt[i]; m.instanceMatrix.needsUpdate = true; });
+  // 窓全体(約2万列)を毎回同期スキャンするとブロック設置や窓移動のたびに大きくカクつくため、
+  // フレーム予算で分割実行するジョブにする。完了時に count/needsUpdate を一括更新する。
+  const _plantTmp = { pm: new THREE.Matrix4(), q: new THREE.Quaternion(), sv: new THREE.Vector3(), pv: new THREE.Vector3(), eu: new THREE.Euler() };
+  let plantJob = null;
+  const PLANT_JOB_MS = 2.0, PLANT_BATCH = 512;
+  function startPlantRebuild(x0, x1, z0, z1) {
+    plantJob = { x0, x1, z0, z1, x: x0, z: z0, cnt: [0, 0, 0] };
   }
+  function commitPlantJob(job) {
+    plantMeshes.forEach((m, i) => { m.count = job.cnt[i]; m.instanceMatrix.needsUpdate = true; });
+  }
+  function processPlantJob() {
+    const job = plantJob;
+    if (!job) return;
+    const { pm, q, sv, pv, eu } = _plantTmp, cnt = job.cnt;
+    const end = performance.now() + PLANT_JOB_MS;
+    while (true) {
+      for (let n = 0; n < PLANT_BATCH; n++) {
+        const x = job.x, z = job.z;
+        job.z++;
+        if (job.z > job.z1) { job.z = job.z0; job.x++; }
+        if (x > job.x1) { commitPlantJob(job); plantJob = null; return; }
+        const h = heightAt(x, z);
+        if (topTypeAt(x, z, h) !== GRASS) continue;
+        if (blockAt(x, h, z) !== GRASS || hasBlock(x, h + 1, z)) continue;
+        const pi = plantKind(x, z); if (pi < 0 || cnt[pi] >= PLANTS[pi].max) continue;
+        pv.set(x + 0.5, h + 1, z + 0.5); eu.set(0, hash2(x * 3, z * 3) * Math.PI, 0); q.setFromEuler(eu);
+        const sc = pi === 0 ? 0.8 + hash2(x, z) * 0.35 : 1; sv.set(sc, sc, sc);
+        pm.compose(pv, q, sv); plantMeshes[pi].setMatrixAt(cnt[pi]++, pm);
+      }
+      if (performance.now() >= end) return;
+    }
+  }
+  // 既存の呼び出し名は維持（中身をジョブ起動に差し替え）
+  function rebuildPlants(x0, x1, z0, z1) { startPlantRebuild(x0, x1, z0, z1); }

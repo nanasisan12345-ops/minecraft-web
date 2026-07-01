@@ -143,8 +143,10 @@
     return g;
   }
   function travelerSurfaceY(x, z) {
-    for (let y = CHUNK_Y_MAX; y >= 0; y--) {
-      const t = world.get(key(x, y, z));
+    const yr = typeof columnYRange === 'function' ? columnYRange(x, z) : null;
+    const startY = Math.min(CHUNK_Y_MAX, Math.max(heightAt(x, z), yr ? yr.max : CHUNK_Y_MIN));
+    for (let y = startY; y >= CHUNK_Y_MIN; y--) {
+      const t = blockAt(x, y, z);
       if (t !== undefined && TYPES[t].solid !== false) return y;
     }
     return heightAt(x, z);
@@ -152,10 +154,10 @@
   function canPlaceTravelerAt(x, z) {
     if (inSpawnClearing(x, z, SPAWN_CLEAR_R + 8)) return false;
     if (!structureAffectsColumn(x, z, 9) && !villageAffectsColumn(x, z, 2) && biomeAt(x, z).id !== 'plains') return false;
-    const y = travelerSurfaceY(x, z), top = world.get(key(x, y, z));
+    const y = travelerSurfaceY(x, z), top = blockAt(x, y, z);
     if (![GRASS, STONE, BRICK, SAND, SNOW, PLANKS].includes(top)) return false;
     if (typeof waterFeatureAt === 'function' && waterFeatureAt(x, z, heightAt(x, z))) return false;
-    if (world.has(key(x, y + 1, z)) || world.has(key(x, y + 2, z))) return false;
+    if (hasBlock(x, y + 1, z) || hasBlock(x, y + 2, z)) return false;
     return true;
   }
   function villageSpawnSpot() {

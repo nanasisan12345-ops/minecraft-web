@@ -1,16 +1,154 @@
   /* ============== ワールド生成（バイオーム / 地下 / 構造物 / スライディング窓） ============== */
   const world = new Map();
+  const airBlocks = new Set();
+  const columnYBounds = new Map();
   const edits = new Map();   // プレイヤー編集を永続化: "x,y,z" -> type | -1(空気)
+  // world/airBlocks/edits はプレイ範囲が広がるほど肥大化するため、チャンク単位の索引を
+  // 別途持ち、collectMeshPayload()/applyEditsInArea() が全件走査せず該当チャンクだけ見られるようにする。
+  const worldChunkIndex = new Map(); // chunkKey(cx,cz) -> Map<id,type>
+  const airChunkIndex = new Map();   // chunkKey(cx,cz) -> Set<id>
+  const editsChunkIndex = new Map(); // chunkKey(cx,cz) -> Map<id,type>
   const key = (x, y, z) => x + ',' + y + ',' + z;
-  const isSolid = (x, y, z) => { const t = world.get(key(x, y, z)); return t !== undefined && TYPES[t].solid !== false; };
-  function setBlock(x, y, z, type) { if (type == null) world.delete(key(x, y, z)); else world.set(key(x, y, z), type); }
+  const columnKey = (x, z) => x + ',' + z;
+  const blockChunkKey = (x, z) => chunkKey(chunkCoord(x), chunkCoord(z));
+  function indexBucketAdd(indexMap, ck, id, value) {
+    let bucket = indexMap.get(ck);
+    if (!bucket) { bucket = new Map(); indexMap.set(ck, bucket); }
+    bucket.set(id, value);
+  }
+  function indexBucketDelete(indexMap, ck, id) {
+    const bucket = indexMap.get(ck);
+    if (!bucket) return;
+    bucket.delete(id);
+    if (!bucket.size) indexMap.delete(ck);
+  }
+  function airIndexAdd(ck, id) {
+    let bucket = airChunkIndex.get(ck);
+    if (!bucket) { bucket = new Set(); airChunkIndex.set(ck, bucket); }
+    bucket.add(id);
+  }
+  function airIndexDelete(ck, id) {
+    const bucket = airChunkIndex.get(ck);
+    if (!bucket) return;
+    bucket.delete(id);
+    if (!bucket.size) airChunkIndex.delete(ck);
+  }
+  function setEdit(id, type) {
+    edits.set(id, type);
+    const c = id.split(',');
+    indexBucketAdd(editsChunkIndex, blockChunkKey(+c[0], +c[2]), id, type);
+  }
+  function noteColumnY(x, y, z) {
+    const id = columnKey(x, z);
+    const b = columnYBounds.get(id);
+    if (b) {
+      if (y < b.min) b.min = y;
+      if (y > b.max) b.max = y;
+    } else {
+      columnYBounds.set(id, { min: y, max: y });
+    }
+  }
+  function columnYRange(x, z) {
+    const h = heightAt(x, z);
+    const wf = waterFeatureAt(x, z, h);
+    const naturalMin = Math.max(CHUNK_Y_MIN, Math.min(h, SEA) - 24);
+    const naturalMax = Math.min(CHUNK_Y_MAX, Math.max(h, SEA, wf && wf.fallTop != null ? wf.fallTop : h));
+    const b = columnYBounds.get(columnKey(x, z));
+    if (!b) return { min: naturalMin, max: naturalMax };
+    return { min: Math.min(naturalMin, b.min), max: Math.max(naturalMax, b.max) };
+  }
+  function deleteBlockKey(id) {
+    world.delete(id);
+    airBlocks.delete(id);
+    const c = id.split(',');
+    const ck = blockChunkKey(+c[0], +c[2]);
+    indexBucketDelete(worldChunkIndex, ck, id);
+    airIndexDelete(ck, id);
+  }
+  function setBlock(x, y, z, type) {
+    if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) return;
+    const id = key(x, y, z);
+    const ck = blockChunkKey(x, z);
+    if (type == null) {
+      world.delete(id);
+      indexBucketDelete(worldChunkIndex, ck, id);
+      airBlocks.add(id);
+      airIndexAdd(ck, id);
+      noteColumnY(x, y, z);
+      return;
+    }
+    airBlocks.delete(id);
+    airIndexDelete(ck, id);
+    world.set(id, type);
+    indexBucketAdd(worldChunkIndex, ck, id, type);
+    noteColumnY(x, y, z);
+  }
+  // 地形は座標だけで決まる（編集は blockAt 側で先に処理）ので、列(x,z)ごとに
+  // 高価な値（高さ/表層/水/洞窟）を一度だけ計算してキャッシュする。terrainBlockAt が
+  // Y ごとに waterFeatureAt/biomeAt を呼び直していたのを解消し、地形生成・当たり判定・
+  // 洞窟装飾など blockAt を多用する箇所すべてを軽くする。ワーカー側と同じ最適化。
+  const COL_DESC_CACHE = new Map();
+  function columnDescMain(x, z) {
+    const id = columnKey(x, z);
+    let d = COL_DESC_CACHE.get(id);
+    if (d !== undefined) return d;
+    const h = heightAt(x, z);
+    const biome = biomeAt(x, z);
+    const top = topTypeAt(x, z, h);
+    const fuji = inFuji(x, z);
+    const waterFeature = fuji ? null : waterFeatureAt(x, z, h);
+    const lavaCap = biome.id === 'volcano' && h >= 27 && hash2(x * 1.3 + 4.1, z * 1.7 - 2.3) < 0.5;
+    let mouth = false, caveRegion = -1;
+    if (!fuji) {
+      mouth = caveMouthAt(x, z, h);
+      caveRegion = h > SEA + 2 ? fbm(x * 0.012 + 1200, z * 0.012 - 300, 2, 0.5) : -1;
+    }
+    d = { h, top, fuji, waterFeature, lavaCap, mouth, caveRegion };
+    COL_DESC_CACHE.set(id, d);
+    if (COL_DESC_CACHE.size > 200000) COL_DESC_CACHE.clear();
+    return d;
+  }
+  function terrainBlockAt(x, y, z) {
+    if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) return undefined;
+    const d = columnDescMain(x, z);
+    const h = d.h, top = d.top, waterFeature = d.waterFeature;
+    const bedType = waterFeature ? (waterFeature.bed || SAND) : SAND;
+    const fillType = waterFeature ? (waterFeature.fill || WATER) : WATER;
+    if (waterFeature) {
+      if (y >= waterFeature.level - waterFeature.deep && y <= waterFeature.level - 1) return bedType;
+      if (y === waterFeature.level || (waterFeature.fallTop != null && y > waterFeature.level && y <= waterFeature.fallTop)) return fillType;
+      if (y > waterFeature.level && y <= Math.max(h + 1, waterFeature.level)) return undefined;
+    }
+    if (y > h) return y <= SEA ? WATER : undefined;
+    if (y === h) return waterFeature && waterFeature.shore ? SAND : d.lavaCap ? LAVA : top;
+    if (!d.fuji) {
+      if ((d.mouth && y >= h - 4) || (d.caveRegion > -0.20 && isCaveAt(x, y, z, h, d.caveRegion))) return undefined;
+    }
+    if (top === SAND && y >= h - 4) return SAND;
+    if ((top === GRASS || top === SNOW) && y >= h - 3) return DIRT;
+    return oreTypeAt(x, y, z, h);
+  }
+  function blockAt(x, y, z) {
+    const id = key(x, y, z);
+    const edit = edits.get(id);
+    if (edit < 0) return undefined;
+    if (edit != null && edit >= 0) return edit;
+    const t = world.get(id);
+    if (t !== undefined) return t;
+    if (airBlocks.has(id)) return undefined;
+    return terrainBlockAt(x, y, z);
+  }
+  function hasBlock(x, y, z) {
+    return blockAt(x, y, z) !== undefined;
+  }
+  const isSolid = (x, y, z) => { const t = blockAt(x, y, z); return t !== undefined && TYPES[t].solid !== false; };
   const EDITS_STORAGE_KEY = `mc_edits_${WORLD_SEED}`;
   function loadSavedEdits() {
     try {
       const raw = localStorage.getItem(EDITS_STORAGE_KEY); if (!raw) return;
       const arr = JSON.parse(raw);
       if (!Array.isArray(arr)) return;
-      for (const [k, v] of arr) if (typeof k === 'string' && Number.isFinite(+v)) edits.set(k, +v);
+      for (const [k, v] of arr) if (typeof k === 'string' && Number.isFinite(+v)) setEdit(k, +v);
     } catch (e) {}
   }
   function saveEditsSoon() {
@@ -177,8 +315,10 @@
     return GRASS;
   }
 
-  const WIN_R = GAME_SETTINGS.renderDistance, PREGEN_R = Math.max(96, GAME_SETTINGS.renderDistance + 24), STEP = 8;
-  const WORLD_JOB_MS = 2.0, PREGEN_JOB_MS = 3.2, JOB_RETARGET_STEP = 24, TREE_MARGIN = 3;
+  const WIN_R = GAME_SETTINGS.renderDistance, PREGEN_R = Math.max(56, GAME_SETTINGS.renderDistance + 4), STEP = 8;
+  // メッシュ生成をワーカーに逃がしたので、メインスレッドの地形生成予算を増やして
+  // 初期ロードと移動時の追従を速くする。初期プリ生成は画面がまだ動かないので大きめ。
+  const WORLD_JOB_MS = 3.5, PREGEN_JOB_MS = 13, JOB_RETARGET_STEP = 24, TREE_MARGIN = 3;
   function hash2(x, z) { const h = Math.sin(x * 127.1 + z * 311.7 + WORLD_SEED * 0.0137) * 43758.5453; return h - Math.floor(h); }
   function pondFeatureAt(x, z, h) {
     if (inSpawnClearing(x, z, SPAWN_CLEAR_R + 18) || structureAffectsColumn(x, z, 2) || villageAffectsColumn(x, z, 2)) return null;
@@ -329,13 +469,20 @@
     return state.i >= ranges.length;
   }
 
-  function isCaveAt(x, y, z, h) {
+  function isCaveAt(x, y, z, h, regionHint = null) {
     if (inSpawnClearing(x, z, SPAWN_CLEAR_R + 8)) return false;
-    if (h <= SEA + 2 || y < 4 || y > h - 4) return false;
+    if (h <= SEA + 2 || y < CHUNK_Y_MIN + 4 || y > h - 4) return false;
+    if (y <= CHUNK_Y_MIN + 2) return false;
+    const deep = y < 0 ? 0.07 : 0;
+    const region = regionHint == null ? fbm(x * 0.012 + 1200, z * 0.012 - 300, 2, 0.5) : regionHint;
+    if (region <= -0.20) return false;
+    const coarse = hash2(Math.floor(x / 4) * 9.17 + y * 0.19, Math.floor(z / 4) * 7.31 - y * 0.23);
+    if (y < -8 && coarse < 0.18) return false;
+    const gate = hash2(Math.floor(x / 3) * 5.11 + Math.floor(y / 2) * 0.37, Math.floor(z / 3) * 6.23 - Math.floor(y / 2) * 0.41);
+    if (gate < (y < -8 ? 0.30 : 0.18)) return false;
     const tunnel = fbm(x * 0.055 + y * 0.030 + 400, z * 0.055 - y * 0.026 - 220, 3, 0.52);
     const chamber = fbm(x * 0.030 - 900, z * 0.030 + y * 0.050 + 140, 2, 0.55);
-    const region = fbm(x * 0.012 + 1200, z * 0.012 - 300, 2, 0.5);
-    return region > -0.18 && tunnel > 0.48 && chamber > -0.24;
+    return region > -0.20 && tunnel > 0.48 - deep && chamber > -0.24 - deep;
   }
 
   function caveMouthAt(x, z, h) {
@@ -348,17 +495,17 @@
     let crystals = 0, stones = 0;
     if (mouth && hash2(x * 1.31 + 6.2, z * 1.73 - 3.4) > 0.82) {
       const y = h - 2;
-      if (!world.has(key(x, y, z)) && world.has(key(x, y - 1, z))) world.set(key(x, y, z), GLOW_CRYSTAL);
+      if (!hasBlock(x, y, z) && hasBlock(x, y - 1, z)) setBlock(x, y, z, GLOW_CRYSTAL);
     }
-    for (let y = 5; y <= h - 5; y++) {
-      if (world.has(key(x, y, z))) continue;
-      const below = world.has(key(x, y - 1, z));
-      const above = world.has(key(x, y + 1, z));
+    for (let y = Math.max(CHUNK_Y_MIN + 5, h - 28); y <= h - 5; y++) {
+      if (hasBlock(x, y, z)) continue;
+      const below = hasBlock(x, y - 1, z);
+      const above = hasBlock(x, y + 1, z);
       if (below && crystals < 1) {
         const deepBias = y < 18 ? 0.05 : 0;
         const glow = hash2(x * 2.17 + y * 0.63, z * 2.41 - y * 0.39);
         if (glow > 0.972 - deepBias) {
-          world.set(key(x, y, z), GLOW_CRYSTAL);
+          setBlock(x, y, z, GLOW_CRYSTAL);
           crystals++;
           continue;
         }
@@ -366,7 +513,7 @@
       if (above && stones < 2) {
         const drip = hash2(x * 2.83 - y * 0.51, z * 2.29 + y * 0.77);
         if (drip > 0.935) {
-          world.set(key(x, y, z), DRIPSTONE);
+          setBlock(x, y, z, DRIPSTONE);
           stones++;
         }
       }
@@ -374,12 +521,13 @@
   }
 
   function oreTypeAt(x, y, z, h) {
-    if (y >= h - 4 || y < 3) return STONE;
+    if (y >= h - 4 || y <= CHUNK_Y_MIN + 1) return STONE;
+    const speck = hash2(x * 3.17 + y * 0.91, z * 2.73 - y * 0.47);
+    if (speck < 0.73) return STONE;
     const vein = fbm3(x * 0.075 + 40, y * 0.115 - 17, z * 0.075 + 90, 3, 0.56);
     const broad = fbm3(x * 0.030 - 220, y * 0.045 + 180, z * 0.030 + 60, 2, 0.55);
-    const speck = hash2(x * 3.17 + y * 0.91, z * 2.73 - y * 0.47);
     const oreBand = vein + broad * 0.45;
-    const deep = y <= 11 ? 0.035 : 0; // 深層ほど良い鉱石が出やすい
+    const deep = y <= -32 ? 0.080 : y <= -8 ? 0.060 : y <= 11 ? 0.035 : 0; // 深層ほど良い鉱石が出やすい
     if (y <= 13 && oreBand > 0.48 - deep && speck > 0.955 - deep) return DIAMOND_ORE;
     if (y <= 24 && oreBand > 0.40 - deep && speck > 0.915 - deep) return GOLD_ORE;
     if (y <= 44 && oreBand > 0.30 && speck > 0.84) return IRON_ORE;
@@ -400,8 +548,8 @@
     const jp = hash2(cx * 53.3 - 7.7, cz * 47.1 + 5.5);
     let type = 'cabin', dir = hash2(cx + 8.8, cz - 4.4) < 0.5 ? 'x' : 'z';
     if ((biome.id === 'plains' || biome.id === 'forest') && jp < 0.40) {
-      // 和風: 東京タワー風(レア) / 天守閣 / 大仏 / 灯台 / 鐘楼 / 屋根付き井戸 / 稲荷神社 / 神社 / 墓地 / 水上鳥居 / 鳥居 / 五重塔 / 茶屋 / 棚田
-      type = jp < 0.020 ? 'tokyoTower' : jp < 0.040 ? 'castle' : jp < 0.058 ? 'daibutsu' : jp < 0.076 ? 'lighthouse' : jp < 0.100 ? 'bell' : jp < 0.128 ? 'well' : jp < 0.156 ? 'inari' : jp < 0.192 ? 'jinja' : jp < 0.220 ? 'graveyard' : jp < 0.246 ? 'watchtower' : jp < 0.280 ? 'waterTorii' : jp < 0.325 ? 'torii' : jp < 0.362 ? 'pagoda' : jp < 0.386 ? 'teahouse' : 'riceTerrace';
+      // 和風: 東京タワー風(レア) / 天守閣 / 大仏 / 灯台 / 大きな寺 / 神社境内 / 千本鳥居風参道 / 鐘楼 / 屋根付き井戸 / 稲荷神社 / 神社 / 墓地 / 水上鳥居 / 鳥居 / 五重塔 / 茶屋 / 棚田
+      type = jp < 0.020 ? 'tokyoTower' : jp < 0.039 ? 'castle' : jp < 0.057 ? 'daibutsu' : jp < 0.073 ? 'lighthouse' : jp < 0.094 ? 'teraPrecinct' : jp < 0.116 ? 'jinjaPrecinct' : jp < 0.138 ? 'toriiAvenue' : jp < 0.158 ? 'bell' : jp < 0.178 ? 'well' : jp < 0.198 ? 'inari' : jp < 0.222 ? 'jinja' : jp < 0.246 ? 'graveyard' : jp < 0.268 ? 'watchtower' : jp < 0.298 ? 'waterTorii' : jp < 0.336 ? 'torii' : jp < 0.370 ? 'pagoda' : jp < 0.392 ? 'teahouse' : 'riceTerrace';
     } else if (modern < 0.78 && biome.id !== 'snowfield') {
       if (biome.id === 'desert') type = modern < 0.30 ? 'solar' : modern < 0.45 ? 'depot' : modern < 0.60 ? 'shop' : 'road';
       else if (biome.id === 'highlands') type = modern < 0.26 ? 'antenna' : modern < 0.43 ? 'observatory' : modern < 0.58 ? 'outpost' : 'road';
@@ -427,6 +575,9 @@
       type === 'antenna' ? [7, 7] :
       type === 'tower' ? [5, 5] :
       type === 'temple' ? [9, 9] :
+      type === 'teraPrecinct' ? [37, 37] :
+      type === 'jinjaPrecinct' ? [35, 35] :
+      type === 'toriiAvenue' ? [17, 31] :
       type === 'torii' ? (dir === 'x' ? [15, 3] : [3, 15]) :
       type === 'waterTorii' ? (dir === 'x' ? [15, 11] : [11, 15]) :
       type === 'pagoda' ? [15, 15] :
@@ -473,7 +624,7 @@
       lo = Math.min(lo, h); hi = Math.max(hi, h);
     }
     const limit =
-      plan.type === 'riceTerrace' ? 5 :
+      plan.type === 'riceTerrace' || plan.type === 'teraPrecinct' || plan.type === 'jinjaPrecinct' || plan.type === 'toriiAvenue' ? 5 :
       plan.type === 'tower' || plan.type === 'antenna' || plan.type === 'observatory' || plan.type === 'outpost' || plan.type === 'tokyoTower' ? 4 :
       plan.type === 'daibutsu' ? 5 :
       plan.type === 'ruin' || plan.type === 'shrine' || plan.type === 'torii' || plan.type === 'waterTorii' || plan.type === 'castle' ? 3 : 2;
@@ -643,9 +794,11 @@
       for (let yy = base + 1; yy <= base + 7; yy++) air(x, yy, z);
       put(x, base, z, PLANKS);                                    // 縁側付きの床
     }
-    framedWalls(put, air, minX, maxX, minZ, maxZ, base, 3, PLANKS, LOG, { winY: base + 2, win: GLASS, door: 'minZ' });
+    for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) put(x, base, z, TATAMI);
+    framedWalls(put, air, minX, maxX, minZ, maxZ, base, 3, SHOJI, LOG, { winY: base + 2, win: SHOJI, door: 'minZ' });
     roofGabledX(put, minX, maxX, minZ, maxZ, base + 4, ROOF_TILE, ROOF_TILE, PLASTER);
-    put(minX + 1, base + 1, minZ + 1, LANTERN);
+    put(cx, base + 3, minZ - 1, NOREN);
+    put(minX + 1, base + 1, minZ + 1, PAPER_LANTERN);
     put(maxX - 1, base + 1, maxZ - 1, CHEST);
     put(maxX - 1, base + 1, minZ + 1, CRAFTING_TABLE);
     stoneLantern(put, cx - 2, base, minZ - 1);
@@ -1032,6 +1185,160 @@
     put(maxX - 2, base + 2, maxZ - 2, CHEST);
   }
 
+  // 神社境内。参照の共通要素（朱の鳥居、石畳の参道、灯籠、手水舎、鐘楼、拝殿、鎮守の木立）を一つの発見地点にまとめる。
+  function addJinjaPrecinct(plan, base, minX, maxX, minZ, maxZ, put) {
+    const cx = plan.x, cz = plan.z;
+    const placeImportedAt = (name, centerX, centerZ) => {
+      const e = importedCells(name); if (!e) return;
+      const [W, H, D] = e.dims, cells = e.cells;
+      const ox = Math.round(centerX - W / 2), oz = Math.round(centerZ - D / 2);
+      let bi = 0;
+      for (let y = 0; y < H; y++) for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+        const v = cells[bi++];
+        if (v) put(ox + x, base + 1 + y, oz + z, v - 1);
+      }
+    };
+    const cedar = (x, z) => {
+      for (let y = base + 1; y <= base + 5; y++) put(x, y, z, LOG);
+      for (let y = base + 4; y <= base + 7; y++) {
+        const r = y >= base + 6 ? 1 : 2;
+        for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+          if (Math.abs(dx) + Math.abs(dz) <= r + 1) put(x + dx, y, z + dz, LEAVES);
+        }
+      }
+    };
+
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const border = x === minX || x === maxX || z === minZ || z === maxZ;
+      const path = Math.abs(x - cx) <= 1 && z <= cz + 5;
+      const mainCourt = x >= cx - 7 && x <= cx + 7 && z >= cz + 3 && z <= cz + 16;
+      const sideCourt = (x >= cx - 15 && x <= cx - 3 && z >= cz - 5 && z <= cz + 9) || (x >= cx + 3 && x <= cx + 15 && z >= cz - 11 && z <= cz + 4);
+      put(x, base, z, path || mainCourt || sideCourt ? STONE_BRICK : GRASS);
+      if (border && (x + z) % 3 !== 0) put(x, base + 1, z, MOSSY_BRICK);
+    }
+
+    for (let z = minZ + 1; z <= cz + 5; z += 4) {
+      stoneLantern(put, cx - 4, base, z);
+      stoneLantern(put, cx + 4, base, z);
+    }
+    addTorii({ x: cx, z: minZ + 2, dir: 'x' }, base, cx - 7, cx + 7, minZ + 1, minZ + 3, put);
+    for (let x = cx - 2; x <= cx + 2; x++) put(x, base, minZ + 7, PLASTER); // 小さな反り橋ふうの白石
+    put(cx, base + 1, cz + 2, CHEST);                                      // 賽銭箱
+    put(cx, base + 2, cz + 2, GOLD_BLOCK);
+
+    placeImportedAt('jinja', cx, cz + 9);
+    placeImportedAt('bell', cx - 10, cz + 2);
+    placeImportedAt('well', cx + 9, cz - 4);
+    put(cx, base + 2, cz + 3, NOREN);
+    put(cx - 3, base + 2, cz + 3, PAPER_LANTERN);
+    put(cx + 3, base + 2, cz + 3, PAPER_LANTERN);
+    for (let x = cx - 2; x <= cx + 2; x++) for (let z = cz + 5; z <= cz + 7; z++) put(x, base, z, TATAMI);
+
+    // 手水舎まわりの水盤と、境内奥の小さな玉垣。
+    for (let x = cx + 5; x <= cx + 12; x++) for (let z = cz - 9; z <= cz - 6; z++) put(x, base, z, STONE);
+    for (let x = cx + 7; x <= cx + 10; x++) for (let z = cz - 8; z <= cz - 7; z++) put(x, base + 1, z, WATER);
+    for (let x = cx - 8; x <= cx + 8; x += 2) { put(x, base + 1, cz + 17, LOG); put(x, base + 2, cz + 17, PLANKS); }
+    for (const [tx, tz] of [[minX + 3, minZ + 4], [maxX - 3, minZ + 4], [minX + 4, maxZ - 4], [maxX - 4, maxZ - 4]]) cedar(tx, tz);
+  }
+
+  // 千本鳥居風の参道。連続する朱の鳥居で、稲荷へ続く細長い探索ランドマークにする。
+  function addToriiAvenue(plan, base, minX, maxX, minZ, maxZ, put) {
+    const cx = plan.x, cz = plan.z;
+    const placeInari = () => {
+      const e = importedCells('inari'); if (!e) return;
+      const [W, H, D] = e.dims, cells = e.cells;
+      const ox = Math.round(cx - W / 2), oz = maxZ - D;
+      let bi = 0;
+      for (let y = 0; y < H; y++) for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+        const v = cells[bi++];
+        if (v) put(ox + x, base + 1 + y, oz + z, v - 1);
+      }
+    };
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const path = Math.abs(x - cx) <= 1;
+      const shoulder = Math.abs(x - cx) <= 4;
+      put(x, base, z, path ? STONE_BRICK : shoulder ? MOSSY_BRICK : GRASS);
+      if ((x === minX || x === maxX) && z % 3 === 0) put(x, base + 1, z, LOG);
+    }
+    for (let z = minZ + 2; z <= maxZ - 14; z += 4) {
+      addTorii({ x: cx, z, dir: 'x' }, base, cx - 7, cx + 7, z - 1, z + 1, put);
+      put(cx - 5, base + 1, z + 1, PAPER_LANTERN);
+      put(cx + 5, base + 1, z + 1, PAPER_LANTERN);
+    }
+    for (let z = minZ; z <= maxZ; z += 5) {
+      put(cx - 6, base + 1, z, LEAVES);
+      put(cx + 6, base + 1, z, LEAVES);
+    }
+    put(cx, base + 1, maxZ - 5, CHEST);
+    put(cx, base + 2, maxZ - 5, GOLD_BLOCK);
+    placeInari();
+  }
+
+  // 大きな寺。山門、本堂、五重塔、鐘楼、墓地をまとめた寺町の核になる探索地点。
+  function addTeraPrecinct(plan, base, minX, maxX, minZ, maxZ, put, air) {
+    const cx = plan.x, cz = plan.z;
+    const placeImportedAt = (name, centerX, centerZ) => {
+      const e = importedCells(name); if (!e) return;
+      const [W, H, D] = e.dims, cells = e.cells;
+      const ox = Math.round(centerX - W / 2), oz = Math.round(centerZ - D / 2);
+      let bi = 0;
+      for (let y = 0; y < H; y++) for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+        const v = cells[bi++];
+        if (v) put(ox + x, base + 1 + y, oz + z, v - 1);
+      }
+    };
+    const pine = (x, z) => {
+      for (let y = base + 1; y <= base + 4; y++) put(x, y, z, LOG);
+      for (let y = base + 4; y <= base + 6; y++) for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+        if (Math.abs(dx) + Math.abs(dz) <= (y === base + 6 ? 2 : 3)) put(x + dx, y, z + dz, LEAVES);
+      }
+    };
+
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const border = x === minX || x === maxX || z === minZ || z === maxZ;
+      const path = Math.abs(x - cx) <= 1 && z <= cz + 8;
+      const court = x >= cx - 8 && x <= cx + 8 && z >= cz + 4 && z <= cz + 17;
+      const sideLeft = x >= minX + 2 && x <= cx - 7 && z >= minZ + 8 && z <= cz + 9;
+      const sideRight = x >= cx + 7 && x <= maxX - 2 && z >= minZ + 9 && z <= cz + 15;
+      put(x, base, z, path || court || sideLeft || sideRight ? STONE_BRICK : GRASS);
+      if (border && (x + z) % 3 !== 1) put(x, base + 1, z, MOSSY_BRICK);
+    }
+
+    // 山門: 参道の入口に、太い柱と大きい瓦屋根の門。
+    const gateZ = minZ + 4;
+    for (const px of [cx - 5, cx + 5]) for (let y = base + 1; y <= base + 5; y++) {
+      put(px, y, gateZ - 1, LOG); put(px, y, gateZ + 1, LOG);
+    }
+    for (let x = cx - 7; x <= cx + 7; x++) for (let z = gateZ - 2; z <= gateZ + 2; z++) put(x, base + 6, z, ROOF_TILE);
+    roofGabledX(put, cx - 7, cx + 7, gateZ - 2, gateZ + 2, base + 7, ROOF_TILE, ROOF_TILE, PLASTER);
+    put(cx, base + 4, gateZ, NOREN);
+    put(cx - 3, base + 3, gateZ, PAPER_LANTERN); put(cx + 3, base + 3, gateZ, PAPER_LANTERN);
+
+    for (let z = gateZ + 4; z <= cz + 6; z += 4) {
+      stoneLantern(put, cx - 4, base, z);
+      stoneLantern(put, cx + 4, base, z);
+    }
+
+    // 本堂: 畳床・障子・暖簾・提灯を使う、寺セットの中心。
+    const hx0 = cx - 7, hx1 = cx + 7, hz0 = cz + 8, hz1 = cz + 16;
+    for (let x = hx0 - 1; x <= hx1 + 1; x++) for (let z = hz0 - 1; z <= hz1 + 1; z++) put(x, base + 1, z, PLANKS);
+    for (let x = hx0 + 1; x <= hx1 - 1; x++) for (let z = hz0 + 1; z <= hz1 - 1; z++) put(x, base + 1, z, TATAMI);
+    framedWalls(put, air, hx0, hx1, hz0, hz1, base + 1, 4, SHOJI, LOG, { winY: base + 3, win: SHOJI, door: 'minZ' });
+    roofGabledX(put, hx0, hx1, hz0, hz1, base + 6, ROOF_TILE, ROOF_TILE, PLASTER);
+    put(cx, base + 4, hz0 - 1, NOREN);
+    put(cx - 4, base + 3, hz0 - 1, PAPER_LANTERN); put(cx + 4, base + 3, hz0 - 1, PAPER_LANTERN);
+    put(cx, base + 2, hz1 - 2, GOLD_BLOCK); put(cx, base + 3, hz1 - 2, PAPER_LANTERN);
+    put(hx1 - 2, base + 2, hz1 - 2, CHEST);
+
+    placeImportedAt('pagoda', cx - 12, cz - 2);
+    placeImportedAt('bell', cx + 11, cz - 1);
+    placeImportedAt('graveyard', cx + 11, cz + 11);
+
+    for (const [tx, tz] of [[minX + 3, minZ + 3], [maxX - 3, minZ + 3], [minX + 4, maxZ - 4], [maxX - 4, maxZ - 4]]) pine(tx, tz);
+    for (let x = cx - 14; x <= cx - 7; x++) for (let z = cz + 12; z <= cz + 15; z++) if ((x + z) % 2 === 0) put(x, base + 1, z, LEAVES);
+    for (let x = cx - 13; x <= cx - 9; x++) for (let z = cz + 13; z <= cz + 14; z++) put(x, base, z, WATER);
+  }
+
   // 取り込み構造物（パーツ18のレジストリ）を配置する汎用ビルダー。
   // セル配列(0=空気, それ以外は ourBlockId+1)を石レンガ基壇の上に積み、正面=-Z側に向ける。
   function addImportedStructure(plan, base, minX, maxX, minZ, maxZ, put) {
@@ -1049,13 +1356,16 @@
     const base = structureBase(plan); if (base == null) return;
     const minX = plan.x - Math.floor(plan.w / 2), maxX = minX + plan.w - 1;
     const minZ = plan.z - Math.floor(plan.d / 2), maxZ = minZ + plan.d - 1;
-    const put = (x, y, z, type) => { if (inWin(x, z)) { world.set(key(x, y, z), type); dirtyStructureChunks.add(chunkKey(chunkCoord(x), chunkCoord(z))); } };
-    const air = (x, y, z) => { if (inWin(x, z)) { world.delete(key(x, y, z)); dirtyStructureChunks.add(chunkKey(chunkCoord(x), chunkCoord(z))); } };
+    const put = (x, y, z, type) => { if (inWin(x, z)) { setBlock(x, y, z, type); dirtyStructureChunks.add(chunkKey(chunkCoord(x), chunkCoord(z))); } };
+    const air = (x, y, z) => { if (inWin(x, z)) { setBlock(x, y, z, null); dirtyStructureChunks.add(chunkKey(chunkCoord(x), chunkCoord(z))); } };
     const impData = importedCells(plan.type);
     const clearTop =
       impData ? base + impData.dims[1] + 8 :
       plan.type === 'tokyoTower' ? base + 36 :
       plan.type === 'daibutsu' ? base + 34 :
+      plan.type === 'teraPrecinct' ? base + 34 :
+      plan.type === 'jinjaPrecinct' ? base + 24 :
+      plan.type === 'toriiAvenue' ? base + 24 :
       plan.type === 'pagoda' ? base + 34 :
       plan.type === 'castle' ? base + 24 :
       plan.type === 'antenna' ? base + 15 :
@@ -1077,6 +1387,9 @@
     if (plan.type === 'shrine') { addShrine(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
     if (plan.type === 'outpost') { addOutpost(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
     if (plan.type === 'observatory') { addObservatory(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
+    if (plan.type === 'teraPrecinct') { addTeraPrecinct(plan, base, minX, maxX, minZ, maxZ, put, air); return; }
+    if (plan.type === 'jinjaPrecinct') { addJinjaPrecinct(plan, base, minX, maxX, minZ, maxZ, put); return; }
+    if (plan.type === 'toriiAvenue') { addToriiAvenue(plan, base, minX, maxX, minZ, maxZ, put); return; }
     if (plan.type === 'torii') { addTorii(plan, base, minX, maxX, minZ, maxZ, put); return; }
     if (plan.type === 'waterTorii') { addWaterTorii(plan, base, minX, maxX, minZ, maxZ, put); return; }
     if (plan.type === 'pagoda') { addPagoda(plan, base, minX, maxX, minZ, maxZ, put); return; }
@@ -1138,9 +1451,9 @@
     if (surf <= SEA + 3) return null;
     const w = 7 + (hash2(cx * 2.11 + 0.3, cz * 1.77 - 0.4) * 5 | 0);
     const d = 7 + (hash2(cx * 1.33 - 0.5, cz * 2.91 + 0.2) * 5 | 0);
-    const ceilY = surf - 4 - (hash2(cx * 5.3 + 2.1, cz * 6.1 - 1.2) * 4 | 0);
-    const floorY = ceilY - 5;
-    if (floorY < 3) return null;
+    const floorY = -44 + (hash2(cx * 5.3 + 2.1, cz * 6.1 - 1.2) * 34 | 0);
+    const ceilY = floorY + 5;
+    if (floorY <= CHUNK_Y_MIN + 3 || ceilY >= surf - 4) return null;
     const dir = hash2(cx + 6.6, cz - 7.7) < 0.5 ? 'x' : 'z';
     const sign = hash2(cx * 0.7 + 2.2, cz * 0.7 - 1.1) < 0.5 ? 1 : -1;
     return { x, z, w, d, floorY, ceilY, surf, dir, sign };
@@ -1183,8 +1496,8 @@
     const { x: cx, z: cz, w, d, floorY, ceilY, dir, sign } = plan;
     const minX = cx - (w >> 1), maxX = minX + w - 1;
     const minZ = cz - (d >> 1), maxZ = minZ + d - 1;
-    const put = (x, y, z, t) => { if (inWin(x, z)) world.set(key(x, y, z), t); };
-    const air = (x, y, z) => { if (inWin(x, z)) world.delete(key(x, y, z)); };
+    const put = (x, y, z, t) => { if (inWin(x, z)) setBlock(x, y, z, t); };
+    const air = (x, y, z) => { if (inWin(x, z)) setBlock(x, y, z, null); };
     const brick = (x, y, z) => put(x, y, z, hash2(x * 1.7 + y * 0.9, z * 1.3 - y * 0.7) < 0.2 ? MOSSY_BRICK : STONE_BRICK);
 
     // 内部を空洞化
@@ -1220,7 +1533,7 @@
     // 部屋側の壁に出入口を開ける
     for (let h = 1; h <= 3; h++) { air(sx, floorY + h, sz); air(sx + perpX, floorY + h, sz + perpZ); }
     let x = sx + stepX, z = sz + stepZ, y = floorY + 1;
-    for (let i = 0; i < 42; i++) {
+    for (let i = 0; i < 128; i++) {
       const ground = heightAt(x, z);
       put(x, y - 1, z, STONE_BRICK);
       put(x + perpX, y - 1, z + perpZ, STONE_BRICK);
@@ -1625,8 +1938,8 @@
 
   function addVillagePlan(plan, inWin) {
     const { x: cx, z: cz, base, slots } = plan;
-    const put = (x, y, z, t) => { if (inWin(x, z)) world.set(key(x, y, z), t); };
-    const air = (x, y, z) => { if (inWin(x, z)) world.delete(key(x, y, z)); };
+    const put = (x, y, z, t) => { if (inWin(x, z)) setBlock(x, y, z, t); };
+    const air = (x, y, z) => { if (inWin(x, z)) setBlock(x, y, z, null); };
     for (const s of slots) buildPath(cx, cz, s.bx, s.bz, base, put, air);
     buildWell(cx, cz, base, put, air);
     buildVillageSign(plan, put, air);
@@ -1649,7 +1962,7 @@
     const stepX = dir === 'x' ? sign : 0, stepZ = dir === 'x' ? 0 : sign;
     const perpX = dir === 'x' ? 0 : 1, perpZ = dir === 'x' ? 1 : 0;
     let x = sx, z = sz, y = startY;
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < 128; i++) {
       const ground = heightAt(x, z);
       put(x, y - 1, z, STONE_BRICK);
       put(x + perpX, y - 1, z + perpZ, STONE_BRICK);
@@ -1676,8 +1989,8 @@
     if (distFromSpawn(x, z) < SPAWN_CLEAR_R + 64) return null;
     const surf = heightAt(x, z);
     if (surf <= SEA + 3) return null;
-    const floorY = 5 + (hash2(cx * 5.7, cz * 6.3) * 5 | 0);
-    if (floorY >= surf - 6) return null;
+    const floorY = -48 + (hash2(cx * 5.7, cz * 6.3) * 32 | 0);
+    if (floorY <= CHUNK_Y_MIN + 3 || floorY >= surf - 6) return null;
     const dir = hash2(cx + 4.4, cz - 3.3) < 0.5 ? 'x' : 'z';
     const sign = hash2(cx * 0.9 + 1.2, cz * 0.9 - 2.1) < 0.5 ? 1 : -1;
     const len = 22 + (hash2(cx * 2.3 + 1.7, cz * 3.9 - 0.8) * 16 | 0);
@@ -1709,8 +2022,8 @@
 
   function addMineshaftPlan(plan, inWin) {
     const { x: ox, z: oz, floorY, dir, sign, len } = plan;
-    const put = (x, y, z, t) => { if (inWin(x, z)) world.set(key(x, y, z), t); };
-    const air = (x, y, z) => { if (inWin(x, z)) world.delete(key(x, y, z)); };
+    const put = (x, y, z, t) => { if (inWin(x, z)) setBlock(x, y, z, t); };
+    const air = (x, y, z) => { if (inWin(x, z)) setBlock(x, y, z, null); };
     const stepX = dir === 'x' ? sign : 0, stepZ = dir === 'x' ? 0 : sign;
     const perpX = dir === 'x' ? 0 : 1, perpZ = dir === 'x' ? 1 : 0;
     const lavaAt = 6 + (hash2(ox * 1.3, oz * 1.7) * (len - 12) | 0);
@@ -1764,8 +2077,8 @@
     if (surf <= SEA + 5) return null;
     const rH = 7 + (hash2(cx * 2.1, cz * 1.9) * 4 | 0);
     const rV = 4 + (hash2(cx * 3.3, cz * 2.7) * 2 | 0);
-    const midY = 7 + rV;
-    if (midY + rV >= surf - 3) return null;
+    const midY = -42 + (hash2(cx * 5.9 + 1.4, cz * 4.7 - 0.8) * 28 | 0);
+    if (midY - rV <= CHUNK_Y_MIN + 2 || midY + rV >= surf - 3) return null;
     const lava = hash2(cx * 6.1 + 3.3, cz * 7.7 - 2.2) < 0.3;
     return { x, z, midY, rH, rV, surf, lava };
   }
@@ -1795,8 +2108,8 @@
 
   function addLakePlan(plan, inWin) {
     const { x: cx, z: cz, midY, rH, rV, lava } = plan;
-    const put = (x, y, z, t) => { if (inWin(x, z)) world.set(key(x, y, z), t); };
-    const air = (x, y, z) => { if (inWin(x, z)) world.delete(key(x, y, z)); };
+    const put = (x, y, z, t) => { if (inWin(x, z)) setBlock(x, y, z, t); };
+    const air = (x, y, z) => { if (inWin(x, z)) setBlock(x, y, z, null); };
     const liquid = lava ? LAVA : WATER;
     const waterY = midY - 1; // 水面（この高さ以下を液体で満たす）
     for (let x = cx - rH; x <= cx + rH; x++) for (let z = cz - rH; z <= cz + rH; z++) {
@@ -1811,12 +2124,12 @@
     for (let x = cx - rH - 1; x <= cx + rH + 1; x++) for (let z = cz - rH - 1; z <= cz + rH + 1; z++) {
       const dh = Math.hypot((x - cx) / rH, (z - cz) / rH);
       if (dh <= 1.05 && dh > 0.55 && !lava) {
-        const t = world.get(key(x, waterY, z));
+        const t = blockAt(x, waterY, z);
         if (t !== undefined && t !== WATER) put(x, waterY, z, SAND);
       }
       if (dh < 0.85 && hash2(x * 2.7 + 1.3, z * 3.1 - 0.7) > 0.8) {
         const cy = midY + rV;
-        if (world.has(key(x, cy + 1, z))) put(x, cy, z, GLOW_CRYSTAL);
+        if (hasBlock(x, cy + 1, z)) put(x, cy, z, GLOW_CRYSTAL);
       }
     }
     // 岸の一点から地上への階段
@@ -1876,12 +2189,12 @@
     return done;
   }
   function startPreGenerate(ccx, ccz, x0, x1, z0, z1) {
-    const gx0 = ccx - PREGEN_R, gx1 = ccx + PREGEN_R, gz0 = ccz - PREGEN_R, gz1 = ccz + PREGEN_R;
     const M = TREE_MARGIN;
+    const gx0 = ccx - PREGEN_R - M, gx1 = ccx + PREGEN_R + M, gz0 = ccz - PREGEN_R - M, gz1 = ccz + PREGEN_R + M;
     const terrainRanges = x0 == null ? [{ x0: gx0, x1: gx1, z0: gz0, z1: gz1, x: gx0, z: gz0 }]
       : rangesOutsideRect(gx0, gx1, gz0, gz1, x0, x1, z0, z1);
-    const treeRanges = x0 == null ? [{ x0: gx0 - M, x1: gx1 + M, z0: gz0 - M, z1: gz1 + M, x: gx0 - M, z: gz0 - M }]
-      : rangesOutsideRect(gx0 - M, gx1 + M, gz0 - M, gz1 + M, x0 - M, x1 + M, z0 - M, z1 + M);
+    const treeRanges = x0 == null ? [{ x0: gx0, x1: gx1, z0: gz0, z1: gz1, x: gx0, z: gz0 }]
+      : rangesOutsideRect(gx0, gx1, gz0, gz1, x0, x1, z0, z1);
     sortRangesNear(terrainRanges, ccx, ccz);
     sortRangesNear(treeRanges, ccx, ccz);
     pregenJob = {
@@ -1898,33 +2211,11 @@
   }
 
   function generateTerrainColumn(x, z) {
-    const h = heightAt(x, z), top = topTypeAt(x, z, h);
-    const biome = biomeAt(x, z);
+    const h = heightAt(x, z);
     const mouth = caveMouthAt(x, z, h);
-    const waterFeature = waterFeatureAt(x, z, h);
-    const bedType = waterFeature ? (waterFeature.bed || SAND) : SAND;
-    const fillType = waterFeature ? (waterFeature.fill || WATER) : WATER;
-    const lavaCap = biome.id === 'volcano' && h >= 27 && hash2(x * 1.3 + 4.1, z * 1.7 - 2.3) < 0.5;
-    const landmark = inFuji(x, z);
-    for (let y = 0; y <= h; y++) {
-      if (y < h && !landmark && (isCaveAt(x, y, z, h) || (mouth && y >= h - 4))) continue;
-      let type;
-      if (waterFeature && y >= waterFeature.level - waterFeature.deep && y <= waterFeature.level - 1) type = bedType;
-      else if (y === h) type = waterFeature && waterFeature.shore ? SAND : lavaCap ? LAVA : top;
-      else if (top === SAND && y >= h - 4) type = SAND;
-      else if ((top === GRASS || top === SNOW) && y >= h - 3) type = DIRT;
-      else type = oreTypeAt(x, y, z, h);
-      world.set(key(x, y, z), type);
-    }
-    if (waterFeature) {
-      // 床を確実に塞ぐ（洞窟入口/洞窟が水の真下を貫通して水が浮くのを防ぐ）
-      for (let y = waterFeature.level - waterFeature.deep; y <= waterFeature.level - 1; y++) world.set(key(x, y, z), bedType);
-      for (let y = waterFeature.level; y <= Math.max(h + 1, waterFeature.level); y++) world.delete(key(x, y, z));
-      world.set(key(x, waterFeature.level, z), fillType);
-      if (waterFeature.fallTop != null) for (let y = waterFeature.level + 1; y <= waterFeature.fallTop; y++) world.set(key(x, y, z), fillType);
-    }
-    for (let y = h + 1; y <= SEA; y++) world.set(key(x, y, z), WATER);
-    addCaveDetails(x, z, h, mouth);
+    const caveRegion = h > SEA + 2 ? fbm(x * 0.012 + 1200, z * 0.012 - 300, 2, 0.5) : -1;
+    const cavePossible = caveRegion > -0.20;
+    if (mouth || cavePossible) addCaveDetails(x, z, h, mouth);
   }
 
   function addTreeAt(x, z, inWin) {
@@ -1936,16 +2227,16 @@
     if (waterFeatureAt(x, z, gh)) return;
     const jungle = biomeAt(x, z).id === 'jungle';
     const trunk = (jungle ? 6 : 4) + (hash2(x + 7, z - 3) * (jungle ? 5 : 3) | 0), topY = gh + trunk, r = (jungle ? 2 : 2) + (hash2(x - 1, z + 5) < (jungle ? 0.8 : 0.5) ? 1 : 0);
-    if (inWin(x, z)) for (let i = 1; i <= trunk; i++) world.set(key(x, gh + i, z), LOG);
+    if (inWin(x, z)) for (let i = 1; i <= trunk; i++) setBlock(x, gh + i, z, LOG);
     for (let dy = -2; dy <= 2; dy++) {
       const ry = r - Math.abs(dy) * 0.4;
       for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
         if (Math.hypot(dx, dz, dy * 1.2) > ry + 0.4) continue;
         const lx = x + dx, lz = z + dz;
-        if (inWin(lx, lz) && !world.has(key(lx, topY + dy, lz))) world.set(key(lx, topY + dy, lz), LEAVES);
+        if (inWin(lx, lz) && !hasBlock(lx, topY + dy, lz)) setBlock(lx, topY + dy, lz, LEAVES);
       }
     }
-    if (inWin(x, z)) world.set(key(x, topY + 1, z), LEAVES);
+    if (inWin(x, z)) setBlock(x, topY + 1, z, LEAVES);
   }
 
   // 自然ディテール（岩・倒木・枯れ木・サボテン・沼の水草）をまばらに散らす
@@ -1958,11 +2249,11 @@
     const gh = heightAt(x, z);
     const wf = waterFeatureAt(x, z, gh);
     if (wf) {
-      if (biome.id === 'swamp' && sel < 0.012 && inWin(x, z) && world.get(key(x, wf.level, z)) === WATER) world.set(key(x, wf.level, z), LEAVES);
+      if (biome.id === 'swamp' && sel < 0.012 && inWin(x, z) && blockAt(x, wf.level, z) === WATER) setBlock(x, wf.level, z, LEAVES);
       return;
     }
     const top = topTypeAt(x, z, gh);
-    const setCol = (lx, lz, ly, t) => { if (inWin(lx, lz)) world.set(key(lx, ly, lz), t); };
+    const setCol = (lx, lz, ly, t) => { if (inWin(lx, lz)) setBlock(lx, ly, lz, t); };
     if (top === SAND && biome.id === 'desert') {
       if (sel < 0.008) { const ht = 2 + (hash2(x * 2.3, z * 1.7) < 0.5 ? 0 : 1); for (let y = 1; y <= ht; y++) setCol(x, z, gh + y, CACTUS); }
       else if (sel < 0.016) { const ht = 1 + (hash2(x * 1.9, z * 2.7) < 0.4 ? 1 : 0); for (let y = 1; y <= ht; y++) setCol(x, z, gh + y, LOG); }
@@ -1984,11 +2275,16 @@
   }
 
   function applyEditsInArea(x0, x1, z0, z1) {
-    for (const [k, v] of edits) {
-      const c = k.split(',');
-      const ex = +c[0], ez = +c[2];
-      if (ex < x0 || ex > x1 || ez < z0 || ez > z1) continue;
-      if (v < 0) world.delete(k); else world.set(k, v);
+    const cx0 = chunkCoord(x0), cx1 = chunkCoord(x1), cz0 = chunkCoord(z0), cz1 = chunkCoord(z1);
+    for (let cx = cx0; cx <= cx1; cx++) for (let cz = cz0; cz <= cz1; cz++) {
+      const bucket = editsChunkIndex.get(chunkKey(cx, cz));
+      if (!bucket) continue;
+      for (const [k, v] of bucket) {
+        const c = k.split(',');
+        const ex = +c[0], ez = +c[2];
+        if (ex < x0 || ex > x1 || ez < z0 || ez > z1) continue;
+        if (v < 0) setBlock(ex, +c[1], ez, null); else setBlock(ex, +c[1], ez, v);
+      }
     }
   }
 
@@ -1999,7 +2295,8 @@
     const oldContains = (x, z) => hadWindow && x >= oldX0 && x <= oldX1 && z >= oldZ0 && z <= oldZ1;
 
     if (hadWindow) {
-      if (generatedContains(x0 - TREE_MARGIN, x1 + TREE_MARGIN, z0 - TREE_MARGIN, z1 + TREE_MARGIN)) {
+      const gx0 = x0 - TREE_MARGIN, gx1 = x1 + TREE_MARGIN, gz0 = z0 - TREE_MARGIN, gz1 = z1 + TREE_MARGIN;
+      if (generatedContains(gx0, gx1, gz0, gz1)) {
         const sameChunks = sameRenderChunkArea(ccx, ccz);
         winCX = ccx; winCZ = ccz;
         if (!sameChunks) requestRebuildWindowMove(x0, x1, z0, z1, oldX0, oldX1, oldZ0, oldZ1);
@@ -2010,10 +2307,10 @@
         if (drift < JOB_RETARGET_STEP) return;
       }
       worldJob = {
-        ccx, ccz, x0, x1, z0, z1, oldContains,
+        ccx, ccz, x0, x1, z0, z1, gx0, gx1, gz0, gz1, oldContains,
         oldX0, oldX1, oldZ0, oldZ1,
-        terrainRanges: sortRangesNear(rangesOutsideRect(x0, x1, z0, z1, oldX0, oldX1, oldZ0, oldZ1), ccx, ccz),
-        treeRanges: sortRangesNear(rangesOutsideRect(x0 - TREE_MARGIN, x1 + TREE_MARGIN, z0 - TREE_MARGIN, z1 + TREE_MARGIN, oldX0 + TREE_MARGIN, oldX1 - TREE_MARGIN, oldZ0 + TREE_MARGIN, oldZ1 - TREE_MARGIN), ccx, ccz),
+        terrainRanges: sortRangesNear(rangesOutsideRect(gx0, gx1, gz0, gz1, generatedX0, generatedX1, generatedZ0, generatedZ1), ccx, ccz),
+        treeRanges: sortRangesNear(rangesOutsideRect(gx0, gx1, gz0, gz1, generatedX0, generatedX1, generatedZ0, generatedZ1), ccx, ccz),
         phase: 'terrain',
         scan: { i: 0 },
         keyIter: null,
@@ -2023,6 +2320,10 @@
 
     winCX = ccx; winCZ = ccz;
     world.clear();
+    airBlocks.clear();
+    worldChunkIndex.clear();
+    airChunkIndex.clear();
+    columnYBounds.clear();
     setGeneratedBounds(1e9, -1e9, 1e9, -1e9);
     startPreGenerate(ccx, ccz, null, null, null, null);
   }
@@ -2072,9 +2373,8 @@
 
     if (job.phase === 'terrain') {
       if (processRanges(job.terrainRanges, job.scan, end, generateTerrainColumn)) {
-        applyEditsInArea(job.x0, job.x1, job.z0, job.z1);
+        applyEditsInArea(job.gx0, job.gx1, job.gz0, job.gz1);
         winCX = job.ccx; winCZ = job.ccz;
-        requestRebuildWindowMove(job.x0, job.x1, job.z0, job.z1, job.oldX0, job.oldX1, job.oldZ0, job.oldZ1);
         job.phase = 'structures';
         const inWin = (x, z) => x >= job.x0 && x <= job.x1 && z >= job.z0 && z <= job.z1;
         job.buildQueue = collectBuilders(job.x0, job.x1, job.z0, job.z1, inWin);
@@ -2091,11 +2391,12 @@
     }
 
     if (job.phase === 'trees') {
-      const inWin = (x, z) => x >= job.x0 && x <= job.x1 && z >= job.z0 && z <= job.z1;
-      if (processRanges(job.treeRanges, job.scan, end, (x, z) => { addTreeAt(x, z, inWin); addDecorAt(x, z, inWin); })) {
-        applyEditsInArea(job.x0, job.x1, job.z0, job.z1);
+      const inTreeArea = (x, z) => x >= job.gx0 && x <= job.gx1 && z >= job.gz0 && z <= job.gz1;
+      if (processRanges(job.treeRanges, job.scan, end, (x, z) => { addTreeAt(x, z, inTreeArea); addDecorAt(x, z, inTreeArea); })) {
+        applyEditsInArea(job.gx0, job.gx1, job.gz0, job.gz1);
         job.phase = 'cleanup';
         job.keyIter = world.keys();
+        job.airIter = null;
       }
     }
 
@@ -2103,15 +2404,23 @@
       while (performance.now() < end) {
         const n = job.keyIter.next();
         if (n.done) {
+          if (!job.airIter) {
+            job.keyIter = airBlocks.keys();
+            job.airIter = true;
+            continue;
+          }
           winCX = job.ccx; winCZ = job.ccz;
-          setGeneratedBounds(job.x0, job.x1, job.z0, job.z1);
+          setGeneratedBounds(job.gx0, job.gx1, job.gz0, job.gz1);
           requestRebuildWindowMove(job.x0, job.x1, job.z0, job.z1, job.oldX0, job.oldX1, job.oldZ0, job.oldZ1);
           if (worldJob === job) worldJob = null;
           break;
         }
         const c = n.value.split(',');
         const x = +c[0], z = +c[2];
-        if (x < job.x0 || x > job.x1 || z < job.z0 || z > job.z1) world.delete(n.value);
+        if (x < job.gx0 || x > job.gx1 || z < job.gz0 || z > job.gz1) {
+          deleteBlockKey(n.value);
+          columnYBounds.delete(columnKey(x, z));
+        }
       }
     }
   }

@@ -46,7 +46,7 @@
   }
   function heldToolForTarget(tg) {
     if (!tg) return null;
-    const type = world.get(key(tg.block[0], tg.block[1], tg.block[2]));
+    const type = blockAt(tg.block[0], tg.block[1], tg.block[2]);
     const tool = type == null ? null : blockPreferredTool(type);
     const held = tool ? bestTool(tool) : null;
     return held ? held.id : null;

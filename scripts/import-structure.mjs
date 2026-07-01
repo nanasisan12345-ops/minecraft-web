@@ -6,7 +6,8 @@ import { loadStructure } from './nbt-structure.mjs';
 
 // 我々のブロック定数（22-block-types.js と一致）
 const B = { GRASS:0,DIRT:1,STONE:2,LOG:3,LEAVES:4,SAND:5,PLANKS:6,BRICK:7,GLASS:8,WATER:9,SNOW:10,
-  STONE_BRICK:20,MOSSY_BRICK:21,CHEST:22,LANTERN:23,LAVA:24,VERMILION:28,PLASTER:29,ROOF_TILE:30,GOLD_BLOCK:31,COPPER_ROOF:32,BRONZE:33 };
+  STONE_BRICK:20,MOSSY_BRICK:21,CHEST:22,LANTERN:23,LAVA:24,VERMILION:28,PLASTER:29,ROOF_TILE:30,GOLD_BLOCK:31,COPPER_ROOF:32,BRONZE:33,
+  TATAMI:35,SHOJI:36,NOREN:37,PAPER_LANTERN:38 };
 
 // Minecraft ブロック名 → 我々のブロックid（-1=置かない）
 export function mapBlock(raw) {
@@ -22,13 +23,15 @@ export function mapBlock(raw) {
   if (/water|kelp|seagrass|lily/.test(n)) return B.WATER;
   if (/lava|magma/.test(n)) return B.LAVA;
   if (/gold/.test(n)) return B.GOLD_BLOCK;
-  if (/lantern|torch|campfire|sea_lantern|glowstone|shroomlight|lit_|beacon/.test(n)) return B.LANTERN;
+  if (/lantern|torch|campfire|sea_lantern|glowstone|shroomlight|lit_|beacon/.test(n)) return B.PAPER_LANTERN;
   if (/chest/.test(n)) return B.CHEST;
-  if (/hay/.test(n)) return B.SAND;
+  if (/hay|carpet|mat/.test(n)) return B.TATAMI;
+  if (/banner/.test(n)) return B.NOREN;
+  if (/paper|white_wool/.test(n)) return B.SHOJI;
   if (/sand/.test(n)) return B.SAND;
   if (/snow/.test(n)) return B.SNOW;
   if (/(log|stem|stripped_|_wood$|bamboo_block)/.test(n)) return B.LOG;            // 幹＝丸太
-  if (/(planks|_slab|_stairs|fence|trapdoor|_door|_sign|barrel|bookshelf|crafting|lectern|scaffold|ladder|composter|banner|wool|carpet|bed)/.test(n)) return B.PLANKS;
+  if (/(planks|_slab|_stairs|fence|trapdoor|_door|_sign|barrel|bookshelf|crafting|lectern|scaffold|ladder|composter|wool|bed)/.test(n)) return B.PLANKS;
   if (/grass_block/.test(n)) return B.GRASS;
   if (/(dirt|path|farmland|podzol|mud|clay|coarse|rooted|moss_block|gravel)/.test(n)) return B.DIRT;
   if (/(cobble|andesite|diorite|granite|smooth_basalt|basalt|tuff|blackstone|deepslate|stone)/.test(n)) return B.STONE;
@@ -90,7 +93,7 @@ const b64 = Buffer.from(cells).toString('base64');
 console.log(`  bytes ${cells.length} base64 ${b64.length}`);
 
 // viz 用 JSON（our id → 色）
-const COLOR=[0x6ab04c,0x8a5a2b,0x8b9094,0x6d4c1b,0x3f8a2e,0xe6da9c,0xb5824a,0xa83a2a,0xbfe9ff,0x3a78d8,0xf2f7ff,0,0,0,0,0,0,0,0,0,0x868b8f,0x6f8a5a,0xc79a52,0xffc25a,0xff6a1a,0x4f8f3a,0,0,0xcf3b1e,0xeae3d2,0x44525c,0xe6c23a,0x4a9e86,0x6f8472];
+const COLOR=[0x6ab04c,0x8a5a2b,0x8b9094,0x6d4c1b,0x3f8a2e,0xe6da9c,0xb5824a,0xa83a2a,0xbfe9ff,0x3a78d8,0xf2f7ff,0,0,0,0,0,0,0,0,0,0x868b8f,0x6f8a5a,0xc79a52,0xffc25a,0xff6a1a,0x4f8f3a,0,0,0xcf3b1e,0xeae3d2,0x44525c,0xe6c23a,0x4a9e86,0x6f8472,0,0x9aa96a,0xf3ead2,0x284669,0xffc36a];
 const vb=[]; for(let y=0;y<H;y++)for(let z=0;z<D;z++)for(let x=0;x<W;x++){const v=cells[(y*D+z)*W+x]; if(v) vb.push([x,y,z,v-1]);}
 fs.writeFileSync(`${OUT}/${NAME}-struct.json`, JSON.stringify({size:[W,H,D], color:vb.map(b=>COLOR[b[3]]||0xaaaaaa), blocks:vb}));
 fs.writeFileSync(`${OUT}/${NAME}.regdata`, `${W} ${H} ${D}\n${b64}\n`);

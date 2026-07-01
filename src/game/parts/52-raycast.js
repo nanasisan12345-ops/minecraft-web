@@ -97,9 +97,9 @@
   function markChestEmpty(id) {
     CHEST_LOOT.delete(id);
     saveChestLootSoon();
-    if (world.get(id) === CHEST) {
-      const [x, y, z] = id.split(',').map(Number);
-      edits.set(id, OPEN_CHEST);
+    const [x, y, z] = id.split(',').map(Number);
+    if (blockAt(x, y, z) === CHEST) {
+      setEdit(id, OPEN_CHEST);
       saveEditsSoon();
       setBlock(x, y, z, OPEN_CHEST);
       requestEditedBlockRebuild(x, y, z);
@@ -127,7 +127,7 @@
   loadChestLootState();
   function blockPreferredTool(type) {
     if ([STONE, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF].includes(type)) return 'pickaxe';
-    if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, CACTUS, VILLAGE_SIGN, VERMILION].includes(type)) return 'axe';
+    if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN].includes(type)) return 'axe';
     if ([DIRT, GRASS, SAND, SNOW].includes(type)) return 'shovel';
     return null;
   }
@@ -139,6 +139,7 @@
     [GLASS, 0.28], [GLOW_CRYSTAL, 0.9], [DRIPSTONE, 0.72],
     [STONE_BRICK, 1.85], [MOSSY_BRICK, 1.7], [CHEST, 1.15], [OPEN_CHEST, 0.85], [LANTERN, 0.3], [CACTUS, 0.4], [VILLAGE_SIGN, 0.45],
     [VERMILION, 0.85], [PLASTER, 0.9], [ROOF_TILE, 1.45], [GOLD_BLOCK, 1.7], [COPPER_ROOF, 1.45],
+    [TATAMI, 0.45], [SHOJI, 0.32], [NOREN, 0.28], [PAPER_LANTERN, 0.24],
   ]);
   const breakMeter = document.createElement('div');
   breakMeter.id = 'breakMeter';
@@ -159,7 +160,7 @@
     breakMeter.querySelector('span').style.width = '0%';
   }
   function finishBreak(tg) {
-    const [x, y, z] = tg.block; const t = world.get(key(x, y, z)); if (t === undefined) return;
+    const [x, y, z] = tg.block; const t = blockAt(x, y, z); if (t === undefined) return;
     burst(x, y, z, TYPES[t].color);
     const tool = blockPreferredTool(t), held = tool ? bestTool(tool) : null;
     if (t === LEAVES && Math.random() < 0.22) addInventory('apple', 1);
@@ -175,7 +176,7 @@
       addInventory(blockDrop(t), 1 + bonus);
     }
     if (held) damageTool(held.id, [STONE, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK].includes(t) ? 2 : 1);
-    edits.set(key(x, y, z), -1); saveEditsSoon(); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z); thock(150);
+    setEdit(key(x, y, z), -1); saveEditsSoon(); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z); thock(150);
   }
   function breakBlock() {
     const tg = pickTarget(); if (!tg) return;
@@ -183,7 +184,7 @@
   }
   function updateMining(dt, tg) {
     if (!mouseHeld.left || !started || !tg) { resetMining(); return; }
-    const [x, y, z] = tg.block, id = key(x, y, z), t = world.get(id);
+    const [x, y, z] = tg.block, id = key(x, y, z), t = blockAt(x, y, z);
     if (t === undefined || TYPES[t].solid === false) { resetMining(); return; }
     if (MINING.id !== id) { MINING.active = true; MINING.id = id; MINING.progress = 0; MINING.tap = 0; }
     const total = Math.max(0.08, miningTime(t));
@@ -199,7 +200,7 @@
   }
   function openChest(block) {
     const [x, y, z] = block;
-    const id = key(x, y, z), t = world.get(id);
+    const id = key(x, y, z), t = blockAt(x, y, z);
     if (t !== CHEST && t !== OPEN_CHEST) return;
     if (t === CHEST) chestLootFor(id);
     if (typeof openChestPanel === 'function') openChestPanel(id);
@@ -215,13 +216,14 @@
       return;
     }
     const tg = pickTarget(); if (!tg) return;
-    const hitType = world.get(key(tg.block[0], tg.block[1], tg.block[2]));
+    const hitType = blockAt(tg.block[0], tg.block[1], tg.block[2]);
     if (hitType === CRAFTING_TABLE) { toggleCraftPanel('craft'); return; }
     if (hitType === FURNACE) { toggleCraftPanel('smelt'); return; }
     if (hitType === CHEST) { openChest(tg.block); return; }
     if (hitType === OPEN_CHEST) { openChest(tg.block); return; }
     const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
+    if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) return;
     if (isSolid(x, y, z) || overlapsPlayer(x, y, z)) return;
     const ty = currentPlaceType(); if (!consumeInventory(ty, 1)) { thock(90); return; }
-    edits.set(key(x, y, z), ty); saveEditsSoon(); setBlock(x, y, z, ty); requestEditedBlockRebuild(x, y, z); thock(260);
+    setEdit(key(x, y, z), ty); saveEditsSoon(); setBlock(x, y, z, ty); requestEditedBlockRebuild(x, y, z); thock(260);
   }

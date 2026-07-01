@@ -126,6 +126,34 @@
       noise(g, S, 0x47554b, 0.85, 1.08);
       dots(g, S, 0x2f3a32, 0.10, 0.8);
     }),
+    tatami: makeTex((g, S) => {                             // 畳。井草の細い縞＋濃い畳縁。
+      noise(g, S, 0x9aa96a, 0.92, 1.07);
+      for (let x = 0; x < S; x += 2) { g.fillStyle = tint(0x6f7c45, x % 4 === 0 ? 0.95 : 1.05); g.fillRect(x, 0, 1, S); }
+      g.fillStyle = tint(0x42533c, 0.9); g.fillRect(0, 0, 3, S); g.fillRect(S - 3, 0, 3, S);
+      g.fillStyle = 'rgba(230,225,170,0.24)'; g.fillRect(4, 3, S - 8, 1); g.fillRect(4, S - 4, S - 8, 1);
+    }),
+    shoji: makeTex((g, S) => {                              // 障子紙＋木格子。
+      noise(g, S, 0xf3ead2, 0.98, 1.02);
+      g.fillStyle = 'rgba(255,255,255,0.28)'; g.fillRect(0, 0, S, S);
+      g.fillStyle = tint(0x9b6b3c, 0.92);
+      g.fillRect(0, 0, S, 2); g.fillRect(0, S - 2, S, 2); g.fillRect(0, 0, 2, S); g.fillRect(S - 2, 0, 2, S);
+      for (let x = 8; x < S; x += 8) g.fillRect(x, 0, 1, S);
+      for (let y = 8; y < S; y += 8) g.fillRect(0, y, S, 1);
+    }),
+    noren: makeTex((g, S) => {                              // 暖簾。藍染め布の縦割れ。
+      noise(g, S, 0x284669, 0.9, 1.08);
+      g.fillStyle = tint(0x172a42, 0.9); g.fillRect(0, 0, S, 3);
+      g.fillStyle = 'rgba(230,240,255,0.20)'; g.fillRect(5, 7, 5, 2); g.fillRect(20, 7, 5, 2);
+      g.fillStyle = 'rgba(10,20,36,0.55)'; g.fillRect(S / 2 - 1, 4, 2, S - 4);
+      g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(3, 3, 1, S - 5); g.fillRect(18, 3, 1, S - 5);
+    }),
+    paperLantern: makeTex((g, S) => {                       // 赤い提灯。会場用ランタンより和風の紙灯り。
+      noise(g, S, 0xc4382a, 0.9, 1.05);
+      g.fillStyle = tint(0x7a1c16, 0.95); g.fillRect(0, 0, S, 3); g.fillRect(0, S - 3, S, 3);
+      g.fillStyle = 'rgba(255,230,160,0.68)'; g.fillRect(8, 7, S - 16, S - 14);
+      g.fillStyle = 'rgba(255,120,80,0.38)'; for (let y = 6; y < S - 4; y += 5) g.fillRect(4, y, S - 8, 1);
+      g.fillStyle = 'rgba(255,245,200,0.42)'; g.fillRect(S / 2 - 2, 9, 4, S - 18);
+    }),
     glass: makeTex((g, S) => {
       g.clearRect(0, 0, S, S); g.fillStyle = 'rgba(180,232,255,0.2)'; g.fillRect(0, 0, S, S);
       g.fillStyle = 'rgba(225,247,255,0.85)'; g.fillRect(0, 0, S, 2); g.fillRect(0, S - 2, S, 2); g.fillRect(0, 0, 2, S); g.fillRect(S - 2, 0, 2, S);
@@ -253,5 +281,5 @@
   TX.lava.wrapS = TX.lava.wrapT = THREE.RepeatWrapping;
   TX.cactus.userData.normalMap = normalFromCanvas(TX.cactus.image, 2.2);
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
-  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign'])
+  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern'])
     TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);

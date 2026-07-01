@@ -1,5 +1,5 @@
   /* ============== チャンク化ブロックメッシュ（見える面だけを結合） ============== */
-  const CHUNK_SIZE = 24, CHUNK_Y_MIN = 0, CHUNK_Y_MAX = 80;
+  const CHUNK_SIZE = 24, CHUNK_Y_MIN = -64, CHUNK_Y_MAX = 319;
   const terrainChunks = new Map();
   const drawCountsByType = TYPES.map(() => 0);
   const chunkKey = (cx, cz) => cx + ',' + cz;
@@ -35,7 +35,8 @@
     for (let t = 0; t < chunk.meshes.length; t++) {
       drawCountsByType[t] -= chunk.counts[t];
       const mesh = chunk.meshes[t];
-      if (mesh.geometry) mesh.geometry.dispose();
+      // EMPTY_GEO（空タイプ共有ジオメトリ）は使い回すので dispose しない
+      if (mesh.geometry && mesh.geometry !== EMPTY_GEO) mesh.geometry.dispose();
       scene.remove(mesh);
     }
   }

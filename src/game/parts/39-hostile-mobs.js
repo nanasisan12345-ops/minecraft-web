@@ -24,7 +24,7 @@
     const h = heightAt(x, z), top = topTypeAt(x, z, h);
     if (top === WATER || top === SAND) return false;
     if (typeof waterFeatureAt === 'function' && waterFeatureAt(x, z, h)) return false;
-    if (world.has(key(x, h + 1, z)) || structureAffectsColumn(x, z, 1)) return false;
+    if (hasBlock(x, h + 1, z) || structureAffectsColumn(x, z, 1)) return false;
     return true;
   }
   function spawnHostileNearPlayer() {

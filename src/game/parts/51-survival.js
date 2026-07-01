@@ -79,12 +79,12 @@
     if (!(typeof DEBUG !== 'undefined' && DEBUG.fly)) {
       const fx = Math.floor(player.pos.x), fz = Math.floor(player.pos.z);
       const feet = Math.floor(player.pos.y - 0.9);
-      if (world.get(key(fx, feet, fz)) === LAVA || world.get(key(fx, feet + 1, fz)) === LAVA) {
+      if (blockAt(fx, feet, fz) === LAVA || blockAt(fx, feet + 1, fz) === LAVA) {
         damagePlayer(dt * 6);
         SURVIVAL.hurtFlash = 0.8;
       }
       for (const [nx, nz] of [[fx + 1, fz], [fx - 1, fz], [fx, fz + 1], [fx, fz - 1]]) {
-        if (world.get(key(nx, feet, nz)) === CACTUS || world.get(key(nx, feet + 1, nz)) === CACTUS) {
+        if (blockAt(nx, feet, nz) === CACTUS || blockAt(nx, feet + 1, nz) === CACTUS) {
           damagePlayer(dt * 1.6);
           SURVIVAL.hurtFlash = Math.max(SURVIVAL.hurtFlash, 0.4);
           break;

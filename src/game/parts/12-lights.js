@@ -33,8 +33,8 @@
     torchLightClock = 0.18;
     const px = Math.floor(player.pos.x), py = Math.floor(player.pos.y), pz = Math.floor(player.pos.z);
     const found = [];
-    for (let x = px - 13; x <= px + 13; x++) for (let z = pz - 13; z <= pz + 13; z++) for (let y = Math.max(1, py - 8); y <= py + 7; y++) {
-      const type = world.get(key(x, y, z));
+    for (let x = px - 13; x <= px + 13; x++) for (let z = pz - 13; z <= pz + 13; z++) for (let y = Math.max(CHUNK_Y_MIN, py - 8); y <= Math.min(CHUNK_Y_MAX, py + 7); y++) {
+      const type = blockAt(x, y, z);
       if (type !== TORCH && type !== GLOW_CRYSTAL && type !== LANTERN && type !== LAVA) continue;
       found.push({ x, y, z, type, d: Math.hypot(x + 0.5 - player.pos.x, y + 0.5 - player.pos.y, z + 0.5 - player.pos.z) });
     }

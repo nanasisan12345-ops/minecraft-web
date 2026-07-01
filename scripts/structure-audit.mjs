@@ -19,12 +19,12 @@ const NAMES = {
   COAL_ORE:11,IRON_ORE:12,GOLD_ORE:13,DIAMOND_ORE:14,TORCH:15,CRAFTING_TABLE:16,FURNACE:17,
   GLOW_CRYSTAL:18,DRIPSTONE:19,STONE_BRICK:20,MOSSY_BRICK:21,CHEST:22,LANTERN:23,LAVA:24,
   CACTUS:25,OPEN_CHEST:26,VILLAGE_SIGN:27,VERMILION:28,PLASTER:29,ROOF_TILE:30,GOLD_BLOCK:31,COPPER_ROOF:32,
-  BRONZE:33,BRONZE_DARK:34,
+  BRONZE:33,BRONZE_DARK:34,TATAMI:35,SHOJI:36,NOREN:37,PAPER_LANTERN:38,
 };
 const COLOR = [0x6ab04c,0x8a5a2b,0x8b9094,0x6d4c1b,0x3f8a2e,0xe6da9c,0xb5824a,0xa83a2a,0xbfe9ff,0x3a78d8,
   0xf2f7ff,0x35383c,0xc78a55,0xe2b93c,0x55d9e8,0xffb23a,0xb5824a,0x757a7d,0x6df7ff,0x8b8172,
   0x868b8f,0x6f8a5a,0xc79a52,0xffc25a,0xff6a1a,0x4f8f3a,0x9a7038,0xb5824a,0xcf3b1e,0xeae3d2,0x44525c,0xe6c23a,0x4a9e86,
-  0x6f8472,0x47554b];
+  0x6f8472,0x47554b,0x9aa96a,0xf3ead2,0x284669,0xffc36a];
 
 // --- ビルダー/ヘルパー関数を抽出 ---
 function extractFunctions(text) {
@@ -209,6 +209,9 @@ const PLANS = {
   well:        {fn:'addImportedStructure', plan:{type:'well', w:16, d:17}, half:9, baseY:0},
   inari:       {fn:'addImportedStructure', plan:{type:'inari', w:8, d:20}, half:11, baseY:0},
   lighthouse:  {fn:'addImportedStructure', plan:{type:'lighthouse', w:13, d:13}, half:7, baseY:0},
+  teraPrecinct:{fn:'addTeraPrecinct', plan:{type:'teraPrecinct', w:37, d:37}, half:18, baseY:0},
+  jinjaPrecinct:{fn:'addJinjaPrecinct', plan:{type:'jinjaPrecinct', w:35, d:35}, half:17, baseY:0},
+  toriiAvenue: {fn:'addToriiAvenue', plan:{type:'toriiAvenue', w:17, d:31}, halfX:8, halfZ:15, baseY:0},
   jinja:       {fn:'addImportedStructure', plan:{type:'jinja', w:15, d:15}, half:8, baseY:0},
   graveyard:   {fn:'addImportedStructure', plan:{type:'graveyard', w:15, d:15}, half:8, baseY:0},
   teahouse:    {fn:'addTeahouse',    plan:{}, half:5, baseY:1},
@@ -221,9 +224,9 @@ const PLANS = {
 const which = process.argv[3] || 'torii';
 const conf = PLANS[which];
 if (!conf) { console.error('unknown', which, 'choices:', Object.keys(PLANS).join(',')); process.exit(1); }
-const half = conf.half, base = conf.baseY;
-const plan = { x:0, z:0, w:conf.plan.w||half*2+1, d:conf.plan.d||half*2+1, ...conf.plan };
-const box = { base, minX:-half, maxX:half, minZ:-half, maxZ:half };
+const halfX = conf.halfX ?? conf.half, halfZ = conf.halfZ ?? conf.half, base = conf.baseY;
+const plan = { x:0, z:0, w:conf.plan.w||halfX*2+1, d:conf.plan.d||halfZ*2+1, ...conf.plan };
+const box = { base, minX:-halfX, maxX:halfX, minZ:-halfZ, maxZ:halfZ };
 const blocks = buildStructure(conf.fn, plan, box);
 const counts = {};
 for (const t of blocks.values()) counts[t]=(counts[t]||0)+1;

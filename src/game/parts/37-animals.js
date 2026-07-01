@@ -183,7 +183,7 @@
     const top = topTypeAt(x, z, h);
     if (top !== GRASS && top !== SNOW) return false;
     if (typeof waterFeatureAt === 'function' && waterFeatureAt(x, z, h)) return false;
-    if (world.has(key(x, h + 1, z)) || structureAffectsColumn(x, z, 2)) return false;
+    if (hasBlock(x, h + 1, z) || structureAffectsColumn(x, z, 2)) return false;
     const biome = biomeAt(x, z);
     if (biome.id === 'desert' || biome.id === 'highlands') return false;
     return true;

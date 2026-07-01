@@ -1,8 +1,94 @@
 # HANDOFF
 
-最終更新: 2026-06-30
+最終更新: 2026-07-01
 
 ---
+
+## 2026-07-01 追記2: メインスレッド生成の高速化＆カクつき除去（実測で詰めた第2弾）
+
+- ユーザー報告（第1弾でロードは数秒になったが）: 「かくつきはまだある。本家みたいにもっとロード短縮したい」。
+- **実測（`window.__L` に計器を仕込みフォアグラウンドのプレビューで計測）で原因を特定**:
+  - 初期ロードの残りコストは**メインスレッドのプリ生成 `pgWall≒6.4秒**。内訳は terrain(洞窟)フェーズ **2798ms** が支配的、trees 176ms、structures 8ms。
+  - プレイ中のカクつきは1フレームのスパイク: `processRebuildJob` が最大 **90ms**、`processWorldJob` が最大 **29ms**。
+- **修正1: メインスレッド `terrainBlockAt` も列単位キャッシュ化**（`src/game/parts/32-world-window.js`）。ワーカーと同じ `columnDescMain()` を追加し、`waterFeatureAt`/`biomeAt`/`heightAt` を列で1回に。`addCaveDetails` が列あたり約72回 `blockAt` を叩くので効果大。→ terrainフェーズ **2798ms→約700ms**、`pgWall 6.4秒→約1.5秒`。
+- **修正2: 草花の再構築をフレーム予算ジョブ化**（`src/game/parts/36-plants.js`）。`rebuildPlants` は窓全体(約2万列)を毎回同期スキャンし、**窓移動(8ブロックごと)やブロック設置のたびに約90msのスパイク**を出していた。`startPlantRebuild()`＋`processPlantJob()`（`PLANT_JOB_MS=2ms`/フレーム、完了時に count/needsUpdate を一括反映）に分割。→ `rbMax 90ms→約10ms`。`82-weather-and-loop.js` のループで `processPlantJob()` を呼ぶ。
+- **修正3: 空ブロック種のジオメトリ生成を廃止**（`src/game/parts/34-mesh-rebuild.js` / `24-instanced-meshes.js`）。チャンクは約40種すべてに毎回ジオメトリを作っていたが、多くは0個。共有 `EMPTY_GEO` を使い回し、0個の種はジオメトリを生成しない。`disposeTerrainChunk` は `EMPTY_GEO` を dispose しないようガード。→ メッシュ適用スパイク低減。
+- **修正4: 初期プリ生成の予算引き上げ** `PREGEN_JOB_MS 8→13`（ロード中は画面が動かないので大きめOK。プレイ中の `WORLD_JOB_MS=3.5` は据え置き）。
+- **結果（フォアグラウンド計測）**: `pgWall 6433ms→1487ms`。高速飛行(最悪ケース)で `rbMax 90→10ms` / `wjMax 29→17ms` / avg 0.97・3.49ms / 約139fps。通常歩行ではさらに滑らか。地形/木/草花/構造物/村すべて正常描画、console error/warn なし、`errors=0`/`fallbacks=0`。
+- 残りの小スパイク: `wjMax≒17ms` は大型構造物ビルダーが1フレームで丸ごと走るため（新規territory進入時に稀）。分割は複雑で頻度も低いので今回は据え置き。次に詰めるならここ（`collectBuilders`/大型ビルダーのフレーム分割）。
+- 補足: プレビュータブは `document.hidden=true` で rAF がスロットルするため、`preview_stop`→`preview_start` で開き直すとフォアグラウンドで計測できる（本セッションの計測法）。
+
+## 2026-07-01 追記: チャンクメッシュ生成を本家並みに軽量化（1チャンク400ms→37ms＋ワーカー並列化）
+
+- ユーザー報告（前項の索引化の後も継続）: 「やはり重くてカクカクするし、マップが生成されない。20秒くらいたってやっと読み込まれた。本家Minecraftみたいにもっと軽くスムーズに」。
+- **原因を実測で特定**: `src/world-mesh-worker.js` の `buildChunkState()` が **1チャンクあたり約400ms** かかっていた（Node ベンチで確認）。理由は `terrainBlockAt()` が Y ごとに `waterFeatureAt()`（渓谷/川/池ノイズ）・`biomeAt()`・`heightAt()` を呼び直し、さらに各ブロックの6面オクルージョン判定が隣接ブロックで同じ計算を再実行していたため、本来「列(x,z)あたり1回」で済む高価なノイズが **1チャンクで10万回規模** 走っていた。ワーカーは1本で49チャンクを直列に組むので 49×400ms≒**約20秒**＝ユーザーのロード時間に一致。
+- **修正1: 列単位キャッシュ + 列スタック化**（`src/world-mesh-worker.js`）。`columnDesc(x,z)`（h/top/biome/waterFeature/lavaCap/mouth/caveRegion を列で1回だけ計算）と `terrainBlockAtCol()` を追加。`columnStack(x,z)` で列のブロック種を `Int32Array` に一度だけ詰め、メッシュ本体の走査もオクルージョン判定もこの配列を読むだけにした。結果 **1チャンク 約400ms→約37ms（約11倍）**。
+- **修正2: メッシュワーカーのプール化**（`src/game/parts/34-mesh-rebuild.js`）。単一 `meshWorker` を `MESH_WORKER_COUNT = clamp(cores-1, 2..6)` 本のプールに変更し、最も空いているワーカーへ割り振る。8コア機なら6本並列。49チャンクの実時間が `49×37ms/6 ≒ 0.3秒` 程度に。
+- **修正3: メッシュ適用のフレーム予算化**（同上）。完成メッシュ（ワーカー結果もキャッシュヒットも）を `meshApplyQueue` に積み、`drainMeshApplyQueue()` がフレームあたり時間予算内でのみ `BufferGeometry` を生成・適用する（プレイ中3.5ms/初期ロード10ms）。並列ワーカーやキャッシュヒットが同一フレームに集中してもメインスレッドがカクつかない。
+- **修正4: 生成予算の引き上げ**（`src/game/parts/32-world-window.js`）。メッシュ生成がワーカーに逃げたぶん、メインスレッドの `PREGEN_JOB_MS 3.2→8`（初期プリ生成、画面がまだ動かないので大きめOK）、`WORLD_JOB_MS 1.8→3.5`（移動時の追従）に。
+- **出力の同一性を厳密検証**: 最適化前後の worker を Node で突き合わせ、**生ブロック 349,200 ボクセル / メッシュ署名 81 チャンクすべて完全一致**（`.tmp`/scratchpad の bench・verify スクリプト）。見た目は一切変わらない＝**既存 IndexedDB キャッシュ（version 4）もそのまま有効**なので `MESH_WORKER_VERSION` は据え置き。
+- **検証**: `npm.cmd run check` 成功。プレビュー（フォアグラウンドで rAF 稼働時）で初期生成49チャンク→クリック開始→F3飛行で高速移動730ブロック→F7村ワープまで、`errors=0`/`fallbacks=0`、地形チャンク49維持、村（夕星広場）と村人が正しく描画、console error/warn なし。
+- 補足: 実時間計測はプレビュータブが `document.hidden=true` で rAF がスロットルされ不安定なため、ロード時間の定量比較は Node ベンチ（1チャンクのワーカー実時間）で担保した。最終的な体感はユーザーのフォアグラウンドタブで要確認。
+
+## 2026-07-01 追記: マップ端で重くなる/生成が止まる不具合を修正（world/edits の全件走査を排除）
+
+- ユーザー報告: 「マップの端に歩いていくたびに重くてカクカクして、かなり待ってもマップが生成されない」。実ブラウザで発生を確認。
+- 原因: `world`（木・構造物・洞窟装飾）/`airBlocks`（採掘/構造物でくり抜いた空気）/`edits`（プレイヤーの設置・採掘の永続化）はプレイした範囲が広がるほど肥大化する。にもかかわらず `src/game/parts/34-mesh-rebuild.js` の `collectMeshPayload()`（チャンクメッシュ再構築のたびに実行＝ウィンドウ移動のたびに何十回も呼ばれる）と `src/game/parts/32-world-window.js` の `applyEditsInArea()`（未生成領域に入るたびに実行）が、いずれも対象チャンク周辺だけ見れば十分なのに **`for (const … of world/airBlocks/edits)` でMap/Set全件を毎回スキャン**していた。探索が進んで各コレクションが大きくなるほど、1チャンクの再構築コストが線形に悪化し、マップの未踏領域（＝端）に近づくたびに指数的に重くなっていた。
+- 修正: `world`/`airBlocks`/`edits` と並行して **チャンク単位の索引** `worldChunkIndex`/`airChunkIndex`/`editsChunkIndex`（`chunkKey(cx,cz) -> Map/Set`）を追加。`setBlock()`/`deleteBlockKey()`/新設の `setEdit()` で索引を同期更新し、`collectMeshPayload()` は対象チャンク±1（3x3チャンク＝パディング1マス分を包含）だけ、`applyEditsInArea()` は指定矩形が重なるチャンクだけを見るように変更。`edits.set(...)` の直接呼び出し（`52-raycast.js` 3箇所、`loadSavedEdits()`）はすべて `setEdit()` 経由に統一。
+- ついでに見つけた別バグ: `52-raycast.js` の `markChestEmpty()` が `x,y,z` を **分割代入する前に参照**しており（TDZ）、宝箱を空にした瞬間に例外を投げる状態だった。分割代入を条件チェックより前に移動して修正。
+- 確認: `npm.cmd run check` 成功（41ファイル）。プレビューで `F3` 飛行→高速移動→`F7` 村ジャンプ等でウィンドウを何度も大きく動かし、`window.__mcMeshWorkerStats` が `errors=0`/`fallbacks=0` のまま `workerBuilds` が増え続けること、地形チャンク49を維持し続けること、console error/warn なしを確認。葉を壊してベリー取得（`setEdit` 経路）、村へジャンプして構造物・村人が正しく描画されることも確認。
+- 注意: `world`/`airBlocks` は既存の `regenWindow()` cleanup フェーズで生成範囲外になると削除される（索引も追随して削除される）が、`edits`（プレイヤー編集）は意図的に永続化対象で削除されない。長時間プレイで大量に採掘/設置すると `edits` 自体はまだ増え続けるので、将来的に重くなるようなら編集数の外部ストレージ化やチャンク粒度の保存分割も検討候補。
+
+## 2026-07-01 追記: チャンクメッシュ生成を Web Worker 化し IndexedDB に保存
+
+- ユーザー要望: 「生成をWeb Workerへ逃がす」「生成済みチャンクをIndexedDB保存」を追加。
+- 実装: `src/game/parts/34-mesh-rebuild.js` でチャンク再構築を Worker 優先に変更。`collectMeshPayload()` が明示ブロック、削除済み空気、編集差分、構造物/村の水生成抑制列を集め、`src/world-mesh-worker.js` に渡す。Worker 不可/エラー時は従来の同期 `buildChunkState()` にフォールバック。
+- キャッシュ: `indexedDB.open('mc_chunk_mesh_cache', 1)` の `chunks` store に packed mesh を保存。キーは `seed + MESH_WORKER_VERSION + chunk座標 + payload hash`。ブロック編集、木/構造物/洞窟装飾、airBlocks、構造物抑制列が変わると別キーになり、古いメッシュを貼らない。
+- メインスレッド反映: Worker は Three.js を触らず、positions/normals/uvs/indices の ArrayBuffer と material group だけ返す。メイン側で `BufferGeometry` に戻してチャンクへ適用する。移動済みの古いチャンクには結果を貼らない `chunkInCurrentWindow()` ガードあり。
+- 確認: `npm.cmd run assemble` 成功。ブラウザ初回開始で `workerBuilds=49` / `cacheWrites=49` / `errors=0`。同じワールド再読み込み後に `cacheHits=49` / `workerBuilds=0` / `errors=0`。地形チャンク49描画、console error/warnなし。
+
+## 2026-07-01 追記: ワールド上下限を本家相当に拡張、生成負荷を軽量化
+
+- ユーザー要望: 「上方向も下方向も本家と同じくらいに拡張したい」。`CHUNK_Y_MIN=-64` / `CHUNK_Y_MAX=319` に変更し、配置・ライト探索・旅人地面探索・落下死判定・レイキャスト設置上限も同じ範囲に同期。
+- 重要修正: 地形本体が旧 `Y=0` から生成されていた一方で洞窟装飾だけ深層まで走り、旧底面の裏に鍾乳石が大量発生していた。地形生成ループを `CHUNK_Y_MIN` 開始に揃えて修正。
+- 生成負荷対策: 初回プリ生成半径を `max(96, renderDistance+24)` から `max(56, renderDistance+4)` に縮小。1フレームあたりの生成予算も下げ、洞窟領域ノイズは列ごとに一度だけ計算し、チャンクメッシュ再構築は列ごとの実ブロックY範囲だけ走査する。
+- 木の部分生成対策: 移動中に「幹なしの葉だけ」が見える問題を修正。木生成用の余白ぶんは地形も一緒に生成し、木フェーズ完了前の早すぎる再メッシュを止めた。
+- 本家方式寄せ: 自然地形の石・土・水・鉱石は `world Map` に全投入せず、`blockAt()` で座標から計算する暗黙ブロックに変更。`world` は木・構造物・編集・洞窟装飾、`airBlocks` は構造物や採掘でくり抜いた空気差分だけを持つ。メッシュ、採掘、当たり判定、植物、動物、旅人、ダメージ判定は `blockAt()` / `hasBlock()` 経由へ同期。
+- 地下構造: 地下遺跡は概ね `Y=-44..-11`、廃坑は `Y=-48..-17`、地下湖は `Y=-42..-15` 付近へ移動。地上階段は深層から届くよう最大128段に延長。
+- 確認: `npm.cmd run check` 成功。起動中の `http://127.0.0.1:5173/` は HTTP 200。ブラウザリロード後、地形チャンク49描画・console error/warnなし。
+
+## 2026-07-01 引き継ぎ: 次は地下都市 `undergroundCity` を実装する
+
+- ユーザー要望: 「地下を拡大して、地下都市をつくりたい」。次チャットでは **qrafty系の「部屋プール」 + Ancient City系の「中央広場・細道・小住宅・灯り」** を自作実装する。外部データパックの `.nbt`/zip/画像/テクスチャは取り込まず、構成アイデアだけ参考にする。
+- 参考候補:
+  - qrafty's Underground Villages: 地下村/バンカー風。地表から降りる導線、部屋プール、通路接続の参考。
+  - Dungeons and Taverns Ancient City Overhaul: 古代都市風の中央広場、壁、細道、小住宅、灯り、見張り塔の参考。
+  - Dungeons+ / Adventure Dungeons / The Ancient Towns: 大部屋、橋、接続部屋、深層集落の雰囲気参考。
+- 実装方針:
+  - まず `src/game/parts/32-world-window.js` に `undergroundCityPlanForCell()` / `collectUndergroundCityPlans()` / `addUndergroundCityPlan()` を追加するか、既存の廃坑/地下湖ビルダーの近くに統合する。
+  - 地上ランドマークの `structurePlanForCell()` ではなく、**地下構造レイヤー**として `collectBuilders()` に入れる。既存の `mineshaftPlanForCell()` / `collectMineshaftPlans()` / `carveStairUp()` が雛形。
+  - 生成深度はまず `baseY=-52〜-34` 付近。都市全体は 45x45〜57x57 程度。大きすぎる場合は「中央広場 + 4方向の通路 + 部屋モジュール」をセル単位で分割する。
+  - 必ず `put`/`air` 経由で配置し、dirtyStructureChunks の再メッシュ保護に乗せる。直接 `world.set` しない。
+- 地下都市の最小構成:
+  - 中央広場: 9x9〜13x13、高さ6〜8。STONE_BRICK/MOSSY_STONE_BRICK床、中央に井戸または水路、PAPER_LANTERN/LANTERNを吊るす。
+  - 細道: 幅2〜3の十字通路、脇に柱・低い壁・ランタン。天井は一部崩落させて自然洞窟と馴染ませる。
+  - 小住宅: 6〜8部屋。畳/TATAMI、小さなCHEST、SHOJI/NORENを使った地下町家風にする。完全な地上建築ではなく、石壁に木枠を差す。
+  - 市場/倉庫: 樽風の木ブロック、CHEST、作業台風のWOOD/PLANKS台、看板相当のVILLAGE_SIGN。
+  - 光: PAPER_LANTERNを多めに使い、Ancient City風に「暗いが点々と灯る」見た目にする。必要なら追加で新ブロック `SOUL_LANTERN` などを検討。
+  - 地表導線: 既存 `carveStairUp()` で地表へ階段/坑口を開ける。入口は石柱とランタンで「見つけられる」程度にする。
+- デバッグ/検証:
+  - `src/game/parts/49-debug-mode.js` に地下都市へ飛ぶデバッグキーを追加するのが望ましい。既存の `9` 洞窟入口/地下系ジャンプがあれば拡張、なければ `0` の地上JP巡回とは分ける。
+  - `scripts/structure-audit.mjs` は地上構造物用なので、そのままでは地下都市の空洞/部屋検証に弱い。最初は `undergroundCity` 用の簡易PLANを追加して front/iso でブロック密度を確認し、必要なら `air` も可視化する。
+  - 実装後は `npm.cmd run check`、`git diff --check`、ブラウザリロードで console error/warn なしを確認。
+- ドキュメント同期:
+  - 実装したら `README.md` に地下都市/デバッグ移動を追記。
+  - `MINECRAFT_GAP_PLAN.md` に「地下都市 第1弾」完了/残りを追記。
+  - `HANDOFF.md` に構成、ファイル、検証結果、次の拡張候補を追記。
+- 次の拡張候補:
+  - 地下都市の大広間を複数バリエーション化。
+  - 地下住民/商人NPCを配置。
+  - 地下都市専用チェスト報酬。
+  - 地下水路、橋、溶岩炉、崩落区画、古代祭壇を追加。
 
 ## 2026-06-30 追記: ★構造データパック取り込み方式を確立（大仏を実データで作り直し）
 
@@ -34,7 +120,36 @@
 - 汎用方式で `bell`(鐘楼 等倍11×14×13)・`well`(屋根付き井戸 jungle_well 等倍13×12×14)・`inari`(稲荷神社 等倍5×15×17)・`lighthouse`(灯台 2倍10×20×10) を `18-imported-structures.js` に登録。`structurePlanForCell` の jp 分布を再配分（tokyoTower<.02/castle<.045/daibutsu<.065/lighthouse<.085/bell<.115/well<.150/inari<.195/waterTorii<.240/torii<.300/pagoda<.350/teahouse<.380/riceTerrace）。`49-debug-mode.js` の `0` 巡回(JP_ORDER/JP_LABEL)に4つ追加。
 - size/clearTop/dispatch は `importedCells(type)` で全自動なので、追加作業は「regdata 生成→part18 に行追加→jp 分布に type→debug ラベル」だけ。
 - 確認: `npm.cmd run check` 成功（41ファイル）。harness で4つとも配置レンダリング確認（鐘楼=木柱＋反り屋根、井戸=屋根付き、灯台=反り屋根の塔、稲荷=朱鳥居＋石祠）。dev サーバ `127.0.0.1:5190` で目視可。
-- まだ取り込んでいない良候補: `tree1-7`(自然物・別経路で植える必要)・`graveyard`(墓地)・`desert_temple`(砂漠)・`palace`(巨大)・`inn`/`barn`/`house`(村に組み込み)。
+- まだ取り込んでいない良候補: `tree1-7`(自然物・別経路で植える必要)・`desert_temple`(砂漠)・`palace`(巨大)・`inn`/`barn`/`house`(村に組み込み)。
+
+### 2026-06-30 続き3: 神社境内セットと千本鳥居風参道を追加
+- ユーザー指示「どんどん実装して」を受け、単体構造物のバラ置きから一段進めて、複数の取り込み済み構造を組み合わせた探索地点を追加。参照確認では「朱の鳥居、石畳の参道、左右対称の石灯籠、少し高い拝殿、手水舎、鐘楼、森に囲まれた境内」を共通シルエットとして採用。
+- `src/game/parts/32-world-window.js`:
+  - `jinjaPrecinct` を追加。35×35の敷地に、入口の鳥居、石畳の参道、石灯籠列、賽銭箱、取り込み済み `jinja` 拝殿、`bell` 鐘楼、`well` 手水舎風の水場、鎮守の木立、玉垣を配置。
+  - `toriiAvenue` を追加。17×31の細長い敷地に、連続する朱鳥居、石畳の参道、灯籠、奥の `inari` を配置。千本鳥居風の「奥へ進みたくなる」ランドマーク枠。
+  - `structurePlanForCell()` の和風抽選に `jinjaPrecinct` / `toriiAvenue` を追加し、`structureBase` 平坦許容・`clearTop`・dispatch を同期。
+- `src/game/parts/49-debug-mode.js`: `0` 順送りに `千本鳥居風参道` と `神社境内` を追加。正面から見下ろす位置へ飛ぶ専用カメラ位置にした。
+- `scripts/structure-audit.mjs`: `jinjaPrecinct` / `toriiAvenue` を PLANS に追加し、矩形ランドマーク用に `halfX` / `halfZ` を扱えるよう拡張。
+- `README.md` / `MINECRAFT_GAP_PLAN.md` を同期。
+- 確認: `node scripts/structure-audit.mjs . jinjaPrecinct` 成功（3084 blocks、front/iso PNGを目視）。`node scripts/structure-audit.mjs . toriiAvenue` 成功（1118 blocks、front/iso PNGを目視）。`npm.cmd run check` 成功（41ファイル、Vite build + 35 runtime asset copy）。`git diff --check` は改行警告のみで空白エラーなし。
+
+### 2026-06-30 続き4: Tachibana TEX 3Dを参照し、和風内装ブロックを自前追加
+- ユーザー提示URL: `https://tachibana11111.wixsite.com/tachibana-tex-3d`。サイト本文では配布物の紹介/カタログと規約更新情報を確認。配布zip同梱規約までは読んでいないため安全側に倒し、**画像/zip/モデルは取り込まず、カタログを和風ディテールの参照としてのみ利用**。公開リポジトリ/Pagesに外部素材は含めていない。
+- `src/game/parts/20-textures.js` / `22-block-types.js`: 新ブロック `TATAMI=35`（畳）・`SHOJI=36`（障子、半透明）・`NOREN=37`（暖簾）・`PAPER_LANTERN=38`（提灯、発光）を自前Canvasテクスチャで追加。既存IDの後ろに足したので既存ワールドIDは崩さない。
+- `src/game/parts/32-world-window.js`: 茶屋を畳床＋障子壁＋暖簾＋提灯に更新。神社境内の拝殿前に暖簾/提灯/畳を追加し、千本鳥居風参道の灯りを提灯へ置換。
+- `src/game/parts/52-raycast.js`: 新ブロックの採掘ツール/硬さを追加（木系扱い）。採掘すればインベントリから再設置可能。
+- `scripts/structure-audit.mjs`: 新ブロックID/色を追加。`scripts/import-structure.mjs`: 将来の `.nbt` 取り込み用に hay/carpet→畳、banner→暖簾、paper/white_wool→障子、lantern/torch→提灯へマップできるよう更新（既存登録済み構造データは変わらない）。
+- 確認: `node scripts/structure-audit.mjs . teahouse` 成功（516 blocks、畳81/障子106/暖簾1/提灯1、front/iso PNG目視）。`jinjaPrecinct` / `toriiAvenue` 再監査成功。`npm.cmd run check` 成功（41ファイル、Vite build + 35 runtime asset copy）。`git diff --check` は改行警告のみ。
+
+### 2026-06-30 続き5: 大きな寺セット `teraPrecinct` を追加
+- ユーザー指示「どんどん実装して」を受け、神社境内と対になる仏教寺院系の探索地点を追加。参照確認では「山門、本堂、石灯籠の直線参道、五重塔、鐘楼、墓地、庭木/庭池」を共通要素として採用。
+- `src/game/parts/32-world-window.js`:
+  - `teraPrecinct` を追加。37×37の敷地に、瓦屋根の山門、畳床＋障子＋暖簾＋提灯の本堂、取り込み済み `pagoda` 五重塔、`bell` 鐘楼、`graveyard` 墓地、石灯籠の参道、庭池、松風の木立を配置。
+  - `structurePlanForCell()` の和風抽選に `teraPrecinct` を追加し、サイズ `[37,37]`、`structureBase` 平坦許容、`clearTop=base+34`、dispatch を同期。
+- `src/game/parts/49-debug-mode.js`: `0` 順送りに `大きな寺` を追加。神社境内/鳥居参道と同じ正面見下ろしカメラ位置へ飛ぶ。
+- `scripts/structure-audit.mjs`: `teraPrecinct` を PLANS に追加。
+- `README.md` / `MINECRAFT_GAP_PLAN.md` を同期。
+- 確認: `node scripts/structure-audit.mjs . teraPrecinct` 成功（3852 blocks、front/iso PNGを目視。新ブロック: 畳77/障子147/暖簾2/提灯5）。`npm.cmd run check` 成功（41ファイル、Vite build + 35 runtime asset copy）。`git diff --check` は改行警告のみ。`http://127.0.0.1:5173/` HTTP 200、ブラウザリロードでcanvas表示・console error/warnなし。
 
 
 ## 2026-06-30 追記: 日本ランドマークを参照画像と見比べて作り直し（第1弾）

@@ -123,8 +123,8 @@
     setDebugToast(`富士山頂へ移動: ${x}, ${z}`);
   }
 
-  const JP_ORDER = ['torii', 'waterTorii', 'pagoda', 'teahouse', 'castle', 'daibutsu', 'riceTerrace', 'tokyoTower', 'lighthouse', 'bell', 'well', 'inari', 'jinja', 'graveyard', 'watchtower'];
-  const JP_LABEL = { torii: '鳥居', waterTorii: '水上鳥居', pagoda: '五重塔', teahouse: '茶屋', castle: '天守閣', daibutsu: '大仏', riceTerrace: '棚田', tokyoTower: '東京タワー風タワー', lighthouse: '灯台', bell: '鐘楼', well: '屋根付き井戸', inari: '稲荷神社', jinja: '神社', graveyard: '墓地', watchtower: '見張り櫓' };
+  const JP_ORDER = ['torii', 'waterTorii', 'toriiAvenue', 'teraPrecinct', 'pagoda', 'teahouse', 'castle', 'daibutsu', 'riceTerrace', 'tokyoTower', 'lighthouse', 'jinjaPrecinct', 'bell', 'well', 'inari', 'jinja', 'graveyard', 'watchtower'];
+  const JP_LABEL = { torii: '鳥居', waterTorii: '水上鳥居', toriiAvenue: '千本鳥居風参道', teraPrecinct: '大きな寺', pagoda: '五重塔', teahouse: '茶屋', castle: '天守閣', daibutsu: '大仏', riceTerrace: '棚田', tokyoTower: '東京タワー風タワー', lighthouse: '灯台', jinjaPrecinct: '神社境内', bell: '鐘楼', well: '屋根付き井戸', inari: '稲荷神社', jinja: '神社', graveyard: '墓地', watchtower: '見張り櫓' };
   let jpCycleIdx = 0;
   // 0キーを押すたびに和風ランドマークの種類を切り替えて最寄りへ飛ぶ。
   function teleportToNearbyJapanese() {
@@ -150,6 +150,10 @@
       player.pos.set(p.x + 0.5, b + 10, p.z - Math.floor(p.d / 2) - 16 + 0.5);
       yaw = Math.PI;
       pitch = -0.22;
+    } else if (type === 'teraPrecinct' || type === 'jinjaPrecinct' || type === 'toriiAvenue') {
+      player.pos.set(p.x + 0.5, b + 12, p.z - Math.floor(p.d / 2) - 12 + 0.5);
+      yaw = Math.PI;
+      pitch = -0.18;
     } else {
       const flyY = type === 'tokyoTower' ? b + 32 : b + 6;
       player.pos.set(p.x + 0.5, flyY, p.z + 0.5);
