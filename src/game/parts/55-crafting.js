@@ -1,70 +1,195 @@
-  /* ============== クラフト / かまど ============== */
+  /* ============== クラフトレシピ（形合わせ判定） + かまど精錬ロジック ==============
+   * レシピは pattern（行の配列）と keys（文字 -> アイテムID）で定義する。
+   * グリッド内の配置を外接矩形に切り出して比較するので、2x2/3x3のどこに置いてもよい。
+   * 左右反転も一致とみなす（斧などの利き手違い）。 */
   const RECIPES = [
-    { id: 'planks', name: '板材 x4', out: PLANKS, amount: 4, cost: [[LOG, 1]] },
-    { id: 'stick', name: '棒 x4', out: 'stick', amount: 4, cost: [[PLANKS, 2]] },
-    { id: 'crafting', name: '作業台', out: CRAFTING_TABLE, amount: 1, cost: [[PLANKS, 4]] },
-    { id: 'furnace', name: 'かまど', out: FURNACE, amount: 1, cost: [[STONE, 8]] },
-    { id: 'torch', name: 'たいまつ x4', out: TORCH, amount: 4, cost: [['coal', 1], ['stick', 1]] },
-    { id: 'woodPickaxe', name: '木のツルハシ', out: 'woodPickaxe', amount: 1, cost: [[PLANKS, 3], ['stick', 2]] },
-    { id: 'stonePickaxe', name: '石のツルハシ', out: 'stonePickaxe', amount: 1, cost: [[STONE, 3], ['stick', 2]] },
-    { id: 'ironPickaxe', name: '鉄のツルハシ', out: 'ironPickaxe', amount: 1, cost: [['ironIngot', 3], ['stick', 2]] },
-    { id: 'woodAxe', name: '木の斧', out: 'woodAxe', amount: 1, cost: [[PLANKS, 3], ['stick', 2]] },
-    { id: 'stoneAxe', name: '石の斧', out: 'stoneAxe', amount: 1, cost: [[STONE, 3], ['stick', 2]] },
-    { id: 'woodShovel', name: '木のシャベル', out: 'woodShovel', amount: 1, cost: [[PLANKS, 1], ['stick', 2]] },
-    { id: 'stoneShovel', name: '石のシャベル', out: 'stoneShovel', amount: 1, cost: [[STONE, 1], ['stick', 2]] },
+    { out: 'planks', n: 4, pattern: ['L'], keys: { L: 'log' } },
+    { out: 'stick', n: 4, pattern: ['P', 'P'], keys: { P: 'planks' } },
+    { out: 'crafting_table', n: 1, pattern: ['PP', 'PP'], keys: { P: 'planks' } },
+    { out: 'furnace', n: 1, pattern: ['CCC', 'C C', 'CCC'], keys: { C: 'cobblestone' } },
+    { out: 'chest', n: 1, pattern: ['PPP', 'P P', 'PPP'], keys: { P: 'planks' } },
+    { out: 'torch', n: 4, pattern: ['O', 'S'], keys: { O: 'coal', S: 'stick' } },
+    { out: 'cloth', n: 1, pattern: ['FF', 'FF'], keys: { F: 'fiber' } },
+    { out: 'bread', n: 1, pattern: ['WWW'], keys: { W: 'wheat' } },
+    { out: 'bed', n: 1, pattern: ['CCC', 'PPP'], keys: { C: 'cloth', P: 'planks' } },
+    { out: 'stone_brick', n: 4, pattern: ['TT', 'TT'], keys: { T: 'stone' } },
+    // ツルハシ
+    { out: 'wood_pickaxe', n: 1, pattern: ['MMM', ' S ', ' S '], keys: { M: 'planks', S: 'stick' } },
+    { out: 'stone_pickaxe', n: 1, pattern: ['MMM', ' S ', ' S '], keys: { M: 'cobblestone', S: 'stick' } },
+    { out: 'iron_pickaxe', n: 1, pattern: ['MMM', ' S ', ' S '], keys: { M: 'iron_ingot', S: 'stick' } },
+    { out: 'diamond_pickaxe', n: 1, pattern: ['MMM', ' S ', ' S '], keys: { M: 'diamond', S: 'stick' } },
+    // 斧
+    { out: 'wood_axe', n: 1, pattern: ['MM', 'MS', ' S'], keys: { M: 'planks', S: 'stick' } },
+    { out: 'stone_axe', n: 1, pattern: ['MM', 'MS', ' S'], keys: { M: 'cobblestone', S: 'stick' } },
+    { out: 'iron_axe', n: 1, pattern: ['MM', 'MS', ' S'], keys: { M: 'iron_ingot', S: 'stick' } },
+    // シャベル
+    { out: 'wood_shovel', n: 1, pattern: ['M', 'S', 'S'], keys: { M: 'planks', S: 'stick' } },
+    { out: 'stone_shovel', n: 1, pattern: ['M', 'S', 'S'], keys: { M: 'cobblestone', S: 'stick' } },
+    { out: 'iron_shovel', n: 1, pattern: ['M', 'S', 'S'], keys: { M: 'iron_ingot', S: 'stick' } },
+    // 剣
+    { out: 'wood_sword', n: 1, pattern: ['M', 'M', 'S'], keys: { M: 'planks', S: 'stick' } },
+    { out: 'stone_sword', n: 1, pattern: ['M', 'M', 'S'], keys: { M: 'cobblestone', S: 'stick' } },
+    { out: 'iron_sword', n: 1, pattern: ['M', 'M', 'S'], keys: { M: 'iron_ingot', S: 'stick' } },
+    { out: 'diamond_sword', n: 1, pattern: ['M', 'M', 'S'], keys: { M: 'diamond', S: 'stick' } },
   ];
-  const SMELT_RECIPES = [
-    { id: 'iron', name: '粗鉄 -> 鉄インゴット', in: 'rawIron', out: 'ironIngot', cost: [['rawIron', 1], ['coal', 1]] },
-    { id: 'gold', name: '粗金 -> 金インゴット', in: 'rawGold', out: 'goldIngot', cost: [['rawGold', 1], ['coal', 1]] },
-    { id: 'glass', name: '砂 -> ガラス', in: SAND, out: GLASS, cost: [[SAND, 1], ['coal', 1]] },
-  ];
-
-  const craftPanel = document.createElement('div');
-  craftPanel.id = 'craftPanel';
-  craftPanel.innerHTML = `<div class="craft-head"><b>クラフト</b><button data-close="1">閉じる</button></div><div class="craft-tools"></div><div class="craft-list"></div>`;
-  document.body.appendChild(craftPanel);
-
-  function costText(cost) {
-    return cost.map(([id, amount]) => `${itemLabel(id)} ${inventoryCount(id)}/${amount}`).join(' ・ ');
+  // レシピの pattern を [ [id|null,...], ... ] に正規化してキャッシュ
+  for (const r of RECIPES) {
+    r.rows = r.pattern.map(row => [...row].map(ch => (ch === ' ' ? null : r.keys[ch])));
+    r.mirror = r.rows.map(row => [...row].reverse());
   }
-  function closeCraftPanel() {
-    craftPanel.classList.remove('show');
+  // グリッド（item|null の配列, 幅w）から非空セルの外接矩形を id の行列で切り出す
+  function craftGridRows(cells, w) {
+    const h = Math.ceil(cells.length / w);
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (!cells[y * w + x]) continue;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+    if (maxX < 0) return null;
+    const rows = [];
+    for (let y = minY; y <= maxY; y++) {
+      const row = [];
+      for (let x = minX; x <= maxX; x++) { const s = cells[y * w + x]; row.push(s ? s.id : null); }
+      rows.push(row);
+    }
+    return rows;
   }
-  function toggleCraftPanel(mode = 'craft') {
-    const showing = craftPanel.classList.contains('show') && craftPanel.dataset.mode === mode;
-    if (showing) { closeCraftPanel(); return; }
-    craftPanel.dataset.mode = mode;
-    craftPanel.classList.add('show');
-    releasePointerForUi();
-    updateCraftPanel();
+  function rowsEqual(a, b) {
+    if (a.length !== b.length) return false;
+    for (let y = 0; y < a.length; y++) {
+      if (a[y].length !== b[y].length) return false;
+      for (let x = 0; x < a[y].length; x++) if (a[y][x] !== b[y][x]) return false;
+    }
+    return true;
   }
-  function doRecipe(recipe) {
-    if (!consumeMany(recipe.cost)) { thock(90); updateCraftPanel(); return; }
-    addInventory(recipe.out, recipe.amount || 1);
-    thock(300);
-    updateCraftPanel();
+  // グリッドに一致するレシピを返す（なければ null）
+  function matchRecipe(cells, w) {
+    const rows = craftGridRows(cells, w);
+    if (!rows) return null;
+    for (const r of RECIPES) {
+      if (r.rows.length > w || r.rows[0].length > w) continue; // 2x2グリッドに3x3レシピは組めない
+      if (rowsEqual(rows, r.rows) || rowsEqual(rows, r.mirror)) return r;
+    }
+    return null;
   }
-  function updateCraftPanel() {
-    if (!craftPanel || !craftPanel.classList.contains('show')) return;
-    const mode = craftPanel.dataset.mode || 'craft';
-    const list = craftPanel.querySelector('.craft-list');
-    const tools = craftPanel.querySelector('.craft-tools');
-    const recipes = mode === 'smelt' ? SMELT_RECIPES : RECIPES;
-    craftPanel.querySelector('.craft-head b').textContent = mode === 'smelt' ? 'かまど' : 'クラフト';
-    tools.innerHTML = `<button data-mode="craft"${mode === 'craft' ? ' class="on"' : ''}>作業台</button><button data-mode="smelt"${mode === 'smelt' ? ' class="on"' : ''}>かまど</button>`;
-    list.innerHTML = '';
-    for (const recipe of recipes) {
-      const btn = document.createElement('button');
-      btn.className = 'recipe';
-      btn.disabled = !hasInventory(recipe.cost);
-      btn.innerHTML = `<span>${recipe.name}</span><small>${costText(recipe.cost)}</small>`;
-      btn.addEventListener('click', () => doRecipe(recipe));
-      list.appendChild(btn);
+  // クラフト実行: 各セルを1個ずつ消費
+  function consumeCraftGrid(cells) {
+    for (let i = 0; i < cells.length; i++) {
+      const s = cells[i];
+      if (!s) continue;
+      s.n -= 1;
+      if (s.n <= 0) cells[i] = null;
     }
   }
-  craftPanel.addEventListener('click', e => {
-    const close = e.target.closest('[data-close]');
-    const mode = e.target.closest('[data-mode]');
-    if (close) closeCraftPanel();
-    if (mode) toggleCraftPanel(mode.dataset.mode);
-  });
+
+  /* --- かまど --- */
+  const SMELT_TIME = 10; // 1アイテムの精錬秒数
+  const SMELT_RESULT = {
+    raw_iron: 'iron_ingot',
+    raw_gold: 'gold_ingot',
+    sand: 'glass',
+    raw_meat: 'cooked_meat',
+    cobblestone: 'stone',
+    log: 'coal', // 木炭の代わり
+  };
+  function furnaceState(id) {
+    let st = SAVE.furnaces[id];
+    if (!st) { st = { in: null, fuel: null, out: null, prog: 0, fuelLeft: 0, fuelMax: 0 }; SAVE.furnaces[id] = st; }
+    return st;
+  }
+  function furnaceCanSmelt(st) {
+    if (!st.in) return false;
+    const outId = SMELT_RESULT[st.in.id];
+    if (!outId) return false;
+    if (st.out && (st.out.id !== outId || st.out.n >= maxStack(outId))) return false;
+    return true;
+  }
+  function updateFurnaces(dt) {
+    let changed = false;
+    for (const id of Object.keys(SAVE.furnaces)) {
+      const st = SAVE.furnaces[id];
+      const canSmelt = furnaceCanSmelt(st);
+      // 燃料の点火
+      if (st.fuelLeft <= 0 && canSmelt && st.fuel) {
+        const fdef = ITEM_DEFS[st.fuel.id];
+        if (fdef && fdef.fuel) {
+          st.fuel.n -= 1;
+          if (st.fuel.n <= 0) st.fuel = null;
+          st.fuelLeft = st.fuelMax = fdef.fuel * SMELT_TIME;
+          changed = true;
+        }
+      }
+      if (st.fuelLeft > 0) {
+        st.fuelLeft = Math.max(0, st.fuelLeft - dt);
+        if (canSmelt) {
+          st.prog += dt;
+          if (st.prog >= SMELT_TIME) {
+            st.prog = 0;
+            const outId = SMELT_RESULT[st.in.id];
+            st.in.n -= 1;
+            if (st.in.n <= 0) st.in = null;
+            if (st.out) st.out.n += 1; else st.out = mkItem(outId, 1);
+            changed = true;
+            if (typeof progressEvent === 'function') progressEvent('smelt', outId);
+          }
+        } else {
+          st.prog = 0;
+        }
+      } else if (!canSmelt || !st.fuel) {
+        st.prog = Math.max(0, st.prog - dt * 2);
+      }
+      // 空のかまど状態は保存から掃除する
+      if (!st.in && !st.fuel && !st.out && st.prog <= 0 && st.fuelLeft <= 0) { delete SAVE.furnaces[id]; changed = true; }
+    }
+    if (changed) {
+      markSaveDirty();
+      if (typeof refreshOpenPanels === 'function') refreshOpenPanels();
+    }
+  }
+  // かまど/チェストを壊したときに中身をプレイヤーへ渡す
+  function spillFurnace(id) {
+    const st = SAVE.furnaces[id];
+    if (!st) return;
+    for (const s of [st.in, st.fuel, st.out]) if (s) giveItem(s.id, s.n, s.dur);
+    delete SAVE.furnaces[id];
+    markSaveDirty();
+  }
+
+  /* --- チェスト（27スロットの本物のコンテナ） --- */
+  const CHEST_SLOTS = 27;
+  function chestSlots(id) {
+    let arr = SAVE.chests[id];
+    if (!Array.isArray(arr) || arr.length !== CHEST_SLOTS) {
+      arr = new Array(CHEST_SLOTS).fill(null);
+      SAVE.chests[id] = arr;
+    }
+    return arr;
+  }
+  // ワールド生成チェスト（遺跡/廃坑/構造物）は初回オープン時に探索報酬を入れる
+  function rollWorldChestLoot(id) {
+    if (SAVE.chestSeen[id]) return;
+    SAVE.chestSeen[id] = 1;
+    const slots = chestSlots(id);
+    const pool = [
+      ['coal', 2, 6], ['raw_iron', 1, 4], ['raw_gold', 1, 2], ['diamond', 1, 2], ['iron_ingot', 1, 2],
+      ['apple', 1, 3], ['bread', 1, 2], ['berries', 2, 5], ['torch', 2, 6], ['stick', 2, 6],
+      ['planks', 3, 8], ['glow_shard', 1, 2], ['fiber', 2, 5], ['cloth', 1, 2], ['wheat', 1, 3],
+    ];
+    const picks = 3 + (Math.random() * 3 | 0);
+    for (let i = 0; i < picks; i++) {
+      const e = pool[Math.random() * pool.length | 0];
+      const item = mkItem(e[0], e[1] + (Math.random() * (e[2] - e[1] + 1) | 0));
+      const slot = Math.random() * CHEST_SLOTS | 0;
+      if (!slots[slot]) slots[slot] = item;
+      else mergeIntoSlots(slots, item);
+    }
+    markSaveDirty();
+    if (typeof progressEvent === 'function') progressEvent('chestLoot', id);
+  }
+  function spillChest(id) {
+    const arr = SAVE.chests[id];
+    if (arr) for (const s of arr) if (s) giveItem(s.id, s.n, s.dur);
+    delete SAVE.chests[id];
+    markSaveDirty();
+  }

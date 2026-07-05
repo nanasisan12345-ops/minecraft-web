@@ -25,6 +25,47 @@
     hedgehog: { scale: 0.5, speed: 0.78, turn: 1.1, turnMin: 1.4, turnMax: 3.4, pauseChance: 0.5, pauseMin: 0.25, pauseMax: 1.0, bob: 0.018, step: 7.0 },
     sparrow: { scale: 0.36, speed: 1.65, turn: 1.7, turnMin: 0.8, turnMax: 2.1, pauseChance: 0.42, pauseMin: 0.1, pauseMax: 0.45, bob: 0.045, step: 12.0 },
   };
+  // 動物のHPとドロップ（攻撃すると生肉などが手に入る。羊は布も落とす）
+  const ANIMAL_HP = { cow: 10, sheep: 8, pig: 8, chicken: 4, deer: 8, squirrel: 3, duck: 4, bear: 16, hedgehog: 3, sparrow: 2 };
+  const ANIMAL_DROPS = {
+    cow: [['raw_meat', 1, 3]],
+    sheep: [['raw_meat', 1, 2], ['cloth', 1, 2]],
+    pig: [['raw_meat', 1, 2]],
+    chicken: [['raw_meat', 1, 1], ['fiber', 0, 1]],
+    deer: [['raw_meat', 1, 2]],
+    bear: [['raw_meat', 2, 3]],
+    duck: [['raw_meat', 1, 1]],
+    squirrel: [['raw_meat', 0, 1]],
+    hedgehog: [['raw_meat', 0, 1]],
+    sparrow: [['fiber', 0, 1]],
+  };
+  function damageAnimal(a, dmg, dir) {
+    const u = a.userData;
+    if (u.hp == null) u.hp = ANIMAL_HP[u.kind] || 6;
+    u.hp -= dmg;
+    burst(a.position.x - 0.5, a.position.y + 0.4, a.position.z - 0.5, 0xcc4444);
+    thock(200);
+    if (u.hp <= 0) {
+      for (const [id, lo, hi] of (ANIMAL_DROPS[u.kind] || [])) {
+        const n = lo + (Math.random() * (hi - lo + 1) | 0);
+        if (n > 0) giveItem(id, n);
+      }
+      const i = ANIMALS.indexOf(a);
+      if (i >= 0) ANIMALS.splice(i, 1);
+      scene.remove(a);
+      if (typeof progressEvent === 'function') progressEvent('kill', u.kind);
+      return;
+    }
+    // 逃げる（プレイヤーと反対方向へ）
+    if (dir) {
+      u.turnTo = Math.atan2(dir.x, dir.z);
+      u.dir = u.turnTo;
+      u.idleTime = 0;
+      u.nextTurn = rnd(1.2, 2.2);
+      a.position.x += dir.x * 0.5;
+      a.position.z += dir.z * 0.5;
+    }
+  }
   const animalMatCache = new Map();
   let animalSpawnClock = 0;
   function animalMat(color) {

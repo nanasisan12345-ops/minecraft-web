@@ -1,47 +1,34 @@
-  /* ============== ホットバー UI ============== */
+  /* ============== ホットバーUI（9枠・スロット式） ============== */
   const hotbar = document.getElementById('hotbar');
-  HOTBAR.forEach((typeIdx, i) => {
-    const slot = document.createElement('div'); slot.className = 'slot';
-    slot.innerHTML = `<span class="sw"></span><b>${i + 1}</b><small>${TYPES[typeIdx].name}</small><em></em>`;
-    slot.querySelector('.sw').style.backgroundImage = `url(${TYPES[typeIdx].icon.image.toDataURL()})`;
+  const hotbarSlots = [];
+  for (let i = 0; i < HOTBAR_SIZE; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    slot.innerHTML = `<b>${i + 1}</b><div class="sl-body"></div><small></small>`;
     slot.addEventListener('click', () => selectSlot(i));
     hotbar.appendChild(slot);
-  });
-  function selectSlot(i, keepOverride = false) {
-    selected = i;
-    if (!keepOverride && typeof clearHeldOverride === 'function') clearHeldOverride();
-    [...hotbar.children].forEach((s, idx) => s.classList.toggle('on', idx === selected));
+    hotbarSlots.push(slot);
   }
-  function updateHotbarCounts() {
-    [...hotbar.children].forEach((slot, i) => {
-      const n = inventoryCount(HOTBAR[i]);
-      slot.classList.toggle('empty', n <= 0);
-      slot.querySelector('em').textContent = n;
-    });
+  function selectSlot(i) {
+    selected = ((i % HOTBAR_SIZE) + HOTBAR_SIZE) % HOTBAR_SIZE;
+    SAVE.selected = selected;
+    markSaveDirty();
+    updateHotbarUI();
   }
-  selectSlot(0);
-  updateHotbarCounts();
+  function updateHotbarUI() {
+    for (let i = 0; i < HOTBAR_SIZE; i++) {
+      const slot = hotbarSlots[i];
+      const item = INV[i];
+      slot.classList.toggle('on', i === selected);
+      slot.classList.toggle('empty', !item);
+      const body = slot.querySelector('.sl-body');
+      renderSlotContent(body, item);
+      slot.querySelector('small').textContent = item && i === selected ? ITEM_DEFS[item.id].name : '';
+    }
+  }
+  updateHotbarUI();
   const stats = document.getElementById('stats');
-  const foodHud = document.createElement('div');
-  foodHud.id = 'foodHud';
-  document.body.appendChild(foodHud);
-  function foodHudButton(id) {
-    const def = ITEMS[id];
-    const n = inventoryCount(id);
-    return `<button data-food="${id}"${n <= 0 ? ' disabled' : ''}><span>${def.name}</span><b>${n}</b><small>+${def.food}</small></button>`;
+  function selectedItemName() {
+    const s = INV[selected];
+    return s ? `${ITEM_DEFS[s.id].name}${s.n > 1 ? ' x' + s.n : ''}` : '素手';
   }
-  function updateFoodHud() {
-    const tool = bestTool('pickaxe') || bestTool('axe') || bestTool('shovel');
-    const toolText = tool ? `${tool.name} ${toolDurabilityText(tool.id)}` : '道具なし';
-    foodHud.innerHTML = `<div class="food-actions">${foodHudButton('apple')}${foodHudButton('berries')}</div><div class="tool-durability">${toolText}</div>`;
-  }
-  foodHud.addEventListener('click', e => {
-    const btn = e.target.closest('[data-food]');
-    if (!btn) return;
-    eatInventoryFood(btn.dataset.food);
-  });
-  addEventListener('keydown', e => {
-    if (e.code !== 'KeyH' || !started) return;
-    if (eatInventoryFood('apple') || eatInventoryFood('berries')) e.preventDefault();
-  });
-  updateFoodHud();

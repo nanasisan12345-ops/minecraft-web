@@ -92,7 +92,7 @@
     requestAnimationFrame(animate);
     const now = performance.now(), dt = Math.min((now - prev) / 1000, 0.05); prev = now;
 
-    if (started) {
+    if (started && !SURVIVAL.dead) {
       const f = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
       const s = (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0);
       let mx = -Math.sin(yaw) * f + Math.cos(yaw) * s, mz = -Math.cos(yaw) * f - Math.sin(yaw) * s;
@@ -148,6 +148,11 @@
     updateTravelers(dt);
     updateFireflies(dt);
     updateHostileMobs(dt);
+    updatePlayerAttack(dt);
+    updateFurnaces(dt);
+    updateFurnaceBars();
+    updateProgress(dt);
+    updateAutosave(dt);
     raveUpdate(dt);
     updateDayNight(dt);
     updateWeather(dt);
@@ -161,9 +166,20 @@
     const px = Math.floor(player.pos.x), pz = Math.floor(player.pos.z);
     const biomeLabel = biomeLabelAt(px, pz);
     const villageLabel = typeof villageLabelAt === 'function' ? villageLabelAt(px, pz) : '';
-    stats.textContent = `XYZ ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}　　選択: ${currentPlaceName()}　　地形チャンク: ${terrainChunkCount()}　　バイオーム: ${biomeLabel}${villageLabel ? '　　村: ' + villageLabel : ''}${RAVE.on ? '' : '　　時間: ' + DAY.label + '　　天候: ' + weatherLabel}${raveStatsText()}`;
+    stats.textContent = `XYZ ${player.pos.x.toFixed(1)} / ${player.pos.y.toFixed(1)} / ${player.pos.z.toFixed(1)}　　手持ち: ${selectedItemName()}　　地形チャンク: ${terrainChunkCount()}　　バイオーム: ${biomeLabel}${villageLabel ? '　　村: ' + villageLabel : ''}${RAVE.on ? '' : '　　時間: ' + DAY.label + '　　天候: ' + weatherLabel}${raveStatsText()}`;
     renderer.render(scene, camera);
   }
   regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z)); // 初期生成
   animate();
   window.__mcReady = true;
+  // 動作検証用のデバッグフック（本番でも軽量なので常時公開）
+  window.__mcDbg = {
+    give: (id, n = 1) => giveItem(id, n),
+    inv: () => INV,
+    save: () => SAVE,
+    survival: SURVIVAL,
+    mobs: () => MOBS,
+    day: DAY,
+    setTime: (t) => { DAY.time = t; },
+    damage: (n) => damagePlayer(n, 'デバッグ'),
+  };

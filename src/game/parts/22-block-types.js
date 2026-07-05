@@ -52,6 +52,8 @@
     { name: '障子', color: 0xf3ead2, icon: T.shoji, mats: faceMats(T.shoji, { transparent: true, opacity: 0.86, depthWrite: false }), transparent: true }, // 36
     { name: '暖簾', color: 0x284669, icon: T.noren, mats: faceMats(T.noren) }, // 37
     { name: '提灯', color: 0xffc36a, icon: T.paperLantern, mats: faceMats(T.paperLantern, { emissive: 0xff9c44, emissiveIntensity: 0.72, shininess: 12, specular: 0x442000 }) }, // 38
+    { name: '丸石', color: 0x7d8286, icon: T.cobble, mats: faceMats(T.cobble) }, // 39
+    { name: 'ベッド', color: 0xb03030, icon: T.bedTop, mats: faceMats([T.bedSide, T.bedSide, T.bedTop, T.bedSide, T.bedSide, T.bedSide]) }, // 40
   ];
   const GRASS = 0, DIRT = 1, STONE = 2, LOG = 3, LEAVES = 4, SAND = 5, PLANKS = 6, BRICK = 7, GLASS = 8, WATER = 9, SNOW = 10;
   const COAL_ORE = 11, IRON_ORE = 12, GOLD_ORE = 13, DIAMOND_ORE = 14, TORCH = 15;
@@ -61,4 +63,4 @@
   const VERMILION = 28, PLASTER = 29, ROOF_TILE = 30, GOLD_BLOCK = 31, COPPER_ROOF = 32;
   const BRONZE = 33, BRONZE_DARK = 34;
   const TATAMI = 35, SHOJI = 36, NOREN = 37, PAPER_LANTERN = 38;
-  const HOTBAR = [0, 1, 2, 10, 5, 3, 4, 6, 8, TORCH, CRAFTING_TABLE, FURNACE]; // 草 土 石 雪 砂 丸太 葉 板材 ガラス たいまつ 作業台 かまど
+  const COBBLESTONE = 39, BED = 40;

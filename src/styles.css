@@ -16,102 +16,100 @@
   #breakMeter span { display: block; width: 0%; height: 100%; background: #d8d8d8;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
 
-  #hotbar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
-    display: flex; gap: 5px; z-index: 10; padding: 5px; border-radius: 6px;
-    max-width: calc(100vw - 16px); overflow-x: auto; background: rgba(0,0,0,0.35); }
-  .slot { position: relative; flex: 0 0 auto; width: 54px; height: 66px; border: 2px solid rgba(0,0,0,0.4); border-radius: 4px;
-    background: rgba(255,255,255,0.08); display: flex; flex-direction: column; align-items: center;
-    justify-content: flex-start; padding-top: 5px; cursor: pointer; transition: transform .08s; }
-  .slot.on { border-color: #fff; transform: translateY(-5px);
-    box-shadow: 0 0 10px rgba(255,255,255,0.45); }
-  .slot .sw { width: 34px; height: 34px; image-rendering: pixelated; background-size: cover;
-    border: 1px solid rgba(0,0,0,0.3); }
-  .slot b { color: #fff; font-size: 10px; margin-top: 3px; opacity: .7; }
-  .slot small { color: #fff; font-size: 11px; margin-top: 1px; }
-  .slot em { position: absolute; right: 5px; bottom: 3px; color: #fff; font-style: normal; font-size: 11px;
-    font-weight: 800; text-shadow: 0 1px 2px #000; }
-  .slot.empty { opacity: .45; filter: grayscale(.7); }
+  /* ---------- ホットバー（9枠） ---------- */
+  #hotbar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+    display: flex; gap: 4px; z-index: 10; padding: 4px; border-radius: 6px;
+    max-width: calc(100vw - 16px); background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,.14); }
+  #hotbar .slot { position: relative; flex: 0 0 auto; width: 52px; height: 52px; border: 2px solid rgba(255,255,255,0.22); border-radius: 4px;
+    background: rgba(0,0,0,0.3); cursor: pointer; transition: transform .07s, border-color .07s; }
+  #hotbar .slot.on { border-color: #fff; transform: translateY(-4px); box-shadow: 0 0 10px rgba(255,255,255,0.45); }
+  #hotbar .slot b { position: absolute; left: 3px; top: 1px; color: rgba(255,255,255,.55); font-size: 9px; z-index: 2; }
+  #hotbar .slot small { position: absolute; left: 50%; top: -20px; transform: translateX(-50%); color: #fff; font-size: 11px;
+    white-space: nowrap; text-shadow: 0 1px 2px #000; pointer-events: none; }
+  #hotbar .slot .sl-body { position: absolute; inset: 0; }
 
-  #craftPanel { position: fixed; right: 12px; top: 96px; z-index: 30; width: 320px; max-width: calc(100vw - 24px);
-    max-height: calc(100vh - 132px); display: none; color: #fff; background: rgba(20,22,24,.92);
-    border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 12px 28px rgba(0,0,0,.34);
-    overflow: hidden; }
-  #craftPanel.show { display: block; }
-  #craftPanel .craft-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px;
-    background: rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.12); }
-  #craftPanel .craft-head b { font-size: 14px; }
-  #craftPanel button { font: inherit; color: #fff; border: 1px solid rgba(255,255,255,.16); border-radius: 5px;
-    background: rgba(255,255,255,.08); cursor: pointer; }
-  #craftPanel button:hover:not(:disabled) { background: rgba(255,255,255,.16); }
-  #craftPanel button:disabled { opacity: .45; cursor: default; }
-  #craftPanel .craft-head button { padding: 4px 8px; font-size: 12px; }
-  #craftPanel .craft-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 10px; }
-  #craftPanel .craft-tools button { padding: 7px 8px; }
-  #craftPanel .craft-tools button.on { border-color: rgba(255,210,90,.8); background: rgba(255,190,60,.18); }
-  #craftPanel .craft-list { max-height: min(440px, calc(100vh - 230px)); overflow-y: auto; padding: 0 10px 10px; }
-  #craftPanel .recipe { width: 100%; display: block; text-align: left; padding: 8px 9px; margin-top: 6px; }
-  #craftPanel .recipe span { display: block; font-weight: 750; font-size: 13px; }
-  #craftPanel .recipe small { display: block; margin-top: 3px; color: rgba(255,255,255,.72); font-size: 11px; line-height: 1.35; }
+  /* ---------- スロット共通 ---------- */
+  .inv-slot, #hotbar .slot .sl-body, #cursorItem { position: relative; }
+  .sl-icon { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; transform: translate(-50%, -50%);
+    background-size: cover; image-rendering: pixelated; border-radius: 3px; pointer-events: none; }
+  .inv-slot em, #hotbar .slot em, #cursorItem em { position: absolute; right: 3px; bottom: 1px; color: #fff; font-style: normal;
+    font-size: 12px; font-weight: 850; text-shadow: 0 1px 2px #000, 0 0 3px #000; z-index: 2; pointer-events: none; font-variant-numeric: tabular-nums; }
+  .sl-dur { position: absolute; left: 4px; right: 4px; bottom: 3px; height: 3px; background: rgba(0,0,0,.6); border-radius: 2px; overflow: hidden; pointer-events: none; }
+  .sl-dur i { display: block; height: 100%; }
 
-  #inventoryPanel { position: fixed; left: 50%; top: 50%; z-index: 34; width: min(560px, calc(100vw - 24px));
-    max-height: min(620px, calc(100vh - 40px)); transform: translate(-50%, -50%); display: none; color: #fff;
-    background: rgba(18,20,22,.94); border: 1px solid rgba(255,255,255,.18); border-radius: 8px;
-    box-shadow: 0 16px 34px rgba(0,0,0,.42); overflow: hidden; }
-  #inventoryPanel.show { display: block; }
-  #inventoryPanel .inventory-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
-    background: rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.12); }
-  #inventoryPanel .inventory-head b { font-size: 15px; }
-  #inventoryPanel button { color: #fff; border: 1px solid rgba(255,255,255,.16); border-radius: 5px;
-    background: rgba(255,255,255,.08); padding: 5px 8px; cursor: pointer; font: inherit; }
-  #inventoryPanel button:hover:not(:disabled) { background: rgba(255,255,255,.16); }
-  #inventoryPanel button:disabled { opacity: .45; cursor: default; }
-  #inventoryPanel .inventory-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 9px 10px;
-    border-bottom: 1px solid rgba(255,255,255,.08); }
-  #inventoryPanel .inventory-tabs button { padding: 7px 6px; font-size: 12px; }
-  #inventoryPanel .inventory-tabs button.on { border-color: rgba(255,210,90,.8); background: rgba(255,190,60,.18); }
-  #inventoryPanel .inventory-list { max-height: min(470px, calc(100vh - 190px)); overflow-y: auto; padding: 8px 10px 10px; }
-  #inventoryPanel .inventory-item { min-height: 46px; display: grid; grid-template-columns: 34px 1fr auto auto;
-    align-items: center; gap: 9px; padding: 7px 8px; margin-bottom: 6px; border: 1px solid rgba(255,255,255,.1);
-    border-radius: 6px; background: rgba(255,255,255,.055); }
-  #inventoryPanel .inventory-icon { width: 32px; height: 32px; display: grid; place-items: center; color: rgba(255,255,255,.82);
-    font-weight: 850; background-size: cover; image-rendering: pixelated; border: 1px solid rgba(0,0,0,.3);
-    border-radius: 4px; background-color: rgba(0,0,0,.28); }
-  #inventoryPanel .inventory-main { min-width: 0; }
-  #inventoryPanel .inventory-main b { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; }
-  #inventoryPanel .inventory-main small { display: block; margin-top: 2px; color: rgba(255,255,255,.68); font-size: 11px; }
-  #inventoryPanel .inventory-item em { font-style: normal; font-weight: 850; font-variant-numeric: tabular-nums; }
-  #inventoryPanel .inventory-item > button { padding: 6px 9px; font-size: 12px; }
-  #inventoryPanel .inventory-item.placeable { cursor: pointer; }
-  #inventoryPanel .inventory-item.placeable:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.22); }
-  #inventoryPanel .inventory-item.selected { background: rgba(120,200,120,.18); border-color: rgba(140,230,140,.6); box-shadow: 0 0 0 1px rgba(140,230,140,.35) inset; }
-  #inventoryPanel .inventory-item.selected small { color: rgba(170,240,170,.95); }
-  #inventoryPanel .inventory-empty { padding: 22px 10px; text-align: center; color: rgba(255,255,255,.68); font-size: 13px; }
+  /* ---------- コンテナ画面（インベントリ/作業台/かまど/チェスト） ---------- */
+  #invScreen { position: fixed; left: 50%; top: 50%; z-index: 40; transform: translate(-50%, -50%);
+    display: none; color: #fff; background: rgba(24,26,28,.96); border: 1px solid rgba(255,255,255,.2);
+    border-radius: 10px; box-shadow: 0 18px 40px rgba(0,0,0,.5); padding-bottom: 12px; min-width: 500px; }
+  #invScreen.show { display: block; }
+  #invScreen .inv-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+    background: rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.12); border-radius: 10px 10px 0 0; }
+  #invScreen .inv-head b { font-size: 15px; }
+  #invScreen button { color: #fff; border: 1px solid rgba(255,255,255,.16); border-radius: 5px;
+    background: rgba(255,255,255,.08); padding: 5px 9px; cursor: pointer; font: inherit; font-size: 12px; }
+  #invScreen button:hover { background: rgba(255,255,255,.16); }
+  #invScreen .inv-top { padding: 14px 14px 6px; min-height: 40px; }
+  #invScreen .inv-grid { display: grid; gap: 4px; }
+  #invScreen .inv-main { grid-template-columns: repeat(9, 46px); padding: 0 14px; }
+  #invScreen .inv-hotbar { grid-template-columns: repeat(9, 46px); padding: 8px 14px 0; }
+  #invScreen .inv-label { padding: 8px 16px 6px; color: rgba(255,255,255,.62); font-size: 12px; font-weight: 700; }
+  .inv-slot { width: 46px; height: 46px; background: rgba(0,0,0,.34); border: 1px solid rgba(255,255,255,.16); border-radius: 4px; cursor: pointer; }
+  .inv-slot:hover { border-color: rgba(255,220,120,.8); background: rgba(90,75,40,.4); }
+  .inv-slot.hot-selected { border-color: rgba(255,255,255,.75); box-shadow: 0 0 0 1px rgba(255,255,255,.4) inset; }
+  .inv-slot.result-slot { border-color: rgba(140,230,140,.5); background: rgba(60,110,60,.25); }
+  .craft-area { display: flex; align-items: center; gap: 14px; }
+  .craft-grid { width: max-content; }
+  .craft-arrow { font-size: 26px; color: rgba(255,255,255,.7); }
+  .craft-hint { margin-top: 8px; color: rgba(255,255,255,.55); font-size: 11px; }
+  .chest-grid { grid-template-columns: repeat(9, 46px); }
+  /* かまど */
+  .furnace-area { display: flex; align-items: center; gap: 22px; padding: 4px 6px; }
+  .furnace-col { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .furnace-slot-label { color: rgba(255,255,255,.6); font-size: 11px; }
+  .furnace-fire { width: 14px; height: 26px; border: 1px solid rgba(255,255,255,.25); border-radius: 3px;
+    background: rgba(0,0,0,.4); display: flex; align-items: flex-end; overflow: hidden; }
+  .furnace-fire i { display: block; width: 100%; height: 0%; background: linear-gradient(0deg,#ff5a18,#ffc23a); }
+  .furnace-mid { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .furnace-progress { width: 90px; height: 12px; border: 1px solid rgba(255,255,255,.3); border-radius: 6px;
+    background: rgba(0,0,0,.4); overflow: hidden; }
+  .furnace-progress i { display: block; width: 0%; height: 100%; background: linear-gradient(90deg,#e8e8e8,#fff); }
+  .furnace-progress-label { color: rgba(255,255,255,.6); font-size: 11px; }
+  /* カーソルに持っているアイテム */
+  #cursorItem { position: fixed; z-index: 60; width: 40px; height: 40px; display: none; pointer-events: none; }
 
-  #chestPanel { position: fixed; left: 50%; top: 50%; z-index: 35; width: min(430px, calc(100vw - 24px));
-    transform: translate(-50%, -50%); display: none; color: #fff; background: rgba(22,20,18,.95);
-    border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 16px 34px rgba(0,0,0,.42);
-    overflow: hidden; }
-  #chestPanel.show { display: block; }
-  #chestPanel .chest-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
-    background: rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.12); }
-  #chestPanel .chest-head b { font-size: 15px; }
-  #chestPanel button { color: #fff; border: 1px solid rgba(255,255,255,.16); border-radius: 5px;
-    background: rgba(255,255,255,.08); padding: 5px 8px; cursor: pointer; font: inherit; }
-  #chestPanel button:hover:not(:disabled) { background: rgba(255,255,255,.16); }
-  #chestPanel button:disabled { opacity: .42; cursor: default; }
-  #chestPanel .chest-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; padding: 12px; }
-  #chestPanel .chest-slot { position: relative; aspect-ratio: 1 / 1; min-width: 0; padding: 5px; display: grid;
-    place-items: center; background: rgba(0,0,0,.28); border-color: rgba(255,255,255,.14); }
-  #chestPanel .chest-slot:not(:disabled):hover { border-color: rgba(255,220,120,.75); background: rgba(100,78,38,.46); }
-  #chestPanel .chest-icon { width: 34px; height: 34px; display: block; color: rgba(255,255,255,.82);
-    font-size: 18px; font-weight: 850; line-height: 34px; text-align: center; background-size: cover;
-    image-rendering: pixelated; border: 1px solid rgba(0,0,0,.28); border-radius: 4px; background-color: rgba(0,0,0,.24); }
-  #chestPanel .chest-slot em { position: absolute; right: 4px; bottom: 3px; font-style: normal; font-size: 11px;
-    font-weight: 850; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #000; }
-  #chestPanel .chest-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px;
-    border-top: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.16); }
-  #chestPanel .chest-status { color: rgba(255,255,255,.72); font-size: 12px; font-weight: 750; }
+  /* ---------- 拾得トースト ---------- */
+  #pickupToasts { position: fixed; right: 12px; bottom: 84px; z-index: 14; display: flex; flex-direction: column;
+    gap: 4px; align-items: flex-end; pointer-events: none; }
+  .pickup-toast { display: flex; align-items: center; gap: 6px; padding: 4px 9px; color: #fff; font-size: 12px; font-weight: 750;
+    background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.18); border-radius: 6px; text-shadow: 0 1px 2px #000;
+    transition: opacity .35s; }
+  .pickup-toast.fade { opacity: 0; }
+  .pickup-toast .pt-icon { width: 20px; height: 20px; background-size: cover; image-rendering: pixelated; border-radius: 3px; }
 
+  /* ---------- 進捗/目標 ---------- */
+  #objectiveHud { position: fixed; right: 12px; top: 96px; z-index: 12; max-width: 300px; padding: 8px 11px;
+    color: #fff; background: rgba(0,0,0,.5); border: 1px solid rgba(255,215,90,.4); border-radius: 8px;
+    font-size: 12px; text-shadow: 0 1px 2px #000; pointer-events: none; }
+  #objectiveHud small { display: block; color: rgba(255,220,120,.9); font-size: 10px; font-weight: 800; letter-spacing: .5px; }
+  #objectiveHud b { display: block; margin-top: 2px; font-size: 13px; line-height: 1.4; }
+  #progressToast { position: fixed; left: 50%; top: 12%; z-index: 45; transform: translate(-50%, -8px); opacity: 0;
+    padding: 10px 18px; color: #fff; text-align: center; background: rgba(20,40,18,.92); border: 1px solid rgba(150,240,130,.55);
+    border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.4); pointer-events: none; transition: opacity .25s, transform .25s; }
+  #progressToast.show { opacity: 1; transform: translate(-50%, 0); }
+  #progressToast b { display: block; color: #a8f090; font-size: 14px; }
+  #progressToast span { display: block; margin-top: 2px; font-size: 12px; color: rgba(255,255,255,.85); }
+
+  /* ---------- 死亡画面 ---------- */
+  #deathScreen { position: fixed; inset: 0; z-index: 70; display: none; flex-direction: column; align-items: center;
+    justify-content: center; gap: 16px; color: #fff; text-align: center; background: rgba(120,10,10,.55); backdrop-filter: blur(2px); }
+  #deathScreen.show { display: flex; }
+  #deathScreen h2 { font-size: 40px; letter-spacing: 3px; text-shadow: 0 3px 0 rgba(0,0,0,.5); }
+  #deathScreen .death-detail { font-size: 14px; opacity: .85; }
+  #deathScreen button { font: inherit; font-size: 16px; font-weight: 800; color: #fff; padding: 12px 30px; cursor: pointer;
+    background: rgba(0,0,0,.5); border: 2px solid rgba(255,255,255,.6); border-radius: 8px; }
+  #deathScreen button:hover { background: rgba(0,0,0,.72); border-color: #fff; }
+
+  /* ---------- 村人取引 ---------- */
   #travelerPanel { position: fixed; left: 50%; top: 50%; z-index: 35; width: min(460px, calc(100vw - 24px));
     transform: translate(-50%, -50%); display: none; color: #fff; background: rgba(18,24,22,.95);
     border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 16px 34px rgba(0,0,0,.42);
@@ -159,7 +157,7 @@
   #settingsPanel input[type="range"] { width: 100%; }
   #settingsPanel output { min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
   #settingsPanel .settings-actions { display: flex; gap: 8px; justify-content: flex-end; padding: 10px; }
-  #survivalHud { position: fixed; left: 50%; bottom: 88px; transform: translateX(-50%);
+  #survivalHud { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%);
     z-index: 12; display: flex; gap: 14px; align-items: center; padding: 5px 9px; border-radius: 6px;
     color: #fff; background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.12);
     font-size: 19px; line-height: 1; letter-spacing: 1px; text-shadow: 0 2px 2px rgba(0,0,0,.75);
@@ -168,20 +166,6 @@
   #survivalHud .hunger { color: #ffb24a; }
   #survivalHud.hurt { animation: hurtBlink .16s alternate 4; }
   @keyframes hurtBlink { from { filter: brightness(1); } to { filter: brightness(2.2); transform: translateX(-50%) scale(1.04); } }
-  #foodHud { position: fixed; right: 12px; bottom: 16px; z-index: 13; width: 188px; max-width: calc(50vw - 18px);
-    color: #fff; font-size: 11px; text-shadow: 0 1px 2px rgba(0,0,0,.75); pointer-events: auto; }
-  #foodHud .food-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-  #foodHud button { min-width: 0; height: 38px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr 1fr;
-    align-items: center; gap: 0 4px; padding: 5px 6px; color: #fff; border: 1px solid rgba(255,255,255,.2);
-    border-radius: 5px; background: rgba(0,0,0,.42); cursor: pointer; font: inherit; }
-  #foodHud button:hover:not(:disabled) { background: rgba(45,95,42,.62); }
-  #foodHud button:disabled { opacity: .45; cursor: default; }
-  #foodHud button span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 750; }
-  #foodHud button b { font-size: 12px; font-variant-numeric: tabular-nums; }
-  #foodHud button small { grid-column: 1 / -1; color: rgba(255,230,170,.86); }
-  #foodHud .tool-durability { margin-top: 5px; padding: 5px 6px; border-radius: 5px;
-    background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.14); white-space: nowrap; overflow: hidden;
-    text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
   #debugHud { position: fixed; left: 50%; top: 42px; transform: translateX(-50%); z-index: 33;
     display: none; max-width: calc(100vw - 24px); padding: 6px 10px; color: #fff; background: rgba(0,0,0,.56);
     border: 1px solid rgba(120,220,255,.38); border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.28);

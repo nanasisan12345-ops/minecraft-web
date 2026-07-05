@@ -11,6 +11,17 @@
     g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.12);
     o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.13);
   }
+  // 被弾音（低いうめき風の下降トーン）
+  function playHurtSound() {
+    if (!actx) return;
+    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(190, t);
+    o.frequency.exponentialRampToValueAtTime(80, t + 0.18);
+    g.gain.setValueAtTime(0.09, t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.22);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.24);
+  }
 
   const ENV = {
     ready: false, master: null, rainGain: null, musicGain: null, delay: null, delayFb: null, nextNote: 0, nextNature: 0, nextWind: 0, scale: [0, 2, 4, 7, 9],

@@ -277,9 +277,34 @@
       g.fillRect(8, 9, 16, 1); g.fillRect(7, 15, 18, 1); g.fillRect(10, 21, 12, 1);
       dots(g, S, 0x6d4c1b, 0.04, 0.76);
     }),
+    cobble: makeTex((g, S) => {                              // 丸石。ゴロゴロした玉石の敷き詰め。
+      noise(g, S, 0x74797d, 0.8, 1.05);
+      const stones = [[2, 2, 9, 8], [13, 1, 9, 9], [24, 3, 7, 8], [1, 12, 8, 9], [11, 12, 10, 8], [23, 13, 8, 8], [3, 22, 9, 8], [14, 22, 8, 8], [24, 23, 7, 7]];
+      for (const [x, y, w, h] of stones) {
+        g.fillStyle = tint(0x84898d, rnd(0.82, 1.06)); g.fillRect(x, y, w, h);
+        g.fillStyle = tint(0xa2a7ab, rnd(0.95, 1.1)); g.fillRect(x + 1, y + 1, Math.max(1, w - 3), 2);
+        g.fillStyle = tint(0x4f545a, 0.9); g.fillRect(x, y + h - 1, w, 1); g.fillRect(x + w - 1, y, 1, h);
+      }
+      dots(g, S, 0x3f4449, 0.05, 0.8);
+    }),
+    bedTop: makeTex((g, S) => {                              // ベッド上面。白い枕＋赤い毛布。
+      noise(g, S, 0xb03030, 0.9, 1.06);
+      g.fillStyle = tint(0xf2f0e6, 1.0); g.fillRect(2, 2, S - 4, 9);          // 枕
+      g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(2, 10, S - 4, 1);
+      g.fillStyle = tint(0x8c1f1f, 0.95); g.fillRect(0, 12, S, 2);            // 毛布の折り返し
+      g.fillStyle = 'rgba(255,255,255,0.14)'; for (let y = 17; y < S - 2; y += 5) g.fillRect(3, y, S - 6, 1);
+      g.fillStyle = tint(0x6d4c1b, 0.9); g.fillRect(0, S - 2, S, 2);
+    }),
+    bedSide: makeTex((g, S) => {                             // ベッド側面。木枠＋赤い毛布。
+      noise(g, S, 0x8a5a35, 0.9, 1.06);
+      g.fillStyle = tint(0xb03030, 1.0); g.fillRect(0, 4, S, 12);
+      g.fillStyle = tint(0xf2f0e6, 1.0); g.fillRect(0, 4, 8, 12);
+      g.fillStyle = tint(0x6d4c1b, 0.85); g.fillRect(0, 16, S, 3);
+      g.fillStyle = tint(0x5a3d1a, 0.9); g.fillRect(0, S - 4, 4, 4); g.fillRect(S - 4, S - 4, 4, 4);
+    }),
   };
   TX.lava.wrapS = TX.lava.wrapT = THREE.RepeatWrapping;
   TX.cactus.userData.normalMap = normalFromCanvas(TX.cactus.image, 2.2);
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
-  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern'])
+  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide'])
     TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);

@@ -38,15 +38,16 @@
     if (id === avatarHeldKey) return;
     avatarHeldKey = id;
     clearAvatarHeld();
-    if (typeof id === 'string' && ITEMS[id]) {
-      const def = ITEMS[id];
-      const metal = id.includes('iron') ? 0xd8dde2 : id.includes('stone') ? 0x8a8f92 : 0xb5824a;
+    const def = id ? ITEM_DEFS[id] : null;
+    if (def && def.tool) {
+      const metal = id.startsWith('diamond') ? 0x66e0ee : id.startsWith('iron') ? 0xd8dde2 : id.startsWith('stone') ? 0x8a8f92 : 0xb5824a;
       avatarBox(avatarParts.held, 0.05, 0.46, 0.05, 0x7a4d24, 0, 0, 0);
       if (def.tool === 'pickaxe') avatarBox(avatarParts.held, 0.32, 0.06, 0.06, metal, 0, 0.2, 0);
       else if (def.tool === 'axe') avatarBox(avatarParts.held, 0.18, 0.2, 0.06, metal, -0.08, 0.18, 0);
       else if (def.tool === 'shovel') avatarBox(avatarParts.held, 0.14, 0.16, 0.06, metal, 0, 0.24, 0);
-    } else if (typeof id === 'number' && TYPES[id]) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), avatarMat(TYPES[id].color));
+      else if (def.tool === 'sword') avatarBox(avatarParts.held, 0.07, 0.44, 0.07, metal, 0, 0.22, 0);
+    } else if (def && def.block != null && TYPES[def.block]) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), avatarMat(TYPES[def.block].color));
       m.castShadow = true;
       avatarParts.held.add(m);
     }
@@ -69,8 +70,8 @@
     avatarParts.legL.rotation.x = -swing;
     avatarParts.legR.rotation.x = swing;
     avatarParts.head.rotation.x = THREE.MathUtils.clamp(pitch * 0.35, -0.35, 0.35);
-    const toolId = mouseHeld.left ? heldToolForTarget(tg) : null;
-    rebuildAvatarHeld(toolId || currentPlaceType());
+    const held = typeof selectedItem === 'function' ? selectedItem() : null;
+    rebuildAvatarHeld(held ? held.id : '');
   }
   function updateCameraView(dt, tg) {
     updatePlayerAvatar(dt, tg);

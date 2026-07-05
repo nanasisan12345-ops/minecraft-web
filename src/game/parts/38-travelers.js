@@ -16,72 +16,122 @@
     library: 'librarian',
     stable: 'herder',
   };
+  // 取引はすべて文字列アイテムID（53-inventory の ITEM_DEFS）。hint付きは探索ヒントを教える。
   const TRAVELER_ROLES = {
     farmer: {
-      label: '農家',
-      line: '畑のものなら少し分けられるよ。',
+      label: '農民',
+      line: '畑のものなら分けられるよ。ベリーや石炭と交換だ。',
       trades: [
-        { id: 'farmer-apple', name: 'リンゴ x2', cost: [['berries', 4]], out: [['apple', 2]] },
-        { id: 'farmer-berries', name: 'ベリー x5', cost: [['apple', 1]], out: [['berries', 5]] },
+        { id: 'farmer-bread', name: 'パン x2', cost: [['berries', 4]], out: [['bread', 2]] },
+        { id: 'farmer-apple', name: 'リンゴ x3', cost: [['coal', 1]], out: [['apple', 3]] },
+        { id: 'farmer-wheat', name: '小麦 x3', cost: [['fiber', 3]], out: [['wheat', 3]] },
       ],
     },
     smith: {
       label: '鍛冶屋',
-      line: '鉱石を持ってきたなら、道具にしてやろう。',
+      line: '鉱石と燃料を持ってきたなら、鍛えてやろう。',
       trades: [
-        { id: 'smith-ingot', name: '鉄インゴット x2', cost: [['rawIron', 2], ['coal', 1]], out: [['ironIngot', 2]] },
-        { id: 'smith-pickaxe', name: '鉄のツルハシ', cost: [['ironIngot', 3], ['stick', 2]], out: [['ironPickaxe', 1]] },
+        { id: 'smith-ingot', name: '鉄インゴット x2', cost: [['raw_iron', 2], ['coal', 1]], out: [['iron_ingot', 2]] },
+        { id: 'smith-pickaxe', name: '鉄のツルハシ', cost: [['iron_ingot', 3], ['stick', 2]], out: [['iron_pickaxe', 1]] },
+        { id: 'smith-sword', name: '鉄の剣', cost: [['iron_ingot', 2], ['stick', 1]], out: [['iron_sword', 1]] },
       ],
     },
     merchant: {
       label: '商人',
-      line: '旅の荷物を軽くしていかないかい。',
+      line: '金やダイヤがあれば、珍しい建材と交換しよう。',
       trades: [
-        { id: 'merchant-torch', name: 'たいまつ x10', cost: [['coal', 3], ['stick', 1]], out: [[TORCH, 10]] },
-        { id: 'merchant-glass', name: 'ガラス x6', cost: [[SAND, 6], ['coal', 1]], out: [[GLASS, 6]] },
+        { id: 'merchant-lantern', name: 'ランタン x4', cost: [['gold_ingot', 1]], out: [['lantern', 4]] },
+        { id: 'merchant-goldblock', name: '金ブロック x1', cost: [['gold_ingot', 2]], out: [['gold_block', 1]] },
+        { id: 'merchant-roof', name: '瓦 x8', cost: [['diamond', 1]], out: [['roof_tile', 8]] },
+        { id: 'merchant-glass', name: 'ガラス x6', cost: [['sand', 6], ['coal', 1]], out: [['glass', 6]] },
       ],
     },
     cleric: {
       label: '聖職者',
       line: '暗い地下へ行くなら、明かりを持っていきなさい。',
       trades: [
-        { id: 'cleric-lantern', name: 'ランタン x2', cost: [['glowShard', 1], ['coal', 1]], out: [[LANTERN, 2]] },
-        { id: 'cleric-food', name: 'リンゴ x3', cost: [['glowShard', 1]], out: [['apple', 3]] },
+        { id: 'cleric-lantern', name: 'ランタン x2', cost: [['glow_shard', 1], ['coal', 1]], out: [['lantern', 2]] },
+        { id: 'cleric-food', name: 'パン x2', cost: [['rotten_flesh', 4]], out: [['bread', 2]] },
       ],
     },
     guard: {
       label: '見張り',
-      line: '遠くへ行くなら、足場と明かりを切らすなよ。',
+      line: '夜は危険だ。備えを整えておけ。',
       trades: [
-        { id: 'guard-stone', name: '石レンガ x8', cost: [[STONE, 8]], out: [[STONE_BRICK, 8]] },
-        { id: 'guard-axe', name: '石の斧', cost: [[STONE, 3], ['stick', 2]], out: [['stoneAxe', 1]] },
+        { id: 'guard-stone', name: '石レンガ x8', cost: [['cobblestone', 8]], out: [['stone_brick', 8]] },
+        { id: 'guard-torch', name: '松明 x8', cost: [['coal', 2]], out: [['torch', 8]] },
+        { id: 'guard-sword', name: '石の剣', cost: [['cobblestone', 4], ['stick', 1]], out: [['stone_sword', 1]] },
       ],
     },
     librarian: {
       label: '司書',
-      line: '古い地図の余白には、地下の明かりの話が残っているよ。',
+      line: '古い地図なら読める。素材と引き換えに場所を教えよう。',
       trades: [
-        { id: 'librarian-glass', name: 'ガラス x8', cost: [[SAND, 8], ['coal', 1]], out: [[GLASS, 8]] },
-        { id: 'librarian-lantern', name: 'ランタン x1', cost: [['glowShard', 1]], out: [[LANTERN, 1]] },
+        { id: 'librarian-hint-dungeon', name: 'ヒント: 地下遺跡の場所', cost: [['bone', 1]], hint: 'dungeon' },
+        { id: 'librarian-hint-mineshaft', name: 'ヒント: 廃坑の場所', cost: [['coal', 2]], hint: 'mineshaft' },
+        { id: 'librarian-glass', name: 'ガラス x8', cost: [['sand', 8], ['coal', 1]], out: [['glass', 8]] },
       ],
     },
     herder: {
       label: '牧場係',
-      line: '家畜小屋のまわりは、食べ物を切らさないのが大事だ。',
+      line: '羊毛と食べ物ならまかせてくれ。',
       trades: [
+        { id: 'herder-cloth', name: '布 x2', cost: [['wheat', 2]], out: [['cloth', 2]] },
+        { id: 'herder-meat', name: '生肉 x3', cost: [['wheat', 3]], out: [['raw_meat', 3]] },
         { id: 'herder-berries', name: 'ベリー x6', cost: [['apple', 1]], out: [['berries', 6]] },
-        { id: 'herder-planks', name: '板材 x10', cost: [[LOG, 3]], out: [[PLANKS, 10]] },
       ],
     },
     wanderer: {
       label: '旅人',
-      line: 'このあたりは地形がよく変わる。迷ったら高い場所を見るといい。',
+      line: 'あちこち歩いてきた。この辺りの話を聞きたいかい？',
       trades: [
-        { id: 'wanderer-planks', name: '板材 x8', cost: [[LOG, 2]], out: [[PLANKS, 8]] },
-        { id: 'wanderer-torch', name: 'たいまつ x6', cost: [['coal', 2]], out: [[TORCH, 6]] },
+        { id: 'wanderer-hint-village', name: 'ヒント: 近くの村', cost: [['bread', 1]], hint: 'village' },
+        { id: 'wanderer-hint-cave', name: 'ヒント: 洞窟の入口', cost: [['coal', 1]], hint: 'cave' },
+        { id: 'wanderer-hint-jp', name: 'ヒント: 近くの見どころ', cost: [['berries', 2]], hint: 'landmark' },
+        { id: 'wanderer-planks', name: '板材 x8', cost: [['log', 2]], out: [['planks', 8]] },
       ],
     },
   };
+  // 方角＋距離のヒント文（北= -Z）
+  function directionLabel(dx, dz) {
+    const a = Math.atan2(dx, -dz); // 北基準の時計回り
+    const oct = Math.round(((a + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 4)) % 8;
+    return ['北', '北東', '東', '南東', '南', '南西', '西', '北西'][oct];
+  }
+  function hintTextFor(kind) {
+    const px = Math.floor(player.pos.x), pz = Math.floor(player.pos.z);
+    const fmt = (label, x, z) => {
+      const d = Math.hypot(x - px, z - pz) | 0;
+      return `${label}は${directionLabel(x - px, z - pz)}へ約${Math.max(10, d)}ブロック`;
+    };
+    if (kind === 'village' && typeof nearestVillage === 'function') {
+      const v = nearestVillage(px, pz);
+      if (v) return fmt(`村「${v.plan.name || ''}」`, v.plan.x, v.plan.z);
+    }
+    if (kind === 'dungeon' && typeof nearestDungeon === 'function') {
+      const d = nearestDungeon(px, pz);
+      if (d) return fmt('地下遺跡', d.plan.x, d.plan.z);
+    }
+    if (kind === 'mineshaft' && typeof nearestMineshaft === 'function') {
+      const m = nearestMineshaft(px, pz);
+      if (m) return fmt('廃坑', m.plan.x, m.plan.z);
+    }
+    if (kind === 'cave' && typeof findNearbyCaveMouth === 'function') {
+      const c = findNearbyCaveMouth(px, pz);
+      if (c) return fmt('洞窟の入口', c.x, c.z);
+    }
+    if (kind === 'landmark' && typeof structurePlanForCell === 'function') {
+      const c0x = Math.floor(px / STRUCT_CELL), c0z = Math.floor(pz / STRUCT_CELL);
+      for (let r = 1; r <= 14; r++) {
+        for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+          if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+          const p = structurePlanForCell(c0x + dx, c0z + dz);
+          if (p && structureBase(p) != null) return fmt('立派な建物', p.x, p.z);
+        }
+      }
+    }
+    return 'うーん、今はいい話を思い出せない…';
+  }
   const travelerMatCache = new Map();
   let travelerSpawnClock = 2.5;
   function travelerMat(color) {
@@ -239,15 +289,27 @@
     return null;
   }
   function canDoTravelerTrade(trade) {
-    return trade && trade.cost.every(([id, amount]) => inventoryCount(id) >= amount);
+    return trade && hasItems(trade.cost);
   }
   function doTravelerTrade(id) {
     const trade = travelerTradeById(id);
-    if (!canDoTravelerTrade(trade)) { thock(90); return false; }
-    for (const [item, amount] of trade.cost) consumeInventory(item, amount);
-    for (const [item, amount] of trade.out) addInventory(item, amount);
+    if (!canDoTravelerTrade(trade)) {
+      thock(90);
+      if (typeof setDebugToast === 'function') setDebugToast('素材が足りない…', 1.6);
+      return false;
+    }
+    takeItems(trade.cost);
+    if (trade.hint) {
+      const text = hintTextFor(trade.hint);
+      if (typeof setDebugToast === 'function') setDebugToast(text, 5.0);
+    } else {
+      for (const [item, amount] of trade.out) giveItem(item, amount);
+      if (typeof setDebugToast === 'function') setDebugToast(`${trade.name} を受け取った`, 1.8);
+    }
+    SAVE.trades[id] = (SAVE.trades[id] || 0) + 1;
+    markSaveDirty();
     thock(330);
-    if (typeof setDebugToast === 'function') setDebugToast(`${trade.name} を受け取った`, 1.8);
+    if (typeof progressEvent === 'function') progressEvent('trade', id);
     return true;
   }
   function updateTravelers(dt) {

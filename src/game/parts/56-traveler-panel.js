@@ -24,6 +24,7 @@
       updateTravelerPanel();
     } else {
       TRAVELER_PANEL.traveler = null;
+      if (typeof relockPointerForGame === 'function') relockPointerForGame();
     }
   }
 
@@ -37,7 +38,7 @@
   }
 
   function tradeCostText(cost) {
-    return cost.map(([id, amount]) => `${itemLabel(id)} ${inventoryCount(id)}/${amount}`).join(' ・ ');
+    return cost.map(([id, amount]) => `${itemLabel(id)} ${countItem(id)}/${amount}`).join(' ・ ');
   }
 
   function updateTravelerPanel() {
@@ -55,7 +56,8 @@
       btn.className = 'traveler-trade';
       btn.dataset.trade = trade.id;
       btn.disabled = !canDoTravelerTrade(trade);
-      btn.innerHTML = `<span>${trade.name}</span><small>渡す: ${tradeCostText(trade.cost)}</small><em>受取: ${tradeItemsText(trade.out)}</em>`;
+      const outText = trade.hint ? '場所のヒントを聞く' : tradeItemsText(trade.out);
+      btn.innerHTML = `<span>${trade.name}</span><small>渡す: ${tradeCostText(trade.cost)}</small><em>受取: ${outText}</em>`;
       list.appendChild(btn);
     }
   }

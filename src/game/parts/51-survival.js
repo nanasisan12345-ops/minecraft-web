@@ -1,92 +1,146 @@
-  /* ============== サバイバル基礎（体力・空腹・落下ダメージ） ============== */
+  /* ============== サバイバル基礎（体力・空腹・ダメージ・死亡/リスポーン） ============== */
   const SURVIVAL = {
     health: 20,
     hunger: 20,
     hurtFlash: 0,
     hungerClock: 0,
     healClock: 0,
-    respawnClock: 0,
+    invuln: 0,      // 被弾後の無敵時間
+    dead: false,
+    wasNight: false,
   };
   const survivalHud = document.createElement('div');
   survivalHud.id = 'survivalHud';
   document.body.appendChild(survivalHud);
+  const deathScreen = document.createElement('div');
+  deathScreen.id = 'deathScreen';
+  deathScreen.innerHTML = `
+    <h2>死んでしまった！</h2>
+    <p class="death-detail"></p>
+    <button id="respawnBtn">リスポーンする</button>
+  `;
+  document.body.appendChild(deathScreen);
 
+  // セーブから体力/空腹/位置/時間を復元
+  if (SAVE.player) {
+    SURVIVAL.health = Number.isFinite(SAVE.player.hp) ? SAVE.player.hp : 20;
+    SURVIVAL.hunger = Number.isFinite(SAVE.player.hunger) ? SAVE.player.hunger : 20;
+    if (Number.isFinite(SAVE.player.x) && Number.isFinite(SAVE.player.y) && Number.isFinite(SAVE.player.z)) {
+      player.pos.set(SAVE.player.x, SAVE.player.y, SAVE.player.z);
+    }
+    if (Number.isFinite(SAVE.player.yaw)) yaw = SAVE.player.yaw;
+    if (Number.isFinite(SAVE.player.pitch)) pitch = SAVE.player.pitch;
+    if (SURVIVAL.health <= 0) SURVIVAL.health = 20; // 死亡中に閉じた場合は復活させる
+  }
+  if (Number.isFinite(SAVE.time)) DAY.time = SAVE.time;
+  // 保存直前にプレイヤーの動的な値をSAVEへ回収する（33-save-state から呼ばれる）
+  function collectSaveState() {
+    SAVE.player = {
+      x: player.pos.x, y: player.pos.y, z: player.pos.z,
+      yaw, pitch,
+      hp: SURVIVAL.health, hunger: SURVIVAL.hunger,
+    };
+    SAVE.time = DAY.time;
+    SAVE.selected = selected;
+  }
+
+  function respawnPoint() {
+    // ベッドで設定したリスポーン地点（ベッドが撤去されていたら初期スポーンへ）
+    const s = SAVE.spawn;
+    if (s && blockAt(s.x, s.y, s.z) === BED) return { x: s.x + 0.5, y: s.y + 2.2, z: s.z + 0.5 };
+    return { x: spawnX, y: heightAt(spawnPt.x, spawnPt.z) + 3, z: spawnZ };
+  }
   function respawnPlayer() {
-    player.pos.set(spawnX, spawnY, spawnZ);
+    const p = respawnPoint();
+    player.pos.set(p.x, p.y, p.z);
     player.vel.set(0, 0, 0);
     player.onGround = false;
     SURVIVAL.health = 20;
     SURVIVAL.hunger = 18;
-    SURVIVAL.hurtFlash = 0.6;
+    SURVIVAL.hurtFlash = 0;
+    SURVIVAL.invuln = 2.0;
+    SURVIVAL.dead = false;
+    deathScreen.classList.remove('show');
+    regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z));
+    writeSaveNow();
+    updateSurvivalHud();
+    if (typeof relockPointerForGame === 'function') relockPointerForGame();
   }
+  deathScreen.querySelector('#respawnBtn').addEventListener('click', respawnPlayer);
 
-  function damagePlayer(amount) {
-    if (SURVIVAL.respawnClock > 0 || amount <= 0) return;
+  let lastDamageCause = '';
+  function damagePlayer(amount, cause = '') {
+    if (SURVIVAL.dead || amount <= 0) return;
+    if (SURVIVAL.invuln > 0 && amount < 900) return;
     SURVIVAL.health = Math.max(0, SURVIVAL.health - amount);
     SURVIVAL.hurtFlash = 0.75;
-    if (SURVIVAL.health <= 0) SURVIVAL.respawnClock = 1.2;
-  }
-
-  function eatFood(amount) {
-    SURVIVAL.hunger = Math.min(20, SURVIVAL.hunger + amount);
-    SURVIVAL.healClock = Math.max(0, SURVIVAL.healClock - 1.0);
+    SURVIVAL.invuln = 0.55;
+    if (cause) lastDamageCause = cause;
+    if (typeof playHurtSound === 'function') playHurtSound();
+    else thock(80);
+    if (SURVIVAL.health <= 0) diePlayer();
     updateSurvivalHud();
   }
-
-  function eatInventoryFood(id) {
-    const def = ITEMS[id];
-    if (!def || !def.food || inventoryCount(id) <= 0 || SURVIVAL.respawnClock > 0) return false;
-    if (SURVIVAL.hunger >= 20 && SURVIVAL.health >= 20) return false;
-    if (!consumeInventory(id, 1)) return false;
-    eatFood(def.food);
-    if (def.heal) SURVIVAL.health = Math.min(20, SURVIVAL.health + def.heal);
-    SURVIVAL.hurtFlash = Math.max(SURVIVAL.hurtFlash, 0.18);
-    updateSurvivalHud();
-    if (typeof updateFoodHud === 'function') updateFoodHud();
-    thock(360);
-    return true;
+  function diePlayer() {
+    SURVIVAL.dead = true;
+    SURVIVAL.health = 0;
+    deathScreen.querySelector('.death-detail').textContent = lastDamageCause ? `死因: ${lastDamageCause}` : '';
+    deathScreen.classList.add('show');
+    releasePointerForUi();
+    if (typeof closeContainer === 'function') closeContainer();
+    writeSaveNow();
   }
-
   function applyFallDamage(fallSpeed) {
     const excess = Math.abs(fallSpeed) - 16.5;
-    if (excess > 0) damagePlayer(Math.ceil(excess * 0.9));
+    if (excess > 0) damagePlayer(Math.ceil(excess * 0.9), '落下');
   }
 
   function updateSurvival(dt, moving) {
-    if (!started) return;
+    if (!started || SURVIVAL.dead) return;
     SURVIVAL.hurtFlash = Math.max(0, SURVIVAL.hurtFlash - dt * 1.8);
-    if (SURVIVAL.respawnClock > 0) {
-      SURVIVAL.respawnClock -= dt;
-      if (SURVIVAL.respawnClock <= 0) respawnPlayer();
-      updateSurvivalHud();
-      return;
+    SURVIVAL.invuln = Math.max(0, SURVIVAL.invuln - dt);
+    // 夜を生き延びた進捗（夜→朝の切り替わりで判定）
+    const isNight = DAY.label === '夜';
+    if (SURVIVAL.wasNight && !isNight) {
+      SAVE.stats.nights = (SAVE.stats.nights || 0) + 1;
+      if (typeof progressEvent === 'function') progressEvent('survive_night');
     }
+    SURVIVAL.wasNight = isNight;
+    // 空腹の減り（動くと早い）
     SURVIVAL.hungerClock += dt * (moving ? 1.0 : 0.35);
     if (SURVIVAL.hungerClock > 28) {
       SURVIVAL.hungerClock = 0;
       SURVIVAL.hunger = Math.max(0, SURVIVAL.hunger - 1);
     }
+    // 空腹が満ちていれば自然回復
     if (SURVIVAL.hunger >= 18 && SURVIVAL.health < 20) {
       SURVIVAL.healClock += dt;
       if (SURVIVAL.healClock > 3.0) {
         SURVIVAL.healClock = 0;
         SURVIVAL.health = Math.min(20, SURVIVAL.health + 1);
+        SURVIVAL.hunger = Math.max(0, SURVIVAL.hunger - 0.4); // 回復は腹が減る
       }
     } else {
       SURVIVAL.healClock = 0;
     }
-    if (SURVIVAL.hunger <= 0) damagePlayer(dt * 0.8);
+    // 飢餓ダメージ
+    if (SURVIVAL.hunger <= 0) {
+      SURVIVAL.starveClock = (SURVIVAL.starveClock || 0) + dt;
+      if (SURVIVAL.starveClock > 3.2) { SURVIVAL.starveClock = 0; damagePlayer(1, '空腹'); }
+    } else {
+      SURVIVAL.starveClock = 0;
+    }
+    // 溶岩・サボテン
     if (!(typeof DEBUG !== 'undefined' && DEBUG.fly)) {
       const fx = Math.floor(player.pos.x), fz = Math.floor(player.pos.z);
       const feet = Math.floor(player.pos.y - 0.9);
       if (blockAt(fx, feet, fz) === LAVA || blockAt(fx, feet + 1, fz) === LAVA) {
-        damagePlayer(dt * 6);
+        damagePlayer(3, '溶岩');
         SURVIVAL.hurtFlash = 0.8;
       }
       for (const [nx, nz] of [[fx + 1, fz], [fx - 1, fz], [fx, fz + 1], [fx, fz - 1]]) {
         if (blockAt(nx, feet, nz) === CACTUS || blockAt(nx, feet + 1, nz) === CACTUS) {
-          damagePlayer(dt * 1.6);
-          SURVIVAL.hurtFlash = Math.max(SURVIVAL.hurtFlash, 0.4);
+          damagePlayer(1, 'サボテン');
           break;
         }
       }
