@@ -74,8 +74,12 @@
     }
     return null;
   }
-  function isExposedToSky(x, y, z) {
-    return y >= heightAt(Math.floor(x), Math.floor(z));
+  // 頭上がブロックで塞がっているか（=空が見えない暗い場所か）。
+  // heightAt は峡谷や洞窟のくり抜きを反映しないため、実ブロックを上へ走査して判定する。
+  function isCoveredFromSky(x, y, z) {
+    const top = Math.min(CHUNK_Y_MAX, y + 48);
+    for (let yy = y + 1; yy <= top; yy++) if (isSolid(x, yy, z)) return true;
+    return false;
   }
 
   /* --- スポーン --- */
@@ -121,9 +125,12 @@
       const x = Math.floor(player.pos.x + Math.cos(a) * r), z = Math.floor(player.pos.z + Math.sin(a) * r);
       if (Math.hypot(x - player.pos.x, z - player.pos.z) < MOB_SPAWN_MIN_R) continue;
       if (underground && counts.cave < MOB_CAVE_MAX && Math.random() < 0.7) {
-        // 洞窟スポーン: プレイヤーの高さ付近の空洞を探す
+        // 洞窟スポーン: プレイヤーの高さ付近の空洞を探す。
+        // 「地形高さより深い」だけでなく「頭上が塞がって空が見えない」ことも必須。
+        // これで峡谷の底や谷底のような、昼間は明るい窪地には湧かない。
         const gy = mobGroundY(x, z, py + rnd(-6, 6));
         if (gy == null || gy >= heightAt(x, z) - 6) continue;
+        if (!isCoveredFromSky(x, gy + 2, z)) continue;
         if (nearPlacedLight(x, gy + 1, z, 8)) continue;
         const roll = Math.random();
         spawnMobAt(roll < 0.45 ? 'slime' : roll < 0.75 ? 'skeleton' : 'zombie', x, gy, z, true);
@@ -258,14 +265,16 @@
     u.attackCd = Math.max(0, u.attackCd - dt);
     u.hurtT = Math.max(0, u.hurtT - dt);
     u.phase += dt * (u.kind === 'slime' ? 5.2 : 7.0);
-    // 昼にゾンビが燃える（日なたのみ）
-    if (u.kind === 'zombie' && !u.cave && DAY.label !== '夜' && isExposedToSky(m.position.x, m.position.y, m.position.z)) {
+    // 昼にゾンビが燃える（空が見える場所のみ。日陰や屋根の下では燃えない）
+    if (u.kind === 'zombie' && !u.cave && DAY.label !== '夜') {
       u.burn += dt;
       if (u.burn > 0.5) {
         u.burn = 0;
-        u.hp -= 2;
-        burst(m.position.x - 0.5, m.position.y + 0.6, m.position.z - 0.5, 0xff7a26);
-        if (u.hp <= 0) { killMob(m); return true; }
+        if (!isCoveredFromSky(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z))) {
+          u.hp -= 2;
+          burst(m.position.x - 0.5, m.position.y + 0.6, m.position.z - 0.5, 0xff7a26);
+          if (u.hp <= 0) { killMob(m); return true; }
+        }
       }
     }
     // ノックバック
