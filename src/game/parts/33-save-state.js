@@ -9,6 +9,8 @@
     player: null,        // {x,y,z,yaw,pitch,hp,hunger}
     time: null,          // DAY.time (0..1)
     inv: null,           // 36スロット [{id,n,dur}|null]
+    armor: null,         // 防具スロット {id,n,dur}|null
+    drops: [],           // 地面に落ちているアイテム [{x,y,z,id,n,dur,life}]
     selected: 0,         // ホットバー選択
     spawn: null,         // ベッドで設定したリスポーン地点 {x,y,z}
     furnaces: {},        // "x,y,z" -> {in,fuel,out,prog,fuelLeft,fuelMax}

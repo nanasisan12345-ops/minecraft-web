@@ -42,6 +42,7 @@
     };
     SAVE.time = DAY.time;
     SAVE.selected = selected;
+    if (typeof collectDropsForSave === 'function') collectDropsForSave();
   }
 
   function respawnPoint() {
@@ -72,6 +73,17 @@
   function damagePlayer(amount, cause = '') {
     if (SURVIVAL.dead || amount <= 0) return;
     if (SURVIVAL.invuln > 0 && amount < 900) return;
+    // 防具によるダメージ軽減（空腹と奈落は防げない）。防具は被弾のたびに消耗する
+    const armor = SAVE.armor, armorDef = armor ? ITEM_DEFS[armor.id] : null;
+    if (armorDef && armorDef.armor && amount < 900 && cause !== '空腹') {
+      amount = Math.max(1, Math.round(amount * (1 - armorDef.armor * 0.06)));
+      armor.dur = (Number.isFinite(armor.dur) ? armor.dur : armorDef.durability) - 1;
+      if (armor.dur <= 0) {
+        SAVE.armor = null;
+        if (typeof setDebugToast === 'function') setDebugToast(`${armorDef.name} が壊れた！`, 2.0);
+      }
+      markSaveDirty();
+    }
     SURVIVAL.health = Math.max(0, SURVIVAL.health - amount);
     SURVIVAL.hurtFlash = 0.75;
     SURVIVAL.invuln = 0.55;
@@ -84,7 +96,19 @@
   function diePlayer() {
     SURVIVAL.dead = true;
     SURVIVAL.health = 0;
-    deathScreen.querySelector('.death-detail').textContent = lastDamageCause ? `死因: ${lastDamageCause}` : '';
+    // Minecraft同様、持ち物は死んだ場所に散らばる（5分残る）。チェスト保管が大事になる
+    const dx = Math.floor(player.pos.x), dy = Math.max(CHUNK_Y_MIN + 2, Math.floor(player.pos.y)), dz = Math.floor(player.pos.z);
+    let dropped = 0;
+    for (let i = 0; i < INV_SIZE; i++) {
+      const s = INV[i];
+      if (!s) continue;
+      spawnItemDrop(dx, dy, dz, s.id, s.n, s.dur, 300);
+      INV[i] = null;
+      dropped++;
+    }
+    if (dropped > 0) invChanged();
+    deathScreen.querySelector('.death-detail').textContent =
+      `${lastDamageCause ? `死因: ${lastDamageCause}　` : ''}${dropped > 0 ? `持ち物は死んだ場所（XYZ ${dx} / ${dy} / ${dz}）に落ちている（約5分で消える）` : ''}`;
     deathScreen.classList.add('show');
     releasePointerForUi();
     if (typeof closeContainer === 'function') closeContainer();

@@ -48,7 +48,7 @@
     if (u.hp <= 0) {
       for (const [id, lo, hi] of (ANIMAL_DROPS[u.kind] || [])) {
         const n = lo + (Math.random() * (hi - lo + 1) | 0);
-        if (n > 0) giveItem(id, n);
+        if (n > 0) spawnItemDrop(Math.floor(a.position.x), Math.floor(a.position.y) + 1, Math.floor(a.position.z), id, n);
       }
       const i = ANIMALS.indexOf(a);
       if (i >= 0) ANIMALS.splice(i, 1);

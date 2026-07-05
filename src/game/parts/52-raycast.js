@@ -133,9 +133,9 @@
     if (t === CHEST) { rollWorldChestLoot(id); spillChest(id); delete SAVE.chestSeen[id]; markSaveDirty(); }
     if (t === FURNACE) spillFurnace(id);
     if (t === BED && SAVE.spawn && SAVE.spawn.x === x && SAVE.spawn.y === y && SAVE.spawn.z === z) { SAVE.spawn = null; markSaveDirty(); }
-    // ドロップ（必要ツールレベルを満たさない鉱石/石はドロップしない）
+    // ドロップ（必要ツールレベルを満たさない鉱石/石はドロップしない）。実体として地面に落ちる
     if (needTier === 0 || hasProperTool) {
-      for (const [itemId, n] of blockDrops(t)) giveItem(itemId, n);
+      for (const [itemId, n] of blockDrops(t)) spawnItemDrop(x, y, z, itemId, n);
     } else if (typeof setDebugToast === 'function' && needTier >= 2) {
       setDebugToast(`${TYPES[t].name} には${needTier >= 3 ? '鉄' : '石'}のツルハシ以上が必要`, 1.6);
     }
@@ -208,8 +208,10 @@
       if (hitType === OPEN_CHEST) { openContainer('chest', { key: key(bx, by, bz) }); return; }
       if (hitType === BED) { trySleepInBed(bx, by, bz); return; }
     }
-    // 食べ物を持っていたら食べる
+    // 弓を持っていたら撃つ
     const def = selectedItemDef();
+    if (def && def.tool === 'bow') { shootPlayerArrow(); return; }
+    // 食べ物を持っていたら食べる
     if (def && def.food) { eatSelectedFood(); return; }
     // ブロック設置
     if (!tg || !def || def.block == null) { if (def && def.block == null) thock(90); return; }

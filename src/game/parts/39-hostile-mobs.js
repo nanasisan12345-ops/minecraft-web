@@ -158,8 +158,43 @@
     vel.x += rnd(-0.8, 0.8); vel.z += rnd(-0.8, 0.8); // 命中は完璧ではない
     mesh.lookAt(mesh.position.clone().add(vel));
     scene.add(mesh);
-    ARROWS.push({ mesh, vel, life: 3.0 });
+    ARROWS.push({ mesh, vel, life: 3.0, fromPlayer: false });
     thock(220);
+  }
+  // プレイヤーの弓（右クリック）。矢を1本消費して視線方向へ撃つ
+  const PLAYER_BOW = { cd: 0 };
+  function shootPlayerArrow() {
+    if (PLAYER_BOW.cd > 0 || SURVIVAL.dead) return false;
+    if (!hasItems([['arrow', 1]])) {
+      if (typeof setDebugToast === 'function') setDebugToast('矢がない！（丸石+棒+繊維でクラフト）', 1.8);
+      thock(90);
+      return false;
+    }
+    takeItems([['arrow', 1]]);
+    PLAYER_BOW.cd = 0.6;
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const mesh = new THREE.Mesh(arrowGeo, arrowMat);
+    mesh.position.copy(camera.position).addScaledVector(dir, 0.6);
+    const vel = dir.multiplyScalar(26);
+    mesh.lookAt(mesh.position.clone().add(vel));
+    scene.add(mesh);
+    ARROWS.push({ mesh, vel, life: 3.0, fromPlayer: true });
+    damageSelectedTool(1);
+    if (typeof triggerHandSwing === 'function') triggerHandSwing();
+    thock(280);
+    return true;
+  }
+  // 矢がMOB/動物に当たったか（プレイヤーの矢のみ）
+  function arrowHitTarget(p) {
+    for (const m of MOBS) {
+      if (Math.abs(p.x - m.position.x) < 0.7 && Math.abs(p.z - m.position.z) < 0.7 && p.y > m.position.y - 0.2 && p.y < m.position.y + 1.9) return m;
+    }
+    if (typeof ANIMALS !== 'undefined') {
+      for (const a of ANIMALS) {
+        if (Math.abs(p.x - a.position.x) < 0.7 && Math.abs(p.z - a.position.z) < 0.7 && p.y > a.position.y - 0.2 && p.y < a.position.y + 1.4) return a;
+      }
+    }
+    return null;
   }
   function updateArrows(dt) {
     for (let i = ARROWS.length - 1; i >= 0; i--) {
@@ -169,11 +204,22 @@
       a.mesh.position.addScaledVector(a.vel, dt);
       a.mesh.lookAt(a.mesh.position.clone().add(a.vel));
       const p = a.mesh.position;
-      const hitPlayer = Math.abs(p.x - player.pos.x) < 0.55 && Math.abs(p.z - player.pos.z) < 0.55 && p.y > player.pos.y - 1.7 && p.y < player.pos.y + 0.4;
-      if (hitPlayer && !SURVIVAL.dead) {
-        damagePlayer(3, 'スケルトンの矢');
-        a.life = 0;
-      } else if (isSolid(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z))) {
+      if (a.fromPlayer) {
+        const hit = a.vel.lengthSq() > 1 ? arrowHitTarget(p) : null;
+        if (hit) {
+          const dir = hit.position.clone().sub(player.pos); dir.y = 0; dir.normalize();
+          if (hit.userData.kind && MOB_DEFS[hit.userData.kind]) damageMobBy(hit, 5, dir, 3.5);
+          else if (typeof damageAnimal === 'function') damageAnimal(hit, 5, dir);
+          a.life = 0;
+        }
+      } else {
+        const hitPlayer = Math.abs(p.x - player.pos.x) < 0.55 && Math.abs(p.z - player.pos.z) < 0.55 && p.y > player.pos.y - 1.7 && p.y < player.pos.y + 0.4;
+        if (hitPlayer && !SURVIVAL.dead) {
+          damagePlayer(3, 'スケルトンの矢');
+          a.life = 0;
+        }
+      }
+      if (a.life > 0 && isSolid(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z))) {
         a.life = Math.min(a.life, 0.4);
         a.vel.set(0, 0, 0);
       }
@@ -187,7 +233,7 @@
     if (!def) return;
     for (const [id, lo, hi] of def.drops) {
       const n = lo + (Math.random() * (hi - lo + 1) | 0);
-      if (n > 0) giveItem(id, n);
+      if (n > 0) spawnItemDrop(Math.floor(m.position.x), Math.floor(m.position.y) + 1, Math.floor(m.position.z), id, n);
     }
   }
   function killMob(m, byPlayer = false) {
@@ -315,6 +361,17 @@
   const PLAYER_ATTACK = { cd: 0 };
   function updatePlayerAttack(dt) {
     PLAYER_ATTACK.cd = Math.max(0, PLAYER_ATTACK.cd - dt);
+    PLAYER_BOW.cd = Math.max(0, PLAYER_BOW.cd - dt);
+  }
+  // 敵MOBへのダメージ共通処理（近接/矢の両方から呼ぶ）
+  function damageMobBy(m, damage, dir, kbPower = 6.5) {
+    const u = m.userData;
+    u.hp -= damage;
+    u.hurtT = 0.35;
+    if (dir) u.kb = { x: dir.x * kbPower, z: dir.z * kbPower, t: 0.22 };
+    burst(m.position.x - 0.5, m.position.y + 0.7, m.position.z - 0.5, 0xcc4444);
+    thock(190);
+    if (u.hp <= 0) killMob(m, true);
   }
   function pickMeleeTarget() {
     const origin = camera.position, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -343,16 +400,10 @@
     const u = target.userData;
     const dir = target.position.clone().sub(player.pos); dir.y = 0; dir.normalize();
     if (u.kind && MOB_DEFS[u.kind]) {
-      u.hp -= damage;
-      u.hurtT = 0.35;
-      u.kb = { x: dir.x * 6.5, z: dir.z * 6.5, t: 0.22 };
-      burst(target.position.x - 0.5, target.position.y + 0.7, target.position.z - 0.5, 0xcc4444);
-      thock(190);
-      if (def && (def.cat === 'weapon' || def.cat === 'tool')) damageSelectedTool(1);
-      if (u.hp <= 0) killMob(target, true);
+      damageMobBy(target, damage, dir);
     } else if (typeof damageAnimal === 'function') {
       damageAnimal(target, damage, dir);
-      if (def && (def.cat === 'weapon' || def.cat === 'tool')) damageSelectedTool(1);
     }
+    if (def && (def.cat === 'weapon' || def.cat === 'tool')) damageSelectedTool(1);
     return true;
   }

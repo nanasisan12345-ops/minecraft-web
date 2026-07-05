@@ -31,6 +31,7 @@
     if (src === 'fin') return furnaceState(UI.ctx.key).in;
     if (src === 'ffuel') return furnaceState(UI.ctx.key).fuel;
     if (src === 'fout') return furnaceState(UI.ctx.key).out;
+    if (src === 'armor') return SAVE.armor;
     const arr = slotArrayFor(src);
     return arr ? arr[idx] || null : null;
   }
@@ -38,12 +39,14 @@
     if (src === 'fin') { furnaceState(UI.ctx.key).in = item; return; }
     if (src === 'ffuel') { furnaceState(UI.ctx.key).fuel = item; return; }
     if (src === 'fout') { furnaceState(UI.ctx.key).out = item; return; }
+    if (src === 'armor') { SAVE.armor = item; markSaveDirty(); return; }
     const arr = slotArrayFor(src);
     if (arr) arr[idx] = item;
   }
   function canPlaceInto(src, item) {
     if (src === 'fout') return false; // 出力は取り出し専用
     if (src === 'ffuel') { const d = item && ITEM_DEFS[item.id]; return !!(d && d.fuel); }
+    if (src === 'armor') { const d = item && ITEM_DEFS[item.id]; return !!(d && d.armor); }
     return true;
   }
 
@@ -113,6 +116,20 @@
       wrap.append(grid, arrow, res);
       top.appendChild(wrap);
       if (UI.mode === 'inventory') {
+        // 防具スロット
+        const armorRow = document.createElement('div');
+        armorRow.className = 'armor-row';
+        const armorLabel = document.createElement('span');
+        armorLabel.className = 'armor-label';
+        armorLabel.textContent = '防具';
+        armorRow.appendChild(armorLabel);
+        armorRow.appendChild(makeSlotEl('armor', 0, 'armor-slot'));
+        const armorInfo = document.createElement('span');
+        armorInfo.className = 'armor-info';
+        const ad = SAVE.armor ? ITEM_DEFS[SAVE.armor.id] : null;
+        armorInfo.textContent = ad && ad.armor ? `${ad.name}: 被ダメージ -${ad.armor * 6}%` : '布/鉄/ダイヤの鎧を装備できる';
+        armorRow.appendChild(armorInfo);
+        top.appendChild(armorRow);
         const hint = document.createElement('div');
         hint.className = 'craft-hint';
         hint.textContent = '2x2クラフト（丸太→板材、板材→棒/作業台 など）。大きなレシピは作業台で。';

@@ -149,6 +149,7 @@
     updateFireflies(dt);
     updateHostileMobs(dt);
     updatePlayerAttack(dt);
+    updateItemDrops(dt);
     updateFurnaces(dt);
     updateFurnaceBars();
     updateProgress(dt);
@@ -170,6 +171,7 @@
     renderer.render(scene, camera);
   }
   regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z)); // 初期生成
+  loadSavedDrops(); // 前回の落ちものを復元
   animate();
   window.__mcReady = true;
   // 動作検証用のデバッグフック（本番でも軽量なので常時公開）
@@ -179,7 +181,11 @@
     save: () => SAVE,
     survival: SURVIVAL,
     mobs: () => MOBS,
+    drops: () => ITEM_DROPS,
+    drop: (id, n = 1) => spawnItemDrop(Math.floor(player.pos.x) + 2, Math.floor(player.pos.y), Math.floor(player.pos.z), id, n),
     day: DAY,
     setTime: (t) => { DAY.time = t; },
     damage: (n) => damagePlayer(n, 'デバッグ'),
+    // レシピ一致テスト: ids は item id | null の配列（長さ w*w）
+    tryRecipe: (ids, w) => { const r = matchRecipe(ids.map(id => (id ? { id, n: 1 } : null)), w); return r ? { out: r.out, n: r.n } : null; },
   };

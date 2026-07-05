@@ -62,6 +62,12 @@
     stone_sword:   { name: '石の剣', cat: 'weapon', tool: 'sword', tier: 2, durability: 132, damage: 4 },
     iron_sword:    { name: '鉄の剣', cat: 'weapon', tool: 'sword', tier: 3, durability: 250, damage: 6 },
     diamond_sword: { name: 'ダイヤの剣', cat: 'weapon', tool: 'sword', tier: 4, durability: 1024, damage: 8 },
+    bow:           { name: '弓', cat: 'weapon', tool: 'bow', tier: 1, durability: 120, damage: 5 },
+    arrow:         { name: '矢', cat: 'material' },
+    // --- 防具（1スロット。armor 1につき被ダメージ-6%） ---
+    cloth_armor:   { name: '布の服', cat: 'armor', armor: 2, durability: 80 },
+    iron_armor:    { name: '鉄の鎧', cat: 'armor', armor: 5, durability: 240 },
+    diamond_armor: { name: 'ダイヤの鎧', cat: 'armor', armor: 7, durability: 500 },
   };
   // 名前付きIDにない設置可能ブロック（和風建材など）も、採掘したら持てるよう自動登録する
   const ITEM_FOR_BLOCK = [];
@@ -227,7 +233,21 @@
     const px = (x, y, w, h, color) => { g.fillStyle = color; g.fillRect(x, y, w, h); };
     const metal = id.startsWith('diamond') ? '#66e0ee' : id.startsWith('iron') ? '#d8dde2' : id.startsWith('stone') ? '#8a8f92' : '#b5824a';
     const darkMetal = id.startsWith('diamond') ? '#2f98a8' : id.startsWith('iron') ? '#9aa3aa' : id.startsWith('stone') ? '#5f6468' : '#6d4c1b';
-    if (d.tool === 'pickaxe') {
+    if (d.tool === 'bow') {
+      px(10, 4, 3, 4, '#7a4d24'); px(8, 7, 3, 6, '#7a4d24'); px(7, 13, 3, 6, '#7a4d24'); px(8, 19, 3, 6, '#7a4d24'); px(10, 24, 3, 4, '#7a4d24');
+      px(14, 5, 1, 22, '#e8e4d6');
+    } else if (d.armor) {
+      const c = id.startsWith('diamond') ? '#66e0ee' : id.startsWith('iron') ? '#d8dde2' : '#f0ede2';
+      const dark = id.startsWith('diamond') ? '#2f98a8' : id.startsWith('iron') ? '#9aa3aa' : '#c9c4b2';
+      px(6, 6, 6, 6, c); px(20, 6, 6, 6, c);
+      px(6, 12, 20, 14, c);
+      px(12, 6, 8, 4, dark);
+      px(8, 14, 16, 2, dark);
+    } else if (id === 'arrow') {
+      px(15, 4, 2, 20, '#cabb9a');
+      px(13, 3, 6, 4, '#8a8f92');
+      px(12, 23, 3, 5, '#e8e4d6'); px(17, 23, 3, 5, '#e8e4d6');
+    } else if (d.tool === 'pickaxe') {
       px(14, 8, 4, 22, '#7a4d24');
       px(6, 4, 20, 4, metal); px(4, 6, 4, 6, metal); px(24, 6, 4, 6, metal);
       px(6, 8, 20, 2, darkMetal);
@@ -273,3 +293,4 @@
     }
   }
   loadInventoryFromSave();
+  SAVE.armor = normalizeSlot(SAVE.armor);

@@ -31,6 +31,13 @@
     { out: 'stone_sword', n: 1, pattern: ['M', 'M', 'S'], keys: { M: 'cobblestone', S: 'stick' } },
     { out: 'iron_sword', n: 1, pattern: ['M', 'M', 'S'], keys: { M: 'iron_ingot', S: 'stick' } },
     { out: 'diamond_sword', n: 1, pattern: ['M', 'M', 'S'], keys: { M: 'diamond', S: 'stick' } },
+    // 弓と矢
+    { out: 'bow', n: 1, pattern: [' SF', 'S F', ' SF'], keys: { S: 'stick', F: 'fiber' } },
+    { out: 'arrow', n: 4, pattern: ['C', 'S', 'F'], keys: { C: 'cobblestone', S: 'stick', F: 'fiber' } },
+    // 防具（胸当て型）
+    { out: 'cloth_armor', n: 1, pattern: ['M M', 'MMM', 'MMM'], keys: { M: 'cloth' } },
+    { out: 'iron_armor', n: 1, pattern: ['M M', 'MMM', 'MMM'], keys: { M: 'iron_ingot' } },
+    { out: 'diamond_armor', n: 1, pattern: ['M M', 'MMM', 'MMM'], keys: { M: 'diamond' } },
   ];
   // レシピの pattern を [ [id|null,...], ... ] に正規化してキャッシュ
   for (const r of RECIPES) {

@@ -61,6 +61,10 @@
   .craft-grid { width: max-content; }
   .craft-arrow { font-size: 26px; color: rgba(255,255,255,.7); }
   .craft-hint { margin-top: 8px; color: rgba(255,255,255,.55); font-size: 11px; }
+  .armor-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .armor-label { color: rgba(255,255,255,.62); font-size: 12px; font-weight: 700; }
+  .armor-slot { border-color: rgba(120,180,240,.5); background: rgba(50,80,110,.3); }
+  .armor-info { color: rgba(160,210,255,.85); font-size: 11px; }
   .chest-grid { grid-template-columns: repeat(9, 46px); }
   /* かまど */
   .furnace-area { display: flex; align-items: center; gap: 22px; padding: 4px 6px; }
