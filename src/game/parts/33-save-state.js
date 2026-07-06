@@ -16,6 +16,7 @@
     furnaces: {},        // "x,y,z" -> {in,fuel,out,prog,fuelLeft,fuelMax}
     chests: {},          // "x,y,z" -> 27スロット配列
     chestSeen: {},       // 生成チェストのロット抽選済みフラグ "x,y,z" -> 1
+    crops: {},           // 成長中の作物 "x,y,z" -> 経過秒
     trades: {},          // 取引ID -> 回数
     progress: [],        // 達成済み進捗ID
     stats: { kills: 0, nights: 0 },
@@ -29,7 +30,7 @@
       for (const k of Object.keys(SAVE)) if (data[k] !== undefined) SAVE[k] = data[k];
       if (!SAVE.stats || typeof SAVE.stats !== 'object') SAVE.stats = { kills: 0, nights: 0 };
       if (!Array.isArray(SAVE.progress)) SAVE.progress = [];
-      for (const k of ['furnaces', 'chests', 'chestSeen', 'trades']) if (!SAVE[k] || typeof SAVE[k] !== 'object') SAVE[k] = {};
+      for (const k of ['furnaces', 'chests', 'chestSeen', 'trades', 'crops']) if (!SAVE[k] || typeof SAVE[k] !== 'object') SAVE[k] = {};
     } catch (e) {}
   }
   function writeSaveNow() {

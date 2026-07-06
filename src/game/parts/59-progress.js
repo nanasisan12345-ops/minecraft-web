@@ -16,6 +16,8 @@
     { id: 'make_chest', label: 'チェストを作る（板材8）', ev: 'item', data: 'chest' },
     { id: 'sleep_bed', label: 'ベッドで眠る（布3+板材3で作成）', ev: 'sleep' },
     { id: 'explore_cave', label: '洞窟を深くまで探索する', ev: 'cave' },
+    { id: 'make_hoe', label: 'クワを作って畑を耕す準備をする', ev: 'item', data: 'wood_hoe' },
+    { id: 'grow_wheat', label: '小麦を育てて収穫する', ev: 'item', data: 'wheat' },
     { id: 'get_diamond', label: 'ダイヤを見つける（鉄のツルハシ以上）', ev: 'item', data: 'diamond' },
     { id: 'find_village', label: '村を見つける', ev: 'village' },
     { id: 'do_trade', label: '村人と取引する', ev: 'trade' },

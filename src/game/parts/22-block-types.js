@@ -54,6 +54,10 @@
     { name: '提灯', color: 0xffc36a, icon: T.paperLantern, mats: faceMats(T.paperLantern, { emissive: 0xff9c44, emissiveIntensity: 0.72, shininess: 12, specular: 0x442000 }) }, // 38
     { name: '丸石', color: 0x7d8286, icon: T.cobble, mats: faceMats(T.cobble) }, // 39
     { name: 'ベッド', color: 0xb03030, icon: T.bedTop, mats: faceMats([T.bedSide, T.bedSide, T.bedTop, T.bedSide, T.bedSide, T.bedSide]) }, // 40
+    { name: '耕地', color: 0x6b4423, icon: T.farmland, mats: faceMats([T.dirt, T.dirt, T.farmland, T.dirt, T.dirt, T.dirt]) }, // 41
+    { name: '小麦の苗', color: 0x55a83c, icon: T.wheatYoung, mats: faceMats(T.wheatYoung, { transparent: true, depthWrite: false }), transparent: true, solid: false }, // 42
+    { name: '小麦', color: 0xd8b84a, icon: T.wheatRipe, mats: faceMats(T.wheatRipe, { transparent: true, depthWrite: false }), transparent: true, solid: false }, // 43
+    { name: 'かまど(点火)', color: 0x757a7d, icon: T.furnaceLit, mats: faceMats(T.furnaceLit, { emissive: 0xff6a24, emissiveIntensity: 0.55 }) }, // 44
   ];
   const GRASS = 0, DIRT = 1, STONE = 2, LOG = 3, LEAVES = 4, SAND = 5, PLANKS = 6, BRICK = 7, GLASS = 8, WATER = 9, SNOW = 10;
   const COAL_ORE = 11, IRON_ORE = 12, GOLD_ORE = 13, DIAMOND_ORE = 14, TORCH = 15;
@@ -64,3 +68,4 @@
   const BRONZE = 33, BRONZE_DARK = 34;
   const TATAMI = 35, SHOJI = 36, NOREN = 37, PAPER_LANTERN = 38;
   const COBBLESTONE = 39, BED = 40;
+  const FARMLAND = 41, WHEAT_YOUNG = 42, WHEAT_RIPE = 43, FURNACE_LIT = 44;

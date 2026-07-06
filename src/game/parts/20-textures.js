@@ -302,9 +302,43 @@
       g.fillStyle = tint(0x6d4c1b, 0.85); g.fillRect(0, 16, S, 3);
       g.fillStyle = tint(0x5a3d1a, 0.9); g.fillRect(0, S - 4, 4, 4); g.fillRect(S - 4, S - 4, 4, 4);
     }),
+    farmland: makeTex((g, S) => {                            // 耕地。湿った土＋畝の溝。
+      noise(g, S, 0x6b4423, 0.72, 1.0);
+      for (let y = 2; y < S; y += 6) { g.fillStyle = 'rgba(26,15,7,0.55)'; g.fillRect(0, y, S, 2); }
+      dots(g, S, 0x8a5a2b, 0.04, 1.1);
+      dots(g, S, 0x3a240f, 0.05, 0.8);
+    }),
+    wheatYoung: makeTex((g, S) => {                          // 小麦の苗。若い緑の茎。
+      g.clearRect(0, 0, S, S);
+      for (let i = 0; i < 10; i++) {
+        const x = 2 + i * 3, h = 9 + (Math.random() * 8 | 0);
+        g.fillStyle = tint(0x55a83c, rnd(0.8, 1.15));
+        g.fillRect(x, S - h, 2, h);
+        g.fillStyle = tint(0x77c455, rnd(0.9, 1.1));
+        g.fillRect(x, S - h, 2, 2);
+      }
+    }),
+    wheatRipe: makeTex((g, S) => {                           // 実った小麦。金色の穂。
+      g.clearRect(0, 0, S, S);
+      for (let i = 0; i < 10; i++) {
+        const x = 2 + i * 3, h = 15 + (Math.random() * 9 | 0);
+        g.fillStyle = tint(0xd8b84a, rnd(0.85, 1.1));
+        g.fillRect(x, S - h, 2, h);
+        g.fillStyle = tint(0xe6cc5e, rnd(0.9, 1.12));
+        g.fillRect(x - 1, S - h - 4, 4, 5);
+      }
+    }),
+    furnaceLit: makeTex((g, S) => {                          // 点火中のかまど。口から炎。
+      noise(g, S, 0x757a7d, 0.86, 1.06);
+      g.fillStyle = tint(0x4a4e52, 0.9); g.fillRect(0, 0, S, 3); g.fillRect(0, S - 3, S, 3); g.fillRect(0, 0, 3, S); g.fillRect(S - 3, 0, 3, S);
+      g.fillStyle = '#33363a'; g.fillRect(6, 13, 20, 13);
+      g.fillStyle = '#ff8a22'; g.fillRect(8, 15, 16, 9);
+      g.fillStyle = '#ffd34a'; g.fillRect(10, 17, 12, 6);
+      g.fillStyle = '#fff2a3'; g.fillRect(13, 18, 6, 4);
+    }),
   };
   TX.lava.wrapS = TX.lava.wrapT = THREE.RepeatWrapping;
   TX.cactus.userData.normalMap = normalFromCanvas(TX.cactus.image, 2.2);
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
-  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide'])
+  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'farmland', 'furnaceLit'])
     TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);

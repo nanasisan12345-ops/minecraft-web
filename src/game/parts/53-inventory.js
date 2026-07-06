@@ -37,6 +37,7 @@
     fiber:        { name: '繊維', cat: 'material' },
     cloth:        { name: '布', cat: 'material' },
     wheat:        { name: '小麦', cat: 'material' },
+    wheat_seeds:  { name: '小麦の種', cat: 'material' },
     bone:         { name: '骨', cat: 'material' },
     slime_ball:   { name: 'スライム玉', cat: 'material' },
     // --- 食料 ---
@@ -57,6 +58,9 @@
     wood_shovel:     { name: '木のシャベル', cat: 'tool', tool: 'shovel', tier: 1, durability: 60, damage: 1 },
     stone_shovel:    { name: '石のシャベル', cat: 'tool', tool: 'shovel', tier: 2, durability: 132, damage: 2 },
     iron_shovel:     { name: '鉄のシャベル', cat: 'tool', tool: 'shovel', tier: 3, durability: 250, damage: 3 },
+    wood_hoe:        { name: '木のクワ', cat: 'tool', tool: 'hoe', tier: 1, durability: 60, damage: 1 },
+    stone_hoe:       { name: '石のクワ', cat: 'tool', tool: 'hoe', tier: 2, durability: 132, damage: 1 },
+    iron_hoe:        { name: '鉄のクワ', cat: 'tool', tool: 'hoe', tier: 3, durability: 250, damage: 1 },
     // --- 武器 ---
     wood_sword:    { name: '木の剣', cat: 'weapon', tool: 'sword', tier: 1, durability: 60, damage: 3 },
     stone_sword:   { name: '石の剣', cat: 'weapon', tool: 'sword', tier: 2, durability: 132, damage: 4 },
@@ -258,6 +262,10 @@
     } else if (d.tool === 'shovel') {
       px(14, 2, 4, 20, '#7a4d24');
       px(11, 20, 10, 9, metal); px(13, 27, 6, 3, darkMetal);
+    } else if (d.tool === 'hoe') {
+      px(14, 6, 4, 22, '#7a4d24');
+      px(6, 4, 12, 4, metal); px(6, 8, 4, 5, metal);
+      px(6, 6, 12, 2, darkMetal);
     } else if (d.tool === 'sword') {
       px(14, 2, 4, 18, metal); px(15, 3, 1, 15, '#ffffff');
       px(9, 20, 14, 3, darkMetal); px(14, 23, 4, 7, '#7a4d24');
@@ -274,6 +282,7 @@
         stick: '#8a5a2b', coal: '#2e3236', raw_iron: '#c78a55', iron_ingot: '#d8dde2',
         raw_gold: '#d8ae3c', gold_ingot: '#f2cb45', diamond: '#5fe0ee', glow_shard: '#6df7ff',
         fiber: '#a8c26a', cloth: '#f0ede2', wheat: '#dcc25e', bone: '#ece8da', slime_ball: '#5aae4c',
+        wheat_seeds: '#8bbf4a',
       };
       const c = colors[id] || '#c0c0c0';
       if (id.endsWith('_ingot')) {
@@ -281,6 +290,8 @@
         px(8, 15, 16, 2, 'rgba(255,255,255,0.5)');
       } else if (id === 'stick') {
         px(18, 4, 4, 8, c); px(15, 10, 4, 8, c); px(12, 16, 4, 8, c); px(9, 22, 4, 7, c);
+      } else if (id === 'wheat_seeds') {
+        for (const [x, y] of [[9, 10], [16, 9], [12, 15], [19, 16], [8, 19], [15, 21]]) { px(x, y, 3, 4, c); px(x, y, 3, 2, '#c8e08a'); }
       } else if (id === 'fiber' || id === 'wheat') {
         for (let i = 0; i < 4; i++) px(8 + i * 5, 6, 2, 20, c);
         px(6, 22, 20, 3, id === 'wheat' ? '#a8863a' : '#7a9a4a');

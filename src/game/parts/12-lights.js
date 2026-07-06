@@ -35,7 +35,7 @@
     const found = [];
     for (let x = px - 13; x <= px + 13; x++) for (let z = pz - 13; z <= pz + 13; z++) for (let y = Math.max(CHUNK_Y_MIN, py - 8); y <= Math.min(CHUNK_Y_MAX, py + 7); y++) {
       const type = blockAt(x, y, z);
-      if (type !== TORCH && type !== GLOW_CRYSTAL && type !== LANTERN && type !== LAVA) continue;
+      if (type !== TORCH && type !== GLOW_CRYSTAL && type !== LANTERN && type !== LAVA && type !== FURNACE_LIT) continue;
       found.push({ x, y, z, type, d: Math.hypot(x + 0.5 - player.pos.x, y + 0.5 - player.pos.y, z + 0.5 - player.pos.z) });
     }
     found.sort((a, b) => a.d - b.d);
@@ -56,6 +56,10 @@
         l.color.setHex(0xff7a26);
         l.distance = 10;
         l.intensity = 1.15 + Math.sin(performance.now() * 0.005 + i) * 0.12;
+      } else if (f.type === FURNACE_LIT) {
+        l.color.setHex(0xff8a30);
+        l.distance = 7;
+        l.intensity = 0.9 + Math.sin(performance.now() * 0.009 + i) * 0.18;
       } else {
         l.color.setHex(0xffb24a);
         l.distance = 9;

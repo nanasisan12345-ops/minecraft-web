@@ -26,6 +26,10 @@
     { out: 'wood_shovel', n: 1, pattern: ['M', 'S', 'S'], keys: { M: 'planks', S: 'stick' } },
     { out: 'stone_shovel', n: 1, pattern: ['M', 'S', 'S'], keys: { M: 'cobblestone', S: 'stick' } },
     { out: 'iron_shovel', n: 1, pattern: ['M', 'S', 'S'], keys: { M: 'iron_ingot', S: 'stick' } },
+    // クワ（農業用）
+    { out: 'wood_hoe', n: 1, pattern: ['MM', 'S ', 'S '], keys: { M: 'planks', S: 'stick' } },
+    { out: 'stone_hoe', n: 1, pattern: ['MM', 'S ', 'S '], keys: { M: 'cobblestone', S: 'stick' } },
+    { out: 'iron_hoe', n: 1, pattern: ['MM', 'S ', 'S '], keys: { M: 'iron_ingot', S: 'stick' } },
     // 剣
     { out: 'wood_sword', n: 1, pattern: ['M', 'M', 'S'], keys: { M: 'planks', S: 'stick' } },
     { out: 'stone_sword', n: 1, pattern: ['M', 'M', 'S'], keys: { M: 'cobblestone', S: 'stick' } },
@@ -112,6 +116,20 @@
     if (st.out && (st.out.id !== outId || st.out.n >= maxStack(outId))) return false;
     return true;
   }
+  // 点火状態に合わせて、かまどブロックの見た目を FURNACE ⇄ FURNACE_LIT で切り替える。
+  // 起動中(fuelLeft>0)は炎テクスチャ＆発光。プレイヤー設置(edit)は setEdit で、
+  // 構造物由来(world)は setBlock で切り替える。edits に載る FURNACE_LIT は起動時に正規化する。
+  function syncFurnaceVisual(id, lit) {
+    const c = id.split(',');
+    const x = +c[0], y = +c[1], z = +c[2];
+    const cur = blockAt(x, y, z);
+    if (cur !== FURNACE && cur !== FURNACE_LIT) return; // かまどが撤去済み
+    const want = lit ? FURNACE_LIT : FURNACE;
+    if (cur === want) return;
+    if (edits.get(id) === FURNACE || edits.get(id) === FURNACE_LIT) { setEdit(id, want); saveEditsSoon(); }
+    setBlock(x, y, z, want);
+    requestEditedBlockRebuild(x, y, z);
+  }
   function updateFurnaces(dt) {
     let changed = false;
     for (const id of Object.keys(SAVE.furnaces)) {
@@ -146,14 +164,19 @@
       } else if (!canSmelt || !st.fuel) {
         st.prog = Math.max(0, st.prog - dt * 2);
       }
+      // 見た目を点火状態に合わせる
+      syncFurnaceVisual(id, st.fuelLeft > 0);
       // 空のかまど状態は保存から掃除する
-      if (!st.in && !st.fuel && !st.out && st.prog <= 0 && st.fuelLeft <= 0) { delete SAVE.furnaces[id]; changed = true; }
+      if (!st.in && !st.fuel && !st.out && st.prog <= 0 && st.fuelLeft <= 0) { syncFurnaceVisual(id, false); delete SAVE.furnaces[id]; changed = true; }
     }
     if (changed) {
       markSaveDirty();
       if (typeof refreshOpenPanels === 'function') refreshOpenPanels();
     }
   }
+  // 起動時: 前回セッションで点火のまま保存された FURNACE_LIT の edit を FURNACE へ戻す
+  // （まだ燃料が残っていれば updateFurnaces が即座に再点火する）。
+  for (const [eid, et] of edits) if (et === FURNACE_LIT) setEdit(eid, FURNACE);
   // かまど/チェストを壊したときに中身をプレイヤーへ渡す
   function spillFurnace(id) {
     const st = SAVE.furnaces[id];

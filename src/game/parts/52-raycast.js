@@ -18,15 +18,15 @@
 
   /* --- ブロックごとの適正ツール / 硬さ / 必要ツールレベル --- */
   function blockPreferredTool(type) {
-    if ([STONE, COBBLESTONE, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK].includes(type)) return 'pickaxe';
+    if ([STONE, COBBLESTONE, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK].includes(type)) return 'pickaxe';
     if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN].includes(type)) return 'axe';
-    if ([DIRT, GRASS, SAND, SNOW].includes(type)) return 'shovel';
+    if ([DIRT, GRASS, SAND, SNOW, FARMLAND].includes(type)) return 'shovel';
     return null;
   }
   const BLOCK_HARDNESS = new Map([
     [LEAVES, 0.25], [TORCH, 0.1], [SNOW, 0.22], [DIRT, 0.6], [GRASS, 0.7], [SAND, 0.55],
-    [LOG, 2.2], [PLANKS, 1.8], [CRAFTING_TABLE, 1.8], [BED, 0.9],
-    [STONE, 2.4], [COBBLESTONE, 2.6], [BRICK, 2.8], [FURNACE, 3.0],
+    [LOG, 2.2], [PLANKS, 1.8], [CRAFTING_TABLE, 1.8], [BED, 0.9], [FARMLAND, 0.6],
+    [STONE, 2.4], [COBBLESTONE, 2.6], [BRICK, 2.8], [FURNACE, 3.0], [FURNACE_LIT, 3.0],
     [COAL_ORE, 3.0], [IRON_ORE, 3.4], [GOLD_ORE, 3.4], [DIAMOND_ORE, 4.0],
     [GLASS, 0.4], [GLOW_CRYSTAL, 1.2], [DRIPSTONE, 1.0],
     [STONE_BRICK, 2.6], [MOSSY_BRICK, 2.4], [CHEST, 1.8], [OPEN_CHEST, 1.4], [LANTERN, 0.4], [CACTUS, 0.5], [VILLAGE_SIGN, 0.7],
@@ -68,10 +68,11 @@
     if (type === DIAMOND_ORE) return [['diamond', 1]];
     if (type === GLOW_CRYSTAL) return [['glow_shard', 1]];
     if (type === OPEN_CHEST || type === VILLAGE_SIGN) return [['planks', 1]];
+    if (type === FARMLAND || type === FURNACE_LIT) return [[type === FARMLAND ? 'dirt' : 'furnace', 1]];
     if (type === GRASS) {
       const out = [['dirt', 1]];
       if (Math.random() < 0.15) out.push(['fiber', 1]);
-      if (Math.random() < 0.10) out.push(['wheat', 1]);
+      if (Math.random() < 0.22) out.push(['wheat_seeds', 1]);
       return out;
     }
     if (type === LEAVES) {
@@ -131,8 +132,18 @@
     const id = key(x, y, z);
     // 中身持ちブロックの後始末
     if (t === CHEST) { rollWorldChestLoot(id); spillChest(id); delete SAVE.chestSeen[id]; markSaveDirty(); }
-    if (t === FURNACE) spillFurnace(id);
+    if (t === FURNACE || t === FURNACE_LIT) spillFurnace(id);
     if (t === BED && SAVE.spawn && SAVE.spawn.x === x && SAVE.spawn.y === y && SAVE.spawn.z === z) { SAVE.spawn = null; markSaveDirty(); }
+    // 耕地を壊したら上の作物も一緒に撤去する
+    if (t === FARMLAND) {
+      const above = blockAt(x, y + 1, z);
+      if (above === WHEAT_YOUNG || above === WHEAT_RIPE) {
+        if (above === WHEAT_RIPE) spawnItemDrop(x, y + 1, z, 'wheat', 1);
+        spawnItemDrop(x, y + 1, z, 'wheat_seeds', 1);
+        if (typeof clearCropAt === 'function') clearCropAt(x, y + 1, z);
+        setEdit(key(x, y + 1, z), -1); setBlock(x, y + 1, z, null); requestEditedBlockRebuild(x, y + 1, z);
+      }
+    }
     // ドロップ（必要ツールレベルを満たさない鉱石/石はドロップしない）。実体として地面に落ちる
     if (needTier === 0 || hasProperTool) {
       for (const [itemId, n] of blockDrops(t)) spawnItemDrop(x, y, z, itemId, n);
@@ -196,7 +207,7 @@
       const [bx, by, bz] = tg.block;
       const hitType = blockAt(bx, by, bz);
       if (hitType === CRAFTING_TABLE) { openContainer('table'); return; }
-      if (hitType === FURNACE) { openContainer('furnace', { key: key(bx, by, bz) }); return; }
+      if (hitType === FURNACE || hitType === FURNACE_LIT) { openContainer('furnace', { key: key(bx, by, bz) }); return; }
       if (hitType === CHEST) {
         const id = key(bx, by, bz);
         // プレイヤーが置いたチェスト以外（＝ワールド生成）は初回に報酬を抽選
@@ -211,6 +222,17 @@
     // 弓を持っていたら撃つ
     const def = selectedItemDef();
     if (def && def.tool === 'bow') { shootPlayerArrow(); return; }
+    // 農業: クワで耕す / 耕地の上の作物を収穫 / 種をまく
+    if (tg) {
+      const [bx, by, bz] = tg.block;
+      const hitType = blockAt(bx, by, bz);
+      if (def && def.tool === 'hoe' && tillableBlock(hitType)) { tillSoil(bx, by, bz); return; }
+      if (hitType === FARMLAND) {
+        const above = blockAt(bx, by + 1, bz);
+        if (above === WHEAT_RIPE || above === WHEAT_YOUNG) { harvestCrop(bx, by + 1, bz); return; }
+        if (def && def.id === 'wheat_seeds') { plantSeed(bx, by, bz); return; }
+      }
+    }
     // 食べ物を持っていたら食べる
     if (def && def.food) { eatSelectedFood(); return; }
     // ブロック設置

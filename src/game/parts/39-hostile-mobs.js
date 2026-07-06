@@ -3,8 +3,10 @@
    * - 左クリックで攻撃（武器でダメージ変化・クールダウン・ノックバックあり）。
    * - ゾンビは昼の日なたで燃える。スケルトンは矢を放つ。ドロップあり。 */
   const MOBS = [];
-  const MOB_SURFACE_MAX = 20, MOB_CAVE_MAX = 10;
-  const MOB_SPAWN_MIN_R = 16, MOB_SPAWN_MAX_R = 46, MOB_DESPAWN_R = 80;
+  // 本家寄りに少なめ・湧きすぎないように。1回のスポーン試行で湧く上限も制限する。
+  const MOB_SURFACE_MAX = 8, MOB_CAVE_MAX = 6;
+  const MOB_SPAWN_PER_CYCLE = 2;   // 1スポーンサイクルで湧かせる最大数
+  const MOB_SPAWN_MIN_R = 20, MOB_SPAWN_MAX_R = 48, MOB_DESPAWN_R = 72;
   const MOB_DEFS = {
     zombie: { name: 'ゾンビ', hp: 20, speed: 1.85, damage: 3, attackRange: 1.5, attackCd: 1.25, drops: [['rotten_flesh', 0, 2]] },
     slime: { name: 'スライム', hp: 8, speed: 1.5, damage: 2, attackRange: 1.15, attackCd: 1.0, drops: [['slime_ball', 1, 2]] },
@@ -120,7 +122,11 @@
     const px = Math.floor(player.pos.x), py = Math.floor(player.pos.y), pz = Math.floor(player.pos.z);
     const surfaceH = heightAt(px, pz);
     const underground = py < surfaceH - 6;
-    for (let tries = 0; tries < 8; tries++) {
+    const isNight = DAY.label === '夜';
+    // 地上が満員 or（地上でも地下でも湧く条件が無い）なら早期に抜ける
+    if (!isNight && !underground) return;                 // 昼の地上では湧かない
+    let spawned = 0;                                       // このサイクルで湧かせた数（上限あり）
+    for (let tries = 0; tries < 12 && spawned < MOB_SPAWN_PER_CYCLE; tries++) {
       const a = Math.random() * Math.PI * 2, r = rnd(MOB_SPAWN_MIN_R + 2, MOB_SPAWN_MAX_R);
       const x = Math.floor(player.pos.x + Math.cos(a) * r), z = Math.floor(player.pos.z + Math.sin(a) * r);
       if (Math.hypot(x - player.pos.x, z - player.pos.z) < MOB_SPAWN_MIN_R) continue;
@@ -134,18 +140,18 @@
         if (nearPlacedLight(x, gy + 1, z, 8)) continue;
         const roll = Math.random();
         spawnMobAt(roll < 0.45 ? 'slime' : roll < 0.75 ? 'skeleton' : 'zombie', x, gy, z, true);
-        counts.cave++;
+        counts.cave++; spawned++;
         continue;
       }
       // 地上スポーン: 夜のみ
-      if (DAY.label !== '夜' || counts.surface >= MOB_SURFACE_MAX) continue;
+      if (!isNight || counts.surface >= MOB_SURFACE_MAX) continue;
       if (!canSpawnSurfaceMobAt(x, z)) continue;
       const h = heightAt(x, z);
       const swamp = typeof biomeAt === 'function' && biomeAt(x, z).id === 'swamp';
       const roll = Math.random();
       const kind = swamp && roll < 0.5 ? 'slime' : roll < 0.6 ? 'zombie' : roll < 0.85 ? 'skeleton' : 'slime';
       spawnMobAt(kind, x, h, z, false);
-      counts.surface++;
+      counts.surface++; spawned++;
     }
   }
 
@@ -265,16 +271,28 @@
     u.attackCd = Math.max(0, u.attackCd - dt);
     u.hurtT = Math.max(0, u.hurtT - dt);
     u.phase += dt * (u.kind === 'slime' ? 5.2 : 7.0);
-    // 昼にゾンビが燃える（空が見える場所のみ。日陰や屋根の下では燃えない）
-    if (u.kind === 'zombie' && !u.cave && DAY.label !== '夜') {
-      u.burn += dt;
-      if (u.burn > 0.5) {
-        u.burn = 0;
-        if (!isCoveredFromSky(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z))) {
-          u.hp -= 2;
-          burst(m.position.x - 0.5, m.position.y + 0.6, m.position.z - 0.5, 0xff7a26);
-          if (u.hp <= 0) { killMob(m); return true; }
+    // 日光による焼失（本家と同じ）。朝〜昼に、空が見える場所にいるゾンビ/スケルトンは
+    // 炎に包まれて数秒で燃え尽きる。屋根や洞窟など日陰にいれば生き延びる。
+    if ((u.kind === 'zombie' || u.kind === 'skeleton') && !u.cave && (DAY.label === '朝' || DAY.label === '昼')) {
+      const exposed = !isCoveredFromSky(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
+      if (exposed) {
+        u.burn += dt;
+        // 燃えている間は継続的に炎の粒子を上げる
+        if (Math.random() < dt * 12) burst(m.position.x - 0.5, m.position.y + 0.4 + Math.random() * 0.9, m.position.z - 0.5, Math.random() < 0.5 ? 0xff7a26 : 0xffd24a);
+        if (u.burn > 0.4) {
+          u.burn = 0;
+          u.hp -= 3;                                  // ゾンビ20/スケルトン16 → 約2〜3秒で焼死
+          if (u.hp <= 0) {
+            for (let k = 0; k < 3; k++) burst(m.position.x - 0.5, m.position.y + 0.5, m.position.z - 0.5, 0xff7a26);
+            killMob(m);                               // 日光で死ぬのでドロップ無し（プレイヤー撃破ではない）
+            return true;
+          }
         }
+      } else if (Math.random() < dt * 0.3) {
+        // 日陰で生き残った個体も、昼のうちに少しずつどこかへ立ち去る（溜まりすぎ防止）
+        burst(m.position.x - 0.5, m.position.y + 0.4, m.position.z - 0.5, 0xdddddd);
+        const idx = MOBS.indexOf(m); if (idx >= 0) MOBS.splice(idx, 1); scene.remove(m);
+        return true;
       }
     }
     // ノックバック
@@ -345,17 +363,18 @@
       return;
     }
     mobSpawnClock -= dt;
-    if (mobSpawnClock <= 0) { trySpawnMobs(); mobSpawnClock = 3.0; }
+    if (mobSpawnClock <= 0) { trySpawnMobs(); mobSpawnClock = 5.0; }
+    const daytime = DAY.label === '昼' || DAY.label === '朝';
     for (let i = MOBS.length - 1; i >= 0; i--) {
       const m = MOBS[i];
       const dist = Math.hypot(m.position.x - player.pos.x, m.position.z - player.pos.z);
       if (dist > MOB_DESPAWN_R) { scene.remove(m); MOBS.splice(i, 1); continue; }
-      // 地上MOBは朝になったら順次消える（ゾンビは燃えて消える）
-      if (!m.userData.cave && DAY.label !== '夜' && m.userData.kind !== 'zombie' && Math.random() < dt * 0.25) {
+      // 朝〜昼、地上のスライムは燃えないので静かに消える（ゾンビ/スケルトンは updateMob 内で焼失）。
+      if (!m.userData.cave && daytime && m.userData.kind === 'slime' && Math.random() < dt * 0.5) {
         burst(m.position.x - 0.5, m.position.y + 0.4, m.position.z - 0.5, 0xdddddd);
         scene.remove(m); MOBS.splice(i, 1); continue;
       }
-      if (updateMob(m, dt)) continue; // killMob済み
+      if (updateMob(m, dt)) continue; // killMob済み（焼失・立ち去り含む）
     }
     updateArrows(dt);
   }

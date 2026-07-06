@@ -20,6 +20,15 @@
 - **検証**: `npm.cmd run check` 成功。プレビュー実測で、クラフト（丸太→板材、UIクリック経由）、かまど（粗鉄2+石炭→鉄インゴット2、燃料消費・進行バー・完成品）、進捗達成・セーブ復元・夜の敵スポーン&朝の焼失を確認。console error/warn なし。
 - **既知の未実装/次の候補**: 農業（小麦は草ブロックのドロップ/取引のみ）、かまど点火中の見た目変化（FURNACE_LIT ブロック追加＋updateFurnaces からの setBlock 切替。edits を汚さない見た目だけの切替にすること）、モブの水泳/落下、本格光量計算によるスポーン抑制、防具の見た目反映（三人称/一人称）。
 
+### 2026-07-06 第3弾: 農業 + かまど点火表示 + 昼夜/スポーンのバランス調整（ユーザー指摘）
+
+- **農業** 新規 `48-farming.js`。新ブロック FARMLAND(41)/WHEAT_YOUNG(42)/WHEAT_RIPE(43)、新アイテム wheat_seeds・木/石/鉄クワ。クワで DIRT/GRASS を右クリック→耕地、耕地に種→WHEAT_YOUNG、`SAVE.crops("x,y,z"->経過秒)` で追跡し CROP_GROW_TIME(80s) で WHEAT_RIPE に差し替え（`updateCrops` は 1.5s ごとにまとめて進める）。収穫/耕地破壊で小麦＋種ドロップ。草ブロックが wheat_seeds をドロップ（22%）。作物は solid:false transparent（水と同じ扱いで安全にメッシュ化）。ripe の収穫・種まきは非solidで pickTarget できないため、**耕地(solid)を右クリックして上(y+1)の作物を判定**する方式。進捗に make_hoe/grow_wheat を追加（全21段）。
+- **かまど点火表示** 新ブロック FURNACE_LIT(44)。`updateFurnaces` の `syncFurnaceVisual(id, fuelLeft>0)` が FURNACE⇄FURNACE_LIT を切替。プレイヤー設置(edit)は setEdit、構造物由来(world)は setBlock。edits に載る FURNACE_LIT は 55 の起動時に FURNACE へ正規化（燃料が残れば即再点火）。FURNACE_LIT は光源スキャン(12-lights)にも追加。interact/break/hardness/preferredTool は FURNACE と同一扱い。
+- **昼夜を遅く**（`46-day-night.js`）: speed 1/720→**1/1440（約24分）**。ラベルを実際の明るさ(sunArc)と整合させ、昼0.0-0.46・夕方0.46-0.54・夜0.54-0.88・朝0.88-1.0（夜は約1/3）。
+- **敵を減らす/昼に残さない**（`39-hostile-mobs.js`）: 上限 地上20→**8**・地下10→**6**、湧き間隔3s→**5s**、1サイクル最大**2体**（従来は最大8体湧けた）、min_r16→20/despawn80→72。昼(朝/昼)は地上スポーン即return。
+- **日光焼失を本家挙動に**（ユーザー質問「朝に燃えて死ぬ？」）: 従来は「朝/昼は地上MOBを白煙で速攻デスポーン(dt*0.7)」が燃焼(5s)より速く、ゾンビが燃え切る前に消えていた。修正して、**ゾンビ＋スケルトンは朝/昼に空の下(isCoveredFromSky=false)で炎に包まれ 3hp/0.4s で約3秒で焼死**（火の粉パーティクル継続、ドロップ無し=プレイヤー撃破でない）。日陰の個体は dt*0.3 で徐々に立ち去る。白煙デスポーンはスライム専用に。検証: 夜6体→朝で日なた4体が約3秒で焼死、日陰2体は生存後に立ち去り。
+- 検証: `npm.cmd run check` 成功（44ファイル）。プレビューで農業フロー(耕地→種→成長→実り)、かまど点火17⇄44、レシピ(クワ)、昼夜ラベル配分、昼スポーン0/夜≤8、日光焼失を実測。console error/warn なし。
+
 ### 2026-07-06 続き: ホットバー表示崩れ修正 + ドラッグ&ドロップ（ユーザー指摘）
 
 - 指摘「ツールベルトのアイテムが枠外に飛び出す」: styles.css の共通ルール `.inv-slot, #hotbar .slot .sl-body, #cursorItem { position: relative }` が、先に書いた `#hotbar .slot .sl-body { position: absolute; inset: 0 }` を**同一詳細度の後勝ちで上書き**し、`.sl-body` が高さ0の通常フローになってアイコン/個数/耐久バーがスロット上へ飛び出していた。共通ルールから `.sl-body` を外して修正（CSSにコメントで注意書きあり）。

@@ -152,6 +152,7 @@
     updateItemDrops(dt);
     updateFurnaces(dt);
     updateFurnaceBars();
+    updateCrops(dt);
     updateProgress(dt);
     updateAutosave(dt);
     raveUpdate(dt);
@@ -188,4 +189,26 @@
     damage: (n) => damagePlayer(n, 'デバッグ'),
     // レシピ一致テスト: ids は item id | null の配列（長さ w*w）
     tryRecipe: (ids, w) => { const r = matchRecipe(ids.map(id => (id ? { id, n: 1 } : null)), w); return r ? { out: r.out, n: r.n } : null; },
+    blockAt: (x, y, z) => blockAt(x, y, z),
+    // 農業フローのテスト: 足元近くに耕地を作り種をまく。育成秒数を返す
+    farmTest: () => {
+      const x = Math.floor(player.pos.x) + 2, z = Math.floor(player.pos.z);
+      let y = Math.floor(player.pos.y);
+      while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--;   // 地面を探す
+      setEdit(key(x, y, z), FARMLAND); setBlock(x, y, z, FARMLAND); requestEditedBlockRebuild(x, y, z);
+      setEdit(key(x, y + 1, z), WHEAT_YOUNG); setBlock(x, y + 1, z, WHEAT_YOUNG); requestEditedBlockRebuild(x, y + 1, z);
+      SAVE.crops[key(x, y + 1, z)] = 0;
+      return { x, y, z, farmland: blockAt(x, y, z) === FARMLAND, crop: blockAt(x, y + 1, z) };
+    },
+    growCrops: (sec) => { for (const k of Object.keys(SAVE.crops)) SAVE.crops[k] += sec; },
+    furnaceState: (x, y, z) => SAVE.furnaces[key(x, y, z)],
+    litFurnaceTest: () => {
+      const x = Math.floor(player.pos.x) + 3, z = Math.floor(player.pos.z);
+      let y = Math.floor(player.pos.y);
+      while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--;
+      const fy = y + 1;
+      setEdit(key(x, fy, z), FURNACE); setBlock(x, fy, z, FURNACE); requestEditedBlockRebuild(x, fy, z);
+      SAVE.furnaces[key(x, fy, z)] = { in: { id: 'raw_iron', n: 2 }, fuel: { id: 'coal', n: 1 }, out: null, prog: 0, fuelLeft: 0, fuelMax: 0 };
+      return { x, y: fy, z };
+    },
   };
