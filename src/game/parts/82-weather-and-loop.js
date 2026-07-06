@@ -153,6 +153,7 @@
     updateFurnaces(dt);
     updateFurnaceBars();
     updateCrops(dt);
+    updateSaplings(dt);
     updateProgress(dt);
     updateAutosave(dt);
     raveUpdate(dt);
@@ -211,4 +212,11 @@
       SAVE.furnaces[key(x, fy, z)] = { in: { id: 'raw_iron', n: 2 }, fuel: { id: 'coal', n: 1 }, out: null, prog: 0, fuelLeft: 0, fuelMax: 0 };
       return { x, y: fy, z };
     },
+    explode: (power = 3) => { const x = Math.floor(player.pos.x) + 5, z = Math.floor(player.pos.z); let y = Math.floor(player.pos.y); while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--; explodeAt(x, y + 1, z, power); return { x, y: y + 1, z, power }; },
+    tntTest: () => { const x = Math.floor(player.pos.x) + 4, z = Math.floor(player.pos.z); let y = Math.floor(player.pos.y); while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--; const fy = y + 1; setEdit(key(x, fy, z), TNT); setBlock(x, fy, z, TNT); requestEditedBlockRebuild(x, fy, z); const ok = igniteTNT(x, fy, z, 1.0); return { x, y: fy, z, ignited: ok }; },
+    plantTree: () => { const x = Math.floor(player.pos.x) + 3, z = Math.floor(player.pos.z) + 3; let y = Math.floor(player.pos.y); while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--; setEdit(key(x, y + 1, z), SAPLING); setBlock(x, y + 1, z, SAPLING); requestEditedBlockRebuild(x, y + 1, z); SAVE.saplings[key(x, y + 1, z)] = 0; return { x, y: y + 1, z }; },
+    growSaplings: (sec) => { for (const k of Object.keys(SAVE.saplings)) SAVE.saplings[k] += sec; },
+    mobKinds: () => MOBS.map(m => m.userData.kind),
+    spawn: (kind) => { const x = Math.floor(player.pos.x) + 6, z = Math.floor(player.pos.z); let y = Math.floor(player.pos.y); while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--; spawnMobAt(kind, x, y, z, false); const m = MOBS[MOBS.length - 1]; return { kind, count: MOBS.length, pos: m.position.toArray().map(n => +n.toFixed(1)) }; },
+    mobFuse: () => { const c = MOBS.find(m => m.userData.kind === 'creeper'); return c ? { hp: c.userData.hp, fuse: +(c.userData.fuse || 0).toFixed(2), scale: +c.scale.x.toFixed(2) } : null; },
   };

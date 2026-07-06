@@ -336,9 +336,29 @@
       g.fillStyle = '#ffd34a'; g.fillRect(10, 17, 12, 6);
       g.fillStyle = '#fff2a3'; g.fillRect(13, 18, 6, 4);
     }),
+    tntSide: makeTex((g, S) => {                             // TNT側面。赤い火薬帯＋白い"TNT"帯。
+      noise(g, S, 0xc0392b, 0.9, 1.06);
+      g.fillStyle = '#efe9dc'; g.fillRect(0, 11, S, 10);
+      g.fillStyle = '#2c2c2c'; g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('TNT', S / 2, 16);
+      g.fillStyle = tint(0x8a231a, 0.9); g.fillRect(0, 0, S, 2); g.fillRect(0, S - 2, S, 2);
+      dots(g, S, 0x000000, 0.03, 0.4);
+    }),
+    tntTop: makeTex((g, S) => {                              // TNT上面。導火線の束。
+      noise(g, S, 0xb33327, 0.9, 1.05);
+      g.fillStyle = '#5a4a2a'; for (let i = 0; i < 6; i++) g.fillRect(4 + i * 4, 4, 2, S - 8);
+      g.fillStyle = '#3a3a3a'; g.fillRect(S / 2 - 3, S / 2 - 3, 6, 6);
+    }),
+    sapling: makeTex((g, S) => {                             // 苗木。細い茶の茎＋小さな緑の葉。
+      g.clearRect(0, 0, S, S);
+      g.fillStyle = '#6d4c1b'; g.fillRect(S / 2 - 1, S / 2, 2, S / 2 - 2);
+      g.fillStyle = tint(0x3f8a2e, 1.0); g.fillRect(S / 2 - 5, S / 2 - 6, 10, 9);
+      g.fillStyle = tint(0x5fb04a, 1.1); g.fillRect(S / 2 - 3, S / 2 - 5, 6, 4);
+      g.fillStyle = tint(0x2c5e20, 0.9); g.fillRect(S / 2 - 5, S / 2 + 1, 10, 2);
+    }),
   };
   TX.lava.wrapS = TX.lava.wrapT = THREE.RepeatWrapping;
   TX.cactus.userData.normalMap = normalFromCanvas(TX.cactus.image, 2.2);
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
-  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'farmland', 'furnaceLit'])
+  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'farmland', 'furnaceLit', 'tntSide', 'tntTop'])
     TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);

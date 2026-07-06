@@ -11,6 +11,31 @@
     g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.12);
     o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.13);
   }
+  // 爆発音（低いノイズのドン＋余韻）
+  function playExplosionSound(power = 1) {
+    if (!actx) return;
+    const t = actx.currentTime;
+    const len = Math.floor(actx.sampleRate * 0.6), buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+    const src = actx.createBufferSource(); src.buffer = buf;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(120, t + 0.5);
+    const g = actx.createGain(); g.gain.setValueAtTime(Math.min(0.5, 0.28 * power), t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.58);
+    src.connect(lp).connect(g).connect(actx.destination); src.start(t); src.stop(t + 0.6);
+    const o = actx.createOscillator(), og = actx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.4);
+    og.gain.setValueAtTime(0.25, t); og.gain.exponentialRampToValueAtTime(0.0008, t + 0.45);
+    o.connect(og).connect(actx.destination); o.start(t); o.stop(t + 0.46);
+  }
+  // クリーパーの導火線の「シューッ」音
+  function playFuseSound() {
+    if (!actx) return;
+    const t = actx.currentTime, len = Math.floor(actx.sampleRate * 0.3), buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1);
+    const src = actx.createBufferSource(); src.buffer = buf;
+    const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000;
+    const g = actx.createGain(); g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+    src.connect(hp).connect(g).connect(actx.destination); src.start(t); src.stop(t + 0.3);
+  }
   // 被弾音（低いうめき風の下降トーン）
   function playHurtSound() {
     if (!actx) return;

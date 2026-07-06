@@ -60,6 +60,59 @@
   // 作物ブロックが壊された/耕地が壊れたときに追跡データを片付ける
   function clearCropAt(x, y, z) { delete SAVE.crops[key(x, y, z)]; }
 
+  /* --- 苗木と植林（葉から採れる苗木を植えると時間で木に育つ） --- */
+  const SAPLING_GROW_TIME = 95;
+  function saplingSoil(t) { return t === GRASS || t === DIRT; }
+  // 苗木を土/草の上に植える（selectedItem が sapling のとき interactOrPlace から呼ぶ）
+  function plantSaplingAt(groundX, groundY, groundZ) {
+    if (!saplingSoil(blockAt(groundX, groundY, groundZ))) return false;
+    const ay = groundY + 1;
+    if (hasBlock(groundX, ay, groundZ)) return false;
+    if (!takeItems([['sapling', 1]])) return false;
+    setEdit(key(groundX, ay, groundZ), SAPLING); saveEditsSoon();
+    setBlock(groundX, ay, groundZ, SAPLING); requestEditedBlockRebuild(groundX, ay, groundZ);
+    SAVE.saplings[key(groundX, ay, groundZ)] = 0;
+    markSaveDirty();
+    thock(240);
+    return true;
+  }
+  function clearSaplingAt(x, y, z) { delete SAVE.saplings[key(x, y, z)]; }
+  // 苗木の位置(y=地面+1)から木を生やす。空間が無ければ false
+  function growTree(x, y, z) {
+    const h = 4 + (Math.random() * 2 | 0);
+    for (let dy = 0; dy < h + 1; dy++) { const t = blockAt(x, y + dy, z); if (t !== undefined && t !== SAPLING && t !== LEAVES) return false; }
+    const put = (bx, by, bz, type, overwriteLeaf) => {
+      if (by < CHUNK_Y_MIN || by > CHUNK_Y_MAX) return;
+      const cur = blockAt(bx, by, bz);
+      if (cur !== undefined && cur !== SAPLING && !(overwriteLeaf && cur === LEAVES)) return;
+      setEdit(key(bx, by, bz), type); setBlock(bx, by, bz, type); requestEditedBlockRebuild(bx, by, bz);
+    };
+    for (let dy = 0; dy < h; dy++) put(x, y + dy, z, LOG, true);          // 幹
+    const topY = y + h - 1;
+    for (let dy = 0; dy <= 2; dy++) {
+      const r = dy < 2 ? 2 : 1;
+      for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+        if (dx === 0 && dz === 0 && dy < 2) continue;                     // 幹の芯は葉にしない
+        if (Math.abs(dx) === r && Math.abs(dz) === r && Math.random() < 0.6) continue; // 角を間引く
+        put(x + dx, topY + dy, z + dz, LEAVES);
+      }
+    }
+    put(x, topY + 3, z, LEAVES, true);
+    saveEditsSoon();
+    return true;
+  }
+  function updateSaplings(dt) {
+    for (const id of Object.keys(SAVE.saplings)) {
+      const c = id.split(','); const bx = +c[0], by = +c[1], bz = +c[2];
+      if (blockAt(bx, by, bz) !== SAPLING) { delete SAVE.saplings[id]; continue; }
+      SAVE.saplings[id] += dt;
+      if (SAVE.saplings[id] >= SAPLING_GROW_TIME) {
+        if (growTree(bx, by, bz)) { delete SAVE.saplings[id]; markSaveDirty(); }
+        else SAVE.saplings[id] = SAPLING_GROW_TIME - 8; // 空間が無い間は少し待って再挑戦
+      }
+    }
+  }
+
   function updateCrops(dt) {
     cropTickClock += dt;
     if (cropTickClock < CROP_TICK) return;

@@ -13,6 +13,7 @@
     { out: 'bread', n: 1, pattern: ['WWW'], keys: { W: 'wheat' } },
     { out: 'bed', n: 1, pattern: ['CCC', 'PPP'], keys: { C: 'cloth', P: 'planks' } },
     { out: 'stone_brick', n: 4, pattern: ['TT', 'TT'], keys: { T: 'stone' } },
+    { out: 'tnt', n: 1, pattern: ['GSG', 'SGS', 'GSG'], keys: { G: 'gunpowder', S: 'sand' } },
     // ツルハシ
     { out: 'wood_pickaxe', n: 1, pattern: ['MMM', ' S ', ' S '], keys: { M: 'planks', S: 'stick' } },
     { out: 'stone_pickaxe', n: 1, pattern: ['MMM', ' S ', ' S '], keys: { M: 'cobblestone', S: 'stick' } },

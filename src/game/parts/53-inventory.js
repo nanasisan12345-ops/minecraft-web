@@ -40,6 +40,9 @@
     wheat_seeds:  { name: '小麦の種', cat: 'material' },
     bone:         { name: '骨', cat: 'material' },
     slime_ball:   { name: 'スライム玉', cat: 'material' },
+    gunpowder:    { name: '火薬', cat: 'material' },
+    tnt:          { name: 'TNT', cat: 'block', block: TNT },
+    sapling:      { name: '苗木', cat: 'block', block: SAPLING, fuel: 0.5 },
     // --- 食料 ---
     apple:        { name: 'リンゴ', cat: 'food', food: 4, heal: 1 },
     berries:      { name: 'ベリー', cat: 'food', food: 2 },
@@ -282,7 +285,7 @@
         stick: '#8a5a2b', coal: '#2e3236', raw_iron: '#c78a55', iron_ingot: '#d8dde2',
         raw_gold: '#d8ae3c', gold_ingot: '#f2cb45', diamond: '#5fe0ee', glow_shard: '#6df7ff',
         fiber: '#a8c26a', cloth: '#f0ede2', wheat: '#dcc25e', bone: '#ece8da', slime_ball: '#5aae4c',
-        wheat_seeds: '#8bbf4a',
+        wheat_seeds: '#8bbf4a', gunpowder: '#4a4a4a',
       };
       const c = colors[id] || '#c0c0c0';
       if (id.endsWith('_ingot')) {

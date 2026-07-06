@@ -81,6 +81,7 @@
       if (Math.random() < 0.14) out.push(['fiber', 1]);
       if (Math.random() < 0.08) out.push(['apple', 1]);
       if (Math.random() < 0.10) out.push(['berries', 1]);
+      if (Math.random() < 0.10) out.push(['sapling', 1]);
       return out;
     }
     const id = ITEM_FOR_BLOCK[type];
@@ -143,6 +144,12 @@
         if (typeof clearCropAt === 'function') clearCropAt(x, y + 1, z);
         setEdit(key(x, y + 1, z), -1); setBlock(x, y + 1, z, null); requestEditedBlockRebuild(x, y + 1, z);
       }
+    }
+    // 土/草を壊したら上の苗木も落として撤去する
+    if ((t === GRASS || t === DIRT) && blockAt(x, y + 1, z) === SAPLING) {
+      spawnItemDrop(x, y + 1, z, 'sapling', 1);
+      if (typeof clearSaplingAt === 'function') clearSaplingAt(x, y + 1, z);
+      setEdit(key(x, y + 1, z), -1); setBlock(x, y + 1, z, null); requestEditedBlockRebuild(x, y + 1, z);
     }
     // ドロップ（必要ツールレベルを満たさない鉱石/石はドロップしない）。実体として地面に落ちる
     if (needTier === 0 || hasProperTool) {
@@ -218,10 +225,15 @@
       }
       if (hitType === OPEN_CHEST) { openContainer('chest', { key: key(bx, by, bz) }); return; }
       if (hitType === BED) { trySleepInBed(bx, by, bz); return; }
+      if (hitType === TNT) { igniteTNT(bx, by, bz); return; }   // TNTを右クリックで着火
     }
     // 弓を持っていたら撃つ
     const def = selectedItemDef();
     if (def && def.tool === 'bow') { shootPlayerArrow(); return; }
+    // 苗木を土/草の上に植える
+    if (tg && def && def.id === 'sapling' && tg.normal[1] === 1) {
+      if (plantSaplingAt(tg.block[0], tg.block[1], tg.block[2])) return;
+    }
     // 農業: クワで耕す / 耕地の上の作物を収穫 / 種をまく
     if (tg) {
       const [bx, by, bz] = tg.block;

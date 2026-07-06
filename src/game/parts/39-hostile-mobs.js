@@ -11,7 +11,47 @@
     zombie: { name: 'ゾンビ', hp: 20, speed: 1.85, damage: 3, attackRange: 1.5, attackCd: 1.25, drops: [['rotten_flesh', 0, 2]] },
     slime: { name: 'スライム', hp: 8, speed: 1.5, damage: 2, attackRange: 1.15, attackCd: 1.0, drops: [['slime_ball', 1, 2]] },
     skeleton: { name: 'スケルトン', hp: 16, speed: 1.6, damage: 3, attackRange: 17, attackCd: 2.4, drops: [['bone', 1, 2], ['coal', 0, 1]] },
+    creeper: { name: 'クリーパー', hp: 20, speed: 1.75, damage: 0, attackRange: 3, attackCd: 0, drops: [['gunpowder', 1, 2]] },
   };
+
+  /* --- 爆発（クリーパー / TNT 共通） --- */
+  // 中心(cx,cy,cz)を球状に破壊し、距離に応じてプレイヤーにダメージ。
+  function explodeAt(cx, cy, cz, power = 3) {
+    // プレイヤーへのダメージ（距離で減衰。防具は damagePlayer 側で軽減）
+    const pdx = player.pos.x - (cx + 0.5), pdy = (player.pos.y - 0.9) - (cy + 0.5), pdz = player.pos.z - (cz + 0.5);
+    const pd = Math.hypot(pdx, pdy, pdz);
+    if (pd < power * 2.2 && !SURVIVAL.dead) {
+      const dmg = Math.round((1 - pd / (power * 2.2)) * (power * 6));
+      if (dmg > 0) {
+        damagePlayer(dmg, '爆発');
+        // 爆風で少し吹き飛ばす
+        const kb = (1 - pd / (power * 2.2)) * 8;
+        if (pd > 0.01) { player.vel.x += (pdx / pd) * kb; player.vel.z += (pdz / pd) * kb; player.vel.y += 4; player.onGround = false; }
+      }
+    }
+    // ブロック破壊（球状。水/溶岩と範囲外は残す。外周はランダムに残す）
+    const R = Math.ceil(power);
+    const touched = [];
+    for (let dx = -R; dx <= R; dx++) for (let dy = -R; dy <= R; dy++) for (let dz = -R; dz <= R; dz++) {
+      const dd = Math.hypot(dx, dy, dz);
+      if (dd > power + 0.4) continue;
+      const x = cx + dx, y = cy + dy, z = cz + dz;
+      if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) continue;
+      const t = blockAt(x, y, z);
+      if (t === undefined || t === WATER || t === LAVA) continue;
+      if (t === TNT) { igniteTNT(x, y, z, rnd(0.1, 0.4)); continue; }   // 連鎖爆発
+      if (dd > power - 0.8 && Math.random() < 0.45) continue;   // 外縁はまばらに残す
+      if (Math.random() < 0.3) for (const [id, n] of blockDrops(t)) spawnItemDrop(x, y, z, id, n); // 3割だけ回収できる
+      if (typeof clearCropAt === 'function') clearCropAt(x, y, z);
+      if (typeof unregisterPlacedLight === 'function') unregisterPlacedLight(x, y, z);
+      setEdit(key(x, y, z), -1); setBlock(x, y, z, null);
+      touched.push([x, y, z]);
+    }
+    if (touched.length) { saveEditsSoon(); for (const [x, y, z] of touched) requestEditedBlockRebuild(x, y, z); }
+    // 派手なパーティクル
+    for (let k = 0; k < 26; k++) burst(cx + rnd(-power, power), cy + rnd(-1, power), cz + rnd(-power, power), k % 2 ? 0xff8a26 : 0x555555);
+    if (typeof playExplosionSound === 'function') playExplosionSound(power / 3);
+  }
   const mobMatCache = new Map();
   function mobMat(color) {
     if (!mobMatCache.has(color)) mobMatCache.set(color, new THREE.MeshLambertMaterial({ color }));
@@ -66,7 +106,30 @@
     g.userData.limbs = { legL, legR };
     return g;
   }
-  const MOB_MAKERS = { zombie: makeZombie, slime: makeSlime, skeleton: makeSkeleton };
+  function makeCreeper() {
+    const g = new THREE.Group();
+    const green = 0x5aa83c, dark = 0x3f7a2a;
+    const body = mobBox(g, 0.42, 0.78, 0.42, green, 0, 0.9, 0);
+    const head = mobBox(g, 0.46, 0.46, 0.46, green, 0, 1.5, 0);
+    // 点滅は個体ごとに独立させたいので、共有マテリアルではなく専用インスタンスにする
+    body.material = new THREE.MeshLambertMaterial({ color: green });
+    head.material = new THREE.MeshLambertMaterial({ color: green });
+    mobBox(head, 0.1, 0.1, 0.03, 0x0f1a0d, -0.11, 0.04, -0.23);   // 目
+    mobBox(head, 0.1, 0.1, 0.03, 0x0f1a0d, 0.11, 0.04, -0.23);
+    mobBox(head, 0.08, 0.18, 0.03, 0x0f1a0d, 0, -0.12, -0.23);    // 口の縦
+    mobBox(head, 0.2, 0.08, 0.03, 0x0f1a0d, -0.09, -0.2, -0.23);  // 口の横
+    mobBox(head, 0.2, 0.08, 0.03, 0x0f1a0d, 0.09, -0.2, -0.23);
+    mobBox(g, 0.16, 0.06, 0.42, dark, 0, 0.5, 0);                 // 体の模様
+    const legFL = mobBox(g, 0.18, 0.3, 0.18, dark, -0.12, 0.15, -0.12);
+    const legFR = mobBox(g, 0.18, 0.3, 0.18, dark, 0.12, 0.15, -0.12);
+    const legBL = mobBox(g, 0.18, 0.3, 0.18, dark, -0.12, 0.15, 0.12);
+    const legBR = mobBox(g, 0.18, 0.3, 0.18, dark, 0.12, 0.15, 0.12);
+    g.userData.limbs = { legL: legFL, legR: legFR, legBL, legBR };
+    g.userData.body = body; g.userData.head = head;
+    g.userData.baseMats = [body.material, head.material];
+    return g;
+  }
+  const MOB_MAKERS = { zombie: makeZombie, slime: makeSlime, skeleton: makeSkeleton, creeper: makeCreeper };
 
   /* --- 地形ヘルパー --- */
   // refY 付近で立てる地面の高さを探す（見つからなければ null）
@@ -139,7 +202,8 @@
         if (!isCoveredFromSky(x, gy + 2, z)) continue;
         if (nearPlacedLight(x, gy + 1, z, 8)) continue;
         const roll = Math.random();
-        spawnMobAt(roll < 0.45 ? 'slime' : roll < 0.75 ? 'skeleton' : 'zombie', x, gy, z, true);
+        const kind = roll < 0.4 ? 'slime' : roll < 0.65 ? 'skeleton' : roll < 0.85 ? 'zombie' : 'creeper';
+        spawnMobAt(kind, x, gy, z, true);
         counts.cave++; spawned++;
         continue;
       }
@@ -149,7 +213,7 @@
       const h = heightAt(x, z);
       const swamp = typeof biomeAt === 'function' && biomeAt(x, z).id === 'swamp';
       const roll = Math.random();
-      const kind = swamp && roll < 0.5 ? 'slime' : roll < 0.6 ? 'zombie' : roll < 0.85 ? 'skeleton' : 'slime';
+      const kind = swamp && roll < 0.4 ? 'slime' : roll < 0.4 ? 'zombie' : roll < 0.62 ? 'skeleton' : roll < 0.82 ? 'creeper' : 'slime';
       spawnMobAt(kind, x, h, z, false);
       counts.surface++; spawned++;
     }
@@ -338,9 +402,34 @@
       u.limbs.legL.rotation.x = sw;
       u.limbs.legR.rotation.x = -sw;
     }
+    // クリーパー: 近づくと導火線に着火して膨らみ、逃げれば止まる。限界で爆発。
+    if (u.kind === 'creeper') {
+      const close = dist < def.attackRange && dy < 3;
+      if (close && !SURVIVAL.dead) {
+        if ((u.fuse || 0) <= 0 && typeof playFuseSound === 'function') playFuseSound();
+        u.fuse = (u.fuse || 0) + dt;
+        // 白く点滅しながら膨らむ
+        const flash = 0.5 + 0.5 * Math.sin(u.fuse * 22);
+        const sc = 1 + Math.min(0.5, u.fuse * 0.34);
+        m.scale.setScalar(sc);
+        if (u.baseMats) for (const mat of u.baseMats) mat.emissive && mat.emissive.setRGB(flash * 0.9, flash * 0.5, flash * 0.5), mat.emissiveIntensity = flash * 0.9;
+        if (u.fuse >= 1.5) {
+          explodeAt(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z), 3);
+          dropMobLoot(m);                 // 火薬を落とす
+          SAVE.stats.kills = (SAVE.stats.kills || 0) + 0; // 自爆は撃破数に含めない
+          scene.remove(m);
+          const idx = MOBS.indexOf(m); if (idx >= 0) MOBS.splice(idx, 1);
+          return true;
+        }
+        return false;
+      } else {
+        // 離れたら導火線リセット
+        if (u.fuse > 0) { u.fuse = 0; m.scale.setScalar(1); if (u.baseMats) for (const mat of u.baseMats) mat.emissiveIntensity = 0; }
+      }
+    }
     // 被弾フラッシュ（少し赤く縮む）
     const hurtScale = u.hurtT > 0 ? 1 - u.hurtT * 0.35 : 1;
-    if (u.kind !== 'slime') m.scale.setScalar(hurtScale);
+    if (u.kind !== 'slime' && u.kind !== 'creeper') m.scale.setScalar(hurtScale);
     // 攻撃
     if (!SURVIVAL.dead && u.attackCd <= 0) {
       if (u.kind === 'skeleton') {
@@ -348,7 +437,7 @@
           u.attackCd = def.attackCd;
           shootArrow(m.position.clone().add(new THREE.Vector3(0, 1.4, 0)), player.pos.clone().add(new THREE.Vector3(0, -0.4, 0)));
         }
-      } else if (dist < def.attackRange && dy < 2.2) {
+      } else if (u.kind !== 'creeper' && dist < def.attackRange && dy < 2.2) {
         u.attackCd = def.attackCd;
         damagePlayer(def.damage, MOB_DEFS[u.kind].name);
       }
@@ -369,14 +458,47 @@
       const m = MOBS[i];
       const dist = Math.hypot(m.position.x - player.pos.x, m.position.z - player.pos.z);
       if (dist > MOB_DESPAWN_R) { scene.remove(m); MOBS.splice(i, 1); continue; }
-      // 朝〜昼、地上のスライムは燃えないので静かに消える（ゾンビ/スケルトンは updateMob 内で焼失）。
-      if (!m.userData.cave && daytime && m.userData.kind === 'slime' && Math.random() < dt * 0.5) {
+      // 朝〜昼、燃えない地上MOB（スライム/クリーパー）は静かに消える（ゾンビ/スケルトンは updateMob 内で焼失）。
+      const k = m.userData.kind;
+      if (!m.userData.cave && daytime && (k === 'slime' || k === 'creeper') && Math.random() < (k === 'slime' ? dt * 0.5 : dt * 0.15)) {
         burst(m.position.x - 0.5, m.position.y + 0.4, m.position.z - 0.5, 0xdddddd);
         scene.remove(m); MOBS.splice(i, 1); continue;
       }
       if (updateMob(m, dt)) continue; // killMob済み（焼失・立ち去り含む）
     }
     updateArrows(dt);
+    updateTNT(dt);
+  }
+
+  /* --- TNT（着火すると導火線→爆発。爆発で隣のTNTも連鎖する） --- */
+  const ACTIVE_TNT = [];
+  const tntPrimeGeo = new THREE.BoxGeometry(1.0, 1.0, 1.0);
+  function igniteTNT(x, y, z, fuse = 2.5) {
+    if (blockAt(x, y, z) !== TNT) return false;
+    setEdit(key(x, y, z), -1); saveEditsSoon(); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xc0392b });
+    const mesh = new THREE.Mesh(tntPrimeGeo, mat);
+    mesh.position.set(x + 0.5, y + 0.5, z + 0.5);
+    scene.add(mesh);
+    ACTIVE_TNT.push({ mesh, mat, x, y, z, fuse, t0: fuse });
+    if (typeof playFuseSound === 'function') playFuseSound();
+    return true;
+  }
+  function updateTNT(dt) {
+    for (let i = ACTIVE_TNT.length - 1; i >= 0; i--) {
+      const t = ACTIVE_TNT[i];
+      t.fuse -= dt;
+      const elapsed = t.t0 - t.fuse;
+      const flash = t.fuse < 0.6 ? 1 : 0.5 + 0.5 * Math.sin(elapsed * 20);
+      t.mat.emissive.setRGB(flash, flash, flash); t.mat.emissiveIntensity = flash;
+      t.mesh.position.y = t.y + 0.5 + Math.abs(Math.sin(elapsed * 6)) * 0.08;
+      if (Math.random() < dt * 8) burst(t.x + rnd(0.2, 0.8), t.y + 1, t.z + rnd(0.2, 0.8), 0xffffff);
+      if (t.fuse <= 0) {
+        scene.remove(t.mesh); t.mat.dispose();
+        ACTIVE_TNT.splice(i, 1);
+        explodeAt(t.x, t.y, t.z, 3.5);
+      }
+    }
   }
   function hostileNear(pos, r) {
     for (const m of MOBS) {

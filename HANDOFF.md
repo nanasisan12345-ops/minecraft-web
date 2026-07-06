@@ -20,6 +20,17 @@
 - **検証**: `npm.cmd run check` 成功。プレビュー実測で、クラフト（丸太→板材、UIクリック経由）、かまど（粗鉄2+石炭→鉄インゴット2、燃料消費・進行バー・完成品）、進捗達成・セーブ復元・夜の敵スポーン&朝の焼失を確認。console error/warn なし。
 - **既知の未実装/次の候補**: 農業（小麦は草ブロックのドロップ/取引のみ）、かまど点火中の見た目変化（FURNACE_LIT ブロック追加＋updateFurnaces からの setBlock 切替。edits を汚さない見た目だけの切替にすること）、モブの水泳/落下、本格光量計算によるスポーン抑制、防具の見た目反映（三人称/一人称）。
 
+### 2026-07-06 第4弾: クリーパー + 爆発 + TNT + 苗木で植林
+
+- **爆発共通 `explodeAt(cx,cy,cz,power)`**（39-hostile-mobs.js）: 球状にブロック破壊（水/溶岩/範囲外は残す、外縁はまばら、3割だけ `blockDrops` を実体ドロップ、`clearCropAt`/`unregisterPlacedLight` 連動、TNTに触れたら `igniteTNT` で連鎖）、距離減衰でプレイヤーへダメージ＋吹き飛ばし、`playExplosionSound`。破壊は setEdit(-1)+setBlock(null)+触れたチャンクを requestEditedBlockRebuild。
+- **クリーパー**（新MOB）: `makeCreeper`（体/頭は**専用マテリアル**にして点滅が他モブへ波及しないように）。AI= 接近(dist<3,dy<3)で `playFuseSound`→`u.fuse` 加算＋白点滅＆膨張、1.5秒で `explodeAt(power3)`＋火薬ドロップして消滅（自爆は撃破数に入れない）、離れると fuse リセット。日光では燃えない（ゾンビ/スケルトンのみ焼失）。昼は他の非燃焼MOBと同様ゆっくり立ち去る。地上/洞窟の抽選に約20%/15%で追加。
+- **TNT**（ブロック45）: `gunpowder`+`sand` でクラフト。設置して右クリックで `igniteTNT`（ブロックを撤去し primed の白点滅Boxエンティティ＋導火線音、`ACTIVE_TNT`/`updateTNT` で fuse 2.5s→`explodeAt(power3.5)`）。爆発で隣接TNTは短い fuse で連鎖。
+- **火薬 `gunpowder`**（素材、クリーパードロップ）、アイコン追加。
+- **苗木で植林**（48-farming.js）: 葉が `sapling`(10%)をドロップ。土/草の上に苗木を置くと `SAVE.saplings("x,y,z"->秒)` で追跡、`SAPLING_GROW_TIME`(95s) で `growTree`（幹LOG 4-5＋葉の冠。空間が無ければ待って再挑戦）。土/草を壊すと上の苗木も落として撤去。新ブロック SAPLING(46, solid:false transparent)。
+- 新ブロック TNT=45, SAPLING=46。ワーカーは typeCount/transparent をペイロード受けなので追加安全。
+- **検証**（`__mcDbg` に explode/tntTest/plantTree/growSaplings/spawn/mobFuse 追加）: 爆発でブロック破壊＋15ドロップ、TNT着火→撤去→爆発、苗木→木(幹LOG)成長、クリーパー直接spawn→高さ揃えで導火線 0.42→0.82→1.22→BOOM・プレイヤーHP20→3・火薬1ドロップを実測。`npm.cmd run check` 成功（45ブロック/ファイル結合）。console error/warn なし。
+- 注意: クリーパーの体/頭は共有 `mobMat` キャッシュではなく専用 `MeshLambertMaterial`（点滅の emissive を個体独立にするため）。増やす場合も点滅系は専用マテリアルにすること。
+
 ### 2026-07-06 第3弾: 農業 + かまど点火表示 + 昼夜/スポーンのバランス調整（ユーザー指摘）
 
 - **農業** 新規 `48-farming.js`。新ブロック FARMLAND(41)/WHEAT_YOUNG(42)/WHEAT_RIPE(43)、新アイテム wheat_seeds・木/石/鉄クワ。クワで DIRT/GRASS を右クリック→耕地、耕地に種→WHEAT_YOUNG、`SAVE.crops("x,y,z"->経過秒)` で追跡し CROP_GROW_TIME(80s) で WHEAT_RIPE に差し替え（`updateCrops` は 1.5s ごとにまとめて進める）。収穫/耕地破壊で小麦＋種ドロップ。草ブロックが wheat_seeds をドロップ（22%）。作物は solid:false transparent（水と同じ扱いで安全にメッシュ化）。ripe の収穫・種まきは非solidで pickTarget できないため、**耕地(solid)を右クリックして上(y+1)の作物を判定**する方式。進捗に make_hoe/grow_wheat を追加（全21段）。
