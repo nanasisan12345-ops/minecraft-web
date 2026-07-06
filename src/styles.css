@@ -29,7 +29,9 @@
   #hotbar .slot .sl-body { position: absolute; inset: 0; }
 
   /* ---------- スロット共通 ---------- */
-  .inv-slot, #hotbar .slot .sl-body, #cursorItem { position: relative; }
+  /* 注意: #hotbar .slot .sl-body は absolute(inset:0) のまま。ここに入れて relative で
+     上書きすると高さ0になり、アイコンが枠の上へ飛び出す */
+  .inv-slot, #cursorItem { position: relative; }
   .sl-icon { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; transform: translate(-50%, -50%);
     background-size: cover; image-rendering: pixelated; border-radius: 3px; pointer-events: none; }
   .inv-slot em, #hotbar .slot em, #cursorItem em { position: absolute; right: 3px; bottom: 1px; color: #fff; font-style: normal;
@@ -53,6 +55,8 @@
   #invScreen .inv-main { grid-template-columns: repeat(9, 46px); padding: 0 14px; }
   #invScreen .inv-hotbar { grid-template-columns: repeat(9, 46px); padding: 8px 14px 0; }
   #invScreen .inv-label { padding: 8px 16px 6px; color: rgba(255,255,255,.62); font-size: 12px; font-weight: 700; }
+  #invScreen .inv-hotbar-label { padding-top: 10px; color: rgba(255,220,120,.72); }
+  #invScreen .inv-hotbar { padding-top: 0; }
   .inv-slot { width: 46px; height: 46px; background: rgba(0,0,0,.34); border: 1px solid rgba(255,255,255,.16); border-radius: 4px; cursor: pointer; }
   .inv-slot:hover { border-color: rgba(255,220,120,.8); background: rgba(90,75,40,.4); }
   .inv-slot.hot-selected { border-color: rgba(255,255,255,.75); box-shadow: 0 0 0 1px rgba(255,255,255,.4) inset; }

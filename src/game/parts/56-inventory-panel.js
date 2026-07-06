@@ -10,6 +10,7 @@
     <div class="inv-bottom">
       <div class="inv-label">インベントリ</div>
       <div class="inv-main inv-grid"></div>
+      <div class="inv-label inv-hotbar-label">ツールベルト（1〜9）</div>
       <div class="inv-hotbar inv-grid"></div>
     </div>
   `;
@@ -18,7 +19,7 @@
   cursorItemEl.id = 'cursorItem';
   document.body.appendChild(cursorItemEl);
 
-  const UI = { mode: null, ctx: null, craftCells: [], craftW: 0, cursor: null };
+  const UI = { mode: null, ctx: null, craftCells: [], craftW: 0, cursor: null, dragFrom: null };
   function isContainerOpen() { return UI.mode !== null; }
 
   function slotArrayFor(src) {
@@ -260,6 +261,7 @@
         if (!item) return;
         UI.cursor = item;
         setSlot(src, idx, null);
+        UI.dragFrom = { src, idx }; // 押したまま別スロットで離すとドロップできる
       } else if (!canPlaceInto(src, UI.cursor)) {
         return;
       } else if (!item) {
@@ -303,6 +305,20 @@
     e.preventDefault();
     handleSlotClick(slot.dataset.src, +slot.dataset.idx, e.button, e.shiftKey);
   });
+  // 本家風ドラッグ&ドロップ: 左ボタンでつかんだまま別のスロットの上で離すと、そこへ置く
+  invScreen.addEventListener('mouseup', e => {
+    if (e.button !== 0) return;
+    const from = UI.dragFrom;
+    UI.dragFrom = null;
+    if (!from || !UI.cursor) return;
+    const slot = e.target.closest('.inv-slot');
+    if (!slot) return;
+    const src = slot.dataset.src, idx = +slot.dataset.idx;
+    if (src === 'result' || src === 'fout') return;                 // 取り出し専用枠には落とせない
+    if (src === from.src && idx === from.idx) return;               // 同じ場所ならクリック式のまま
+    handleSlotClick(src, idx, 0, false);
+  });
+  addEventListener('mouseup', () => { UI.dragFrom = null; });
   invScreen.addEventListener('contextmenu', e => e.preventDefault());
 
   function openContainer(mode, ctx = null) {
