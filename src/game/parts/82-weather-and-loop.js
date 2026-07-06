@@ -2,6 +2,11 @@
   // Sky(大気散乱)・フォグ・太陽/環境光・雲・雨をまとめて制御。会場(RAVE)起動中は会場側が大気を支配するため停止。
   // フォグの far はワールド生成窓(WIN_R=72)の内側に収め、地形の切れ目を常に隠す。
   const WHITE = new THREE.Color(0xffffff);
+  // 時間帯で霧/背景を寄せる色（夜=暗い紺、朝夕=暖色）。天候の霧色にこれを混ぜて夜の明るさを抑える。
+  const FOG_NIGHT = new THREE.Color(0x0a1226);
+  const FOG_SUNSET = new THREE.Color(0xb0521f);
+  const FOG_SUNRISE = new THREE.Color(0xb96a6a);
+  const _fogTmp = new THREE.Color();
   const WEATHER = {
     clear:  { label: '☀ 快晴', fog: 0xa3acbb, near: 38, far: 70, sun: 1.32, sunCol: 0xfff2da, hemi: 1.02, hSky: 0xd8edfb, hGnd: 0x5b5542, turb: 2.6, rayl: 2.85, mie: 0.004, cloud: 0.05, cloudCol: 0xffffff, gray: 0.0,  rain: 0, skyTop: 0x1f6fd4, skyMid: 0x4a93e6, skyHor: 0xcfe6f7, glow: 1.0,  hcloud: 0.5 },
     fair:   { label: '🌤 晴れ', fog: 0x9fa9b9, near: 36, far: 70, sun: 1.22, sunCol: 0xfff2da, hemi: 0.96, hSky: 0xd2e8fb, hGnd: 0x565040, turb: 3.4, rayl: 2.6,  mie: 0.005, cloud: 0.12, cloudCol: 0xffffff, gray: 0.0,  rain: 0, skyTop: 0x2a7ad8, skyMid: 0x5aa2ec, skyHor: 0xcbe6f8, glow: 0.92, hcloud: 0.95 },
@@ -39,7 +44,7 @@
   const rain = new THREE.LineSegments(rainGeo, rainMat); rain.frustumCulled = false; rain.visible = false; scene.add(rain);
   let lightning = 0, lightningNext = rnd(4, 10);
   function updateWeather(dt) {
-    if (RAVE.on) { rain.visible = false; skyTint.visible = false; skyDome.visible = false; sunGlow.visible = false; photoSky.visible = false; photoOvercast.visible = false; updateEnvironmentAudio(dt, 0); return; } // 会場起動中は会場が大気を支配
+    if (RAVE.on) { rain.visible = false; skyTint.visible = false; skyDome.visible = false; sunGlow.visible = false; photoSky.visible = false; photoOvercast.visible = false; photoSunrise.visible = false; photoSunset.visible = false; photoNight.visible = false; updateEnvironmentAudio(dt, 0); return; } // 会場起動中は会場が大気を支配
     const dayLight = typeof DAY !== 'undefined' ? DAY.light : 1;
     skyDome.visible = true; sunGlow.visible = true; photoSky.visible = skyReady; // 写真の読込完了まで青いグラデ空を見せる
     if (started) { weatherClock += dt; if (weatherClock > weatherNext) pickWeather(); }
@@ -61,14 +66,23 @@
     photoOvercast.material.opacity = overcastK * (1 - flash * 0.2);
     photoSky.material.color.setScalar(0.86 + 0.16 * wCur.glow).lerp(WHITE, flash * 0.5); // テクスチャ自体を明るく焼いたので等倍付近。曇天のみ少し沈める
     photoOvercast.material.color.setScalar(0.86 + 0.14 * wCur.glow).lerp(WHITE, flash * 0.5); // 曇天テクスチャを明るく保つ（雨でのみ少し沈む）
-    scene.fog.color.copy(wCur.fog).lerp(WHITE, flash * 0.6); scene.fog.near = wCur.near; scene.fog.far = wCur.far;
-    scene.background.copy(wCur.fog).lerp(WHITE, flash * 0.6);
+    // 霧/背景: 天候の霧色を、時間帯（夜=暗い紺、朝夕=暖色）へ寄せてから雷で白飛ばし。
+    // これをしないと夜でも天候の灰色フォグが画面を覆って明るく見える（特に霧の濃い雨）。
+    const dayA = typeof DAY !== 'undefined' ? DAY : { nightAmt: 0, sunriseAmt: 0, sunsetAmt: 0 };
+    _fogTmp.copy(wCur.fog)
+      .lerp(FOG_NIGHT, dayA.nightAmt * 0.9)
+      .lerp(FOG_SUNSET, dayA.sunsetAmt * 0.45)
+      .lerp(FOG_SUNRISE, dayA.sunriseAmt * 0.45)
+      .lerp(WHITE, flash * 0.6);
+    scene.fog.color.copy(_fogTmp); scene.fog.near = wCur.near; scene.fog.far = wCur.far;
+    scene.background.copy(_fogTmp);
     sun.intensity = wCur.sun * dayLight + flash * 1.6; sun.color.copy(wCur.sunCol);
     hemi.intensity = wCur.hemi * (0.42 + dayLight * 0.58) + flash * 1.2; hemi.color.copy(wCur.hSky); hemi.groundColor.copy(wCur.hGnd);
     const u = sky.material.uniforms; u.turbidity.value = wCur.turb; u.rayleigh.value = wCur.rayl; u.mieCoefficient.value = wCur.mie;
     clouds.material.opacity = wCur.cloud; clouds.material.color.copy(wCur.cloudCol);
     skyTint.visible = wCur.gray > 0.01; skyTint.material.opacity = wCur.gray * (1 - flash * 0.8); skyTint.position.copy(camera.position);
-    skyTint.material.color.copy(wCur.fog).multiplyScalar(0.82).lerp(WHITE, flash * 0.7);
+    // 曇天/雨ドームも夜は暗くする（夜の雨で灰色ドームが明るく浮くのを防ぐ）
+    skyTint.material.color.copy(wCur.fog).multiplyScalar(0.82).lerp(FOG_NIGHT, dayA.nightAmt * 0.88).lerp(WHITE, flash * 0.7);
     rain.visible = wCur.rain > 0.03; rainMat.opacity = wCur.rain * 0.55;
     if (rain.visible) {
       rain.position.set(camera.position.x, camera.position.y, camera.position.z);
@@ -85,6 +99,16 @@
     }
     photoSky.material.color.multiplyScalar(0.55 + dayLight * 0.45);
     photoOvercast.material.color.multiplyScalar(0.55 + dayLight * 0.45);
+    // 時間帯パノラマのクロスフェード（昼写真の上に朝焼け/夕焼け/夜空を重ねる）。
+    // 曇り/雨のときは弱め、雷の瞬間は少し飛ばす。
+    const clear = 1 - overcastK * 0.7, nf = 1 - flash * 0.5;
+    photoNight.visible = dayA.nightAmt > 0.01;
+    photoSunrise.visible = dayA.sunriseAmt > 0.01;
+    photoSunset.visible = dayA.sunsetAmt > 0.01;
+    photoNight.material.opacity = Math.min(1, dayA.nightAmt * 1.35) * (1 - overcastK * 0.5) * nf;
+    photoSunrise.material.opacity = Math.min(1, dayA.sunriseAmt) * clear * nf;
+    photoSunset.material.opacity = Math.min(1, dayA.sunsetAmt) * clear * nf;
+    for (const pano of [photoNight, photoSunrise, photoSunset]) { pano.position.copy(camera.position); }
     updateEnvironmentAudio(dt, wCur.rain);
   }
 
@@ -217,6 +241,9 @@
     plantTree: () => { const x = Math.floor(player.pos.x) + 3, z = Math.floor(player.pos.z) + 3; let y = Math.floor(player.pos.y); while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--; setEdit(key(x, y + 1, z), SAPLING); setBlock(x, y + 1, z, SAPLING); requestEditedBlockRebuild(x, y + 1, z); SAVE.saplings[key(x, y + 1, z)] = 0; return { x, y: y + 1, z }; },
     growSaplings: (sec) => { for (const k of Object.keys(SAVE.saplings)) SAVE.saplings[k] += sec; },
     mobKinds: () => MOBS.map(m => m.userData.kind),
+    skyView: (pit = 0.5) => { DEBUG.fly = true; player.pos.set(120, 48, 120); player.vel.set(0, 0, 0); player.onGround = false; pitch = pit; yaw = 0.6; regenWindow(120, 120); return 'ok'; },
+    setWeather: (name) => { if (!WEATHER[name]) return 'no'; weatherState = name; weatherLabel = WEATHER[name].label; setWeatherVals(wTgt, WEATHER[name]); weatherClock = 0; weatherNext = 999; return name; },
+    fogInfo: () => ({ fog: '#' + scene.fog.color.getHexString(), bg: '#' + scene.background.getHexString(), near: scene.fog.near, far: scene.fog.far }),
     spawn: (kind) => { const x = Math.floor(player.pos.x) + 6, z = Math.floor(player.pos.z); let y = Math.floor(player.pos.y); while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--; spawnMobAt(kind, x, y, z, false); const m = MOBS[MOBS.length - 1]; return { kind, count: MOBS.length, pos: m.position.toArray().map(n => +n.toFixed(1)) }; },
     mobFuse: () => { const c = MOBS.find(m => m.userData.kind === 'creeper'); return c ? { hp: c.userData.hp, fuse: +(c.userData.fuse || 0).toFixed(2), scale: +c.scale.x.toFixed(2) } : null; },
   };

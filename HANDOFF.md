@@ -20,6 +20,14 @@
 - **検証**: `npm.cmd run check` 成功。プレビュー実測で、クラフト（丸太→板材、UIクリック経由）、かまど（粗鉄2+石炭→鉄インゴット2、燃料消費・進行バー・完成品）、進捗達成・セーブ復元・夜の敵スポーン&朝の焼失を確認。console error/warn なし。
 - **既知の未実装/次の候補**: 農業（小麦は草ブロックのドロップ/取引のみ）、かまど点火中の見た目変化（FURNACE_LIT ブロック追加＋updateFurnaces からの setBlock 切替。edits を汚さない見た目だけの切替にすること）、モブの水泳/落下、本格光量計算によるスポーン抑制、防具の見た目反映（三人称/一人称）。
 
+### 2026-07-06 第5弾: 時間帯で変わる空（朝焼け/夕焼け/夜空）＋夜の暗さ修正（ユーザー要望）
+
+- 要望「空の種類を増やしたい」「夕方なのに夕日っぽくない・夜なのに暗くない」「新しい画像を使って」「朝日も追加」。従来は昼の写真パノラマ1枚を明るさ66%に落とすだけで、夜も薄暗い昼・夕方も無変化だった。
+- **新パノラマ3枚をCanvasで生成**（`14-sky.js` `makeSkyPano`）: `SKY_SUNRISE_TEX`（朝焼け=ピンク〜金＋朝日、太陽 W*0.38）/`SKY_SUNSET_TEX`（夕焼け=赤橙＋夕日、太陽 W*0.63）/`SKY_NIGHT_TEX`（濃紺グラデ＋星820個＋月＋天の川）。equirect 1536x768、地平線 v=0.55。`photoSunrise`/`photoSunset`/`photoNight` 球を追加（BackSide, renderOrder -8.7/-8.5/-8.4, 既存 day=-9・overcast=-8 の間）。
+- **時間で重み付けクロスフェード**（`46-day-night.js` が `DAY.dayAmt/nightAmt/sunriseAmt/sunsetAmt` を出す。朝夕は `cos(t·2π)` の符号で朝(rising)/夕を分離）。`82` updateWeather で各パノラマの opacity に反映（夜は×1.35で早く濃く、曇天/雷で弱める）。RAVE中は全パノラマ非表示。
+- **夜の暗さ修正**（本題のバグ「夜に雨が降ると明るくなる」）: 霧色/背景/曇天ドームが dayLight で暗くなっておらず、特に雨は霧が濃く(near22)灰色が画面を覆っていた。`82` で `scene.fog.color`/`background` を `FOG_NIGHT(#0a1226)` へ nightAmt×0.9、`FOG_SUNSET`/`FOG_SUNRISE` へ golden×0.45 で寄せてから雷flash。`skyTint`(曇天ドーム)も nightAmt×0.88 で暗く。`DAY.light` の夜の下限も 0.24→0.13 に下げ済み（第3弾）。実測: 夜雨 fog #363a44 ≪ 昼雨 #989da5。
+- **検証**: フォアグラウンドのプレビューで夕焼け・星付き夜空のスクショ、time=0.72→夜/nightAmt=0.98、夜雨の霧が昼雨の約半分の明度を確認。`__mcDbg` に skyView/setWeather/fogInfo 追加。`npm.cmd run check` 成功。console error/warn なし。※プレビュータブがバックグラウンド化すると rAF スロットルで updateDayNight が止まり setTime が効かなく見えるので、計測は foreground（stop→start）で行うこと。
+
 ### 2026-07-06 第4弾: クリーパー + 爆発 + TNT + 苗木で植林
 
 - **爆発共通 `explodeAt(cx,cy,cz,power)`**（39-hostile-mobs.js）: 球状にブロック破壊（水/溶岩/範囲外は残す、外縁はまばら、3割だけ `blockDrops` を実体ドロップ、`clearCropAt`/`unregisterPlacedLight` 連動、TNTに触れたら `igniteTNT` で連鎖）、距離減衰でプレイヤーへダメージ＋吹き飛ばし、`playExplosionSound`。破壊は setEdit(-1)+setBlock(null)+触れたチャンクを requestEditedBlockRebuild。

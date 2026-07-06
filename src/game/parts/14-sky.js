@@ -98,6 +98,82 @@
   const photoOvercast = new THREE.Mesh(photoSkyGeo,
     new THREE.MeshBasicMaterial({ map: loadSkyTex(SKY_OVERCAST_URI), side: THREE.BackSide, depthWrite: false, fog: false, transparent: true, opacity: 0 }));
   photoOvercast.renderOrder = -8; photoOvercast.frustumCulled = false; photoOvercast.rotation.y = SKY_ROT_Y; scene.add(photoOvercast);
+
+  /* ---- 時間帯パノラマ（朝焼け／夕焼け／夜空）をCanvasで生成し、時間でクロスフェード ---- */
+  // equirectangular（横=方位, 縦=天頂→地平線→地面）。地平線は縦の少し下(0.55)。
+  function makeSkyPano(draw) {
+    const W = 1536, H = 768, c = document.createElement('canvas'); c.width = W; c.height = H;
+    draw(c.getContext('2d'), W, H, H * 0.55);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; t.minFilter = THREE.LinearMipmapLinearFilter; return t;
+  }
+  // 地平線付近に横へ伸びる雲の帯を描く
+  function panoClouds(g, W, hor, spread, color) {
+    for (let i = 0; i < 60; i++) {
+      const y = hor - Math.random() * spread, x = Math.random() * W, w = 40 + Math.random() * 160, h = 3 + Math.random() * 8;
+      g.globalAlpha = 0.06 + Math.random() * 0.16; g.fillStyle = color;
+      g.beginPath(); g.ellipse(x, y, w, h, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.globalAlpha = 1;
+  }
+  // 太陽の光芒＋本体を地平線付近に描く
+  function panoSun(g, W, H, hor, sx, coreCol, midCol, edgeCol) {
+    const sy = hor - 4;
+    const glow = g.createRadialGradient(sx, sy, 0, sx, sy, H * 0.55);
+    glow.addColorStop(0, coreCol); glow.addColorStop(0.11, midCol); glow.addColorStop(0.42, edgeCol); glow.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = glow; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(255,248,224,0.98)'; g.beginPath(); g.arc(sx, sy, 24, 0, Math.PI * 2); g.fill();
+  }
+  const SKY_SUNRISE_TEX = makeSkyPano((g, W, H, hor) => {   // 朝焼け（ピンク〜金）
+    const sky = g.createLinearGradient(0, 0, 0, hor);
+    sky.addColorStop(0, '#1f3170'); sky.addColorStop(0.42, '#6b5a9a'); sky.addColorStop(0.72, '#e0899a'); sky.addColorStop(1, '#ffdca0');
+    g.fillStyle = sky; g.fillRect(0, 0, W, hor);
+    const gnd = g.createLinearGradient(0, hor, 0, H); gnd.addColorStop(0, '#6a4a5a'); gnd.addColorStop(1, '#171826');
+    g.fillStyle = gnd; g.fillRect(0, hor, W, H - hor);
+    panoSun(g, W, H, hor, W * 0.38, 'rgba(255,246,224,0.95)', 'rgba(255,196,168,0.78)', 'rgba(240,140,150,0.22)');
+    panoClouds(g, W, hor, hor * 0.5, '#ffd0c0');
+  });
+  const SKY_SUNSET_TEX = makeSkyPano((g, W, H, hor) => {    // 夕焼け（赤橙）
+    const sky = g.createLinearGradient(0, 0, 0, hor);
+    sky.addColorStop(0, '#15204c'); sky.addColorStop(0.4, '#4a2a63'); sky.addColorStop(0.72, '#d05a28'); sky.addColorStop(1, '#ff9a38');
+    g.fillStyle = sky; g.fillRect(0, 0, W, hor);
+    const gnd = g.createLinearGradient(0, hor, 0, H); gnd.addColorStop(0, '#7a3a1a'); gnd.addColorStop(1, '#170f1c');
+    g.fillStyle = gnd; g.fillRect(0, hor, W, H - hor);
+    panoSun(g, W, H, hor, W * 0.63, 'rgba(255,244,210,0.97)', 'rgba(255,176,80,0.82)', 'rgba(255,110,50,0.26)');
+    panoClouds(g, W, hor, hor * 0.5, '#ff9a5a');
+  });
+  const SKY_NIGHT_TEX = makeSkyPano((g, W, H, hor) => {     // 夜空（濃紺＋星＋月）
+    const sky = g.createLinearGradient(0, 0, 0, hor);
+    sky.addColorStop(0, '#04050c'); sky.addColorStop(0.6, '#0a1024'); sky.addColorStop(1, '#132247');
+    g.fillStyle = sky; g.fillRect(0, 0, W, hor);
+    g.fillStyle = '#05060e'; g.fillRect(0, hor, W, H - hor);
+    // 天の川の淡い帯（斜め）
+    g.save(); g.translate(W * 0.5, hor * 0.42); g.rotate(-0.35);
+    const mw = g.createLinearGradient(0, -70, 0, 70); mw.addColorStop(0, 'rgba(150,170,220,0)'); mw.addColorStop(0.5, 'rgba(150,170,220,0.12)'); mw.addColorStop(1, 'rgba(150,170,220,0)');
+    g.fillStyle = mw; g.fillRect(-W, -70, W * 2, 140); g.restore();
+    // 星（地平線より上に散らす。明るい星はにじませる）
+    for (let i = 0; i < 820; i++) {
+      const x = Math.random() * W, y = Math.random() * (hor * 0.98), b = Math.random();
+      const s = b > 0.94 ? 2.4 : b > 0.72 ? 1.5 : 1;
+      g.fillStyle = `rgba(255,255,255,${(0.3 + b * 0.7).toFixed(2)})`;
+      g.fillRect(x, y, s, s);
+      if (b > 0.97) { const gl = g.createRadialGradient(x, y, 0, x, y, 6); gl.addColorStop(0, 'rgba(200,220,255,0.5)'); gl.addColorStop(1, 'rgba(200,220,255,0)'); g.fillStyle = gl; g.fillRect(x - 6, y - 6, 12, 12); }
+    }
+    // 月＋光輪＋クレーター
+    const mx = W * 0.28, my = hor * 0.34;
+    const halo = g.createRadialGradient(mx, my, 0, mx, my, 70); halo.addColorStop(0, 'rgba(210,225,255,0.5)'); halo.addColorStop(1, 'rgba(210,225,255,0)');
+    g.fillStyle = halo; g.fillRect(mx - 70, my - 70, 140, 140);
+    g.fillStyle = 'rgba(236,242,255,0.98)'; g.beginPath(); g.arc(mx, my, 24, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(196,208,232,0.9)';
+    for (const [dx, dy, r] of [[-7, -5, 4], [8, 2, 5], [-2, 9, 3], [10, -8, 3]]) { g.beginPath(); g.arc(mx + dx, my + dy, r, 0, Math.PI * 2); g.fill(); }
+  });
+  function makePanoSky(tex, order) {
+    const m = new THREE.Mesh(photoSkyGeo, new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, depthWrite: false, fog: false, transparent: true, opacity: 0 }));
+    m.renderOrder = order; m.frustumCulled = false; m.rotation.y = SKY_ROT_Y; scene.add(m); return m;
+  }
+  const photoNight = makePanoSky(SKY_NIGHT_TEX, -8.7);
+  const photoSunrise = makePanoSky(SKY_SUNRISE_TEX, -8.5);
+  const photoSunset = makePanoSky(SKY_SUNSET_TEX, -8.4);
   const SUN_DIR = SUN_OFFSET.clone().normalize();
   const _skyTop = new THREE.Color(), _skyMid = new THREE.Color(), _skyHor = new THREE.Color();
   function updateSkyDome(flash) {
