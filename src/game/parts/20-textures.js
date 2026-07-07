@@ -82,6 +82,40 @@
       for (let y = 0; y < S; y += step) { g.fillStyle = tint(0x6d4c1b, 0.72); g.fillRect(0, y, S, 1); }
       for (let row = 0; row * step < S; row++) { const y = row * step, sx = (row % 2) ? S / 2 : 0; g.fillStyle = tint(0x6d4c1b, 0.78); g.fillRect(sx, y, 1, step); }
     }),
+    doorLower: makeTex((g, S) => {
+      noise(g, S, 0xa8743d, 0.88, 1.08);
+      g.fillStyle = tint(0x5a361a, 0.9);
+      g.fillRect(0, 0, S, 2); g.fillRect(0, S - 2, S, 2); g.fillRect(0, 0, 2, S); g.fillRect(S - 2, 0, 2, S);
+      g.fillRect(S / 2 - 1, 0, 2, S);
+      g.fillStyle = tint(0x6d4c1b, 0.82);
+      g.fillRect(6, 8, 8, 15); g.fillRect(18, 8, 8, 15);
+      g.fillStyle = '#d2a844'; g.fillRect(22, 13, 3, 3);
+      g.fillStyle = 'rgba(255,220,150,0.18)'; g.fillRect(4, 3, S - 8, 1);
+    }),
+    doorUpper: makeTex((g, S) => {
+      noise(g, S, 0xa8743d, 0.88, 1.08);
+      g.fillStyle = tint(0x5a361a, 0.9);
+      g.fillRect(0, 0, S, 2); g.fillRect(0, S - 2, S, 2); g.fillRect(0, 0, 2, S); g.fillRect(S - 2, 0, 2, S);
+      g.fillRect(S / 2 - 1, 0, 2, S);
+      g.fillStyle = tint(0x6d4c1b, 0.82);
+      g.fillRect(6, 17, 8, 10); g.fillRect(18, 17, 8, 10);
+      g.clearRect(7, 5, 7, 8); g.clearRect(18, 5, 7, 8);
+      g.fillStyle = 'rgba(180,232,255,0.42)';
+      g.fillRect(7, 5, 7, 8); g.fillRect(18, 5, 7, 8);
+      g.fillStyle = tint(0x5a361a, 0.9);
+      g.fillRect(7, 5, 7, 1); g.fillRect(7, 12, 7, 1); g.fillRect(18, 5, 7, 1); g.fillRect(18, 12, 7, 1);
+      g.fillRect(7, 5, 1, 8); g.fillRect(13, 5, 1, 8); g.fillRect(18, 5, 1, 8); g.fillRect(24, 5, 1, 8);
+    }),
+    trapdoor: makeTex((g, S) => {
+      noise(g, S, 0xa8743d, 0.88, 1.08);
+      g.fillStyle = tint(0x5a361a, 0.9);
+      g.fillRect(0, 0, S, 3); g.fillRect(0, S - 3, S, 3); g.fillRect(0, 0, 3, S); g.fillRect(S - 3, 0, 3, S);
+      g.fillRect(S / 2 - 1, 3, 2, S - 6); g.fillRect(3, S / 2 - 1, S - 6, 2);
+      g.clearRect(7, 7, 6, 6); g.clearRect(19, 7, 6, 6); g.clearRect(7, 19, 6, 6); g.clearRect(19, 19, 6, 6);
+      g.fillStyle = 'rgba(180,232,255,0.30)';
+      g.fillRect(7, 7, 6, 6); g.fillRect(19, 7, 6, 6); g.fillRect(7, 19, 6, 6); g.fillRect(19, 19, 6, 6);
+      g.fillStyle = 'rgba(255,220,150,0.16)'; g.fillRect(4, 4, S - 8, 1);
+    }),
     brick: makeTex((g, S) => {
       noise(g, S, 0xa83a2a, 0.9, 1.08); g.fillStyle = '#cdbfa8'; const r = S / 4;
       for (let row = 0; row * r < S; row++) {
@@ -201,11 +235,31 @@
     }),
     furnace: makeTex((g, S) => {
       noise(g, S, 0x757a7d, 0.78, 1.08);
-      g.fillStyle = '#44484a'; g.fillRect(6, 7, 20, 13);
-      g.fillStyle = '#1d2022'; g.fillRect(8, 9, 16, 9);
-      g.fillStyle = '#ff8a22'; g.fillRect(10, 13, 12, 4);
-      g.fillStyle = '#ffd15a'; g.fillRect(13, 11, 6, 6);
-      g.fillStyle = '#3f4448'; g.fillRect(4, 24, 24, 3);
+      g.fillStyle = tint(0x4a4e52, 0.9); g.fillRect(0, 0, S, 3); g.fillRect(0, S - 3, S, 3); g.fillRect(0, 0, 3, S); g.fillRect(S - 3, 0, 3, S);
+      g.fillStyle = '#34383b'; g.fillRect(6, 7, 20, 13);
+      g.fillStyle = '#16191b'; g.fillRect(8, 9, 16, 9);
+      g.fillStyle = '#2d3134'; g.fillRect(10, 22, 12, 4);
+      g.fillStyle = '#596066'; g.fillRect(12, 11, 8, 4);
+    }),
+    furnaceSide: makeTex((g, S) => {
+      noise(g, S, 0x73787c, 0.82, 1.08);
+      g.fillStyle = tint(0x4a4e52, 0.88); g.fillRect(0, 0, S, 3); g.fillRect(0, S - 3, S, 3); g.fillRect(0, 0, 3, S); g.fillRect(S - 3, 0, 3, S);
+      dots(g, S, 0x4c5256, 0.08, 0.86);
+      g.fillStyle = 'rgba(230,235,238,0.16)'; g.fillRect(4, 4, S - 8, 1);
+    }),
+    furnaceTop: makeTex((g, S) => {
+      noise(g, S, 0x777c80, 0.8, 1.08);
+      g.fillStyle = tint(0x4a4e52, 0.9); g.fillRect(0, 0, S, 3); g.fillRect(0, S - 3, S, 3); g.fillRect(0, 0, 3, S); g.fillRect(S - 3, 0, 3, S);
+      g.fillStyle = '#555b60'; g.fillRect(8, 8, S - 16, S - 16);
+      dots(g, S, 0x303438, 0.06, 0.9);
+    }),
+    furnaceFront: makeTex((g, S) => {
+      noise(g, S, 0x757a7d, 0.78, 1.08);
+      g.fillStyle = tint(0x4a4e52, 0.9); g.fillRect(0, 0, S, 3); g.fillRect(0, S - 3, S, 3); g.fillRect(0, 0, 3, S); g.fillRect(S - 3, 0, 3, S);
+      g.fillStyle = '#34383b'; g.fillRect(6, 7, 20, 13);
+      g.fillStyle = '#16191b'; g.fillRect(8, 9, 16, 9);
+      g.fillStyle = '#2d3134'; g.fillRect(10, 22, 12, 4);
+      g.fillStyle = '#596066'; g.fillRect(12, 11, 8, 4);
     }),
     glowCrystal: makeTex((g, S) => {
       noise(g, S, 0x1f4150, 0.72, 1.05);
@@ -381,5 +435,5 @@
   TX.lava.wrapS = TX.lava.wrapT = THREE.RepeatWrapping;
   TX.cactus.userData.normalMap = normalFromCanvas(TX.cactus.image, 2.2);
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
-  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'farmland', 'furnaceLit', 'tntSide', 'tntTop', 'ironBlock', 'diamondBlock', 'coalBlock'])
+  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'doorLower', 'doorUpper', 'trapdoor', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'furnaceSide', 'furnaceTop', 'furnaceFront', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'farmland', 'furnaceLit', 'tntSide', 'tntTop', 'ironBlock', 'diamondBlock', 'coalBlock'])
     TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);

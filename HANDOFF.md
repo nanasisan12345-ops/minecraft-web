@@ -6,6 +6,7 @@
 
 ## 🚩 現在地（次セッションはここから）
 
+- **2026-07-07: 建築ブロック忠実化 第1弾/第2弾を実装、`npm.cmd run check` 成功**。専用ブロック形状システムを追加し、ベッド/チェスト/開いたチェスト/松明/ランタン/提灯/看板/サボテン/小麦/苗木を薄型・小型シルエットへ修正。かまどは正面・側面・上面テクスチャを分離。木のドア（2ブロック高、上下ペア、右クリック開閉、上半分/下半分どちらを壊しても1枚ドロップ）と木のトラップドア（右クリック開閉）を追加。次は **フェンス/フェンスゲート/石壁** から続ける。
 - **2026-07-07: 繁殖（第6弾）／鉱物ブロック（第7弾）／防具の見た目（第8弾）／バケツ（第9弾）を実装、`npm.cmd run check` 成功・プレビュー実測OK**。ローカルの `main` にコミット済み（`adc7149` 繁殖 / `c4e73d3` 鉱物 / `2ea1c4d` 防具 / バケツはこれからコミット）だが **push はガードで保留中**（main への直接 push が自動モードでブロック。ユーザーに手動 push か権限許可を確認中）。前回までのコミットは `4fa1044`（Time-of-day skies）。生成物 `src/game.generated.js` と `.claude/` は gitignore。
 - **やってきたこと（新しい順・各セクションに詳細あり）**:
   1. サバイバル全面再設計（インベントリ36スロット/クラフト/かまど/HP空腹/敵MOB/チェスト/ベッド/村人取引/進捗/統合セーブ）
@@ -25,7 +26,7 @@
 ### サバイバル実装のファイル早見表（どこを触るか）
 
 - `20-textures.js`: 32pxドット絵テクスチャ。新ブロックのテクスチャはここに追加し、末尾の normalMap 生成リストにも名前を足す。
-- `22-block-types.js`: `TYPES[]`（描画マテリアル）と各ブロックの `const` 定数、`ITEM_FOR_BLOCK` 用。現在の最大インデックスは 49（COAL_BLOCK）。ブロック追加はここ。solid:false transparent は水/作物/苗木と同じ扱い。
+- `22-block-types.js`: `TYPES[]`（描画マテリアル）と各ブロックの `const` 定数、`ITEM_FOR_BLOCK` 用。現在の最大インデックスは 59（OAK_TRAPDOOR_OPEN）。ブロック追加はここ。`TYPES[type].model` に箱パーツ/交差板パーツを入れると、通常立方体ではないブロック形状を描ける。solid:false transparent は水/作物/苗木と同じ扱い。
 - `33-save-state.js`: 統合セーブ `SAVE`（1オブジェクト→localStorage `mc_save_<seed>`）。保存対象を増やすときはここに枠を足し、`collectSaveState()`（51）で動的値を回収。ブロック編集は別キー `mc_edits_<seed>`（32-world-window.js）。
 - `39-hostile-mobs.js`: 敵MOB（`MOB_DEFS`/`MOB_MAKERS`）、スポーン制御(`trySpawnMobs`)、AI(`updateMob`)、戦闘(`tryMeleeAttack`/`damageMobBy`)、弓矢、**共有爆発 `explodeAt`**、TNT(`igniteTNT`/`updateTNT`)。新モブはここに maker+def+スポーン抽選+（必要なら）updateMob 分岐。
 - `37-animals.js`: 友好動物。HP/ドロップ/`damageAnimal`。**繁殖**（`BREED_FOOD`/`feedAnimal`/`pickAnimalTarget`/`tryBreedPairs`/`spawnBaby`、`makeAnimal(kind, baby)`）。子供の成長/恋愛モードは `updateAnimal` 内。
@@ -40,6 +41,16 @@
 - `56-hotbar-ui.js`: 9枠ホットバー。 `59-progress.js`: 進捗21段。 `82-weather-and-loop.js`: メインループ配線＋天候＋空の色制御＋`__mcDbg`。
 - `57-first-person-hand.js`/`58-third-person-view.js`: 選択アイテムの手持ち表示。**装備防具の見た目**（三人称=`rebuildAvatarArmor`/`ARMOR_COLORS`、一人称=`ARMOR_SLEEVE` で袖着色）は `SAVE.armor.id` から。防具の見た目を増やすならここ。
 - **鉄則**: `src/game.generated.js` は自動生成（`npm run assemble`）なので触らない。ファイルは番号順(アルファベット順)に結合され、関数宣言はモジュール全体でホイストされるので番号をまたいだ呼び出しOK。ただし top-level 実行時の変数参照は定義順に注意。音楽会場(`60-rave-venues.js`/`70-music.js`)と `gikopoi2/`・`hallucinate/` は対象外。
+
+## 2026-07-07 建築ブロック忠実化 第1弾/第2弾
+
+- ユーザー要望: 「本家にある建築要素が不足」「既存のカマドやベッドなども本家の形を踏襲したい」「ドアは開閉ギミックもちゃんと追加」。
+- **専用ブロック形状**: `22-block-types.js` の `TYPES[type].model` に `{ box:[x0,y0,z0,x1,y1,z1] }` と `{ kind:'cross', y0,y1,r }` を持てるようにし、`34-mesh-rebuild.js` と `world-mesh-worker.js` の両方で通常立方体の代わりに描画。`collectMeshPayload()` で `blockModels` を worker へ渡す。メッシュキャッシュ世代は `MESH_WORKER_VERSION=6`。
+- **既存ブロック修正**: ベッド（低い寝台＋脚）、チェスト/開いたチェスト（小さめ箱＋開き蓋）、松明（細い棒＋炎）、ランタン/提灯（小型吊り形状）、村の看板（支柱＋板）、サボテン（少し細い柱）、小麦/苗木（交差板）を専用モデル化。かまどは `furnaceSide`/`furnaceTop`/`furnaceFront`/`furnaceLit` に分離し、未点火時の炎を消した。
+- **木のドア**: 8種類のブロックIDで向き(x/z)・開閉・上下を表現（50-57）。`oak_door` は板材6個 `['PP','PP','PP']` で3枚。設置時に上下2ブロックの空きを確認し、右クリックで上下ペアを閉⇄開に切替。上/下どちらを壊しても両方消え、`oak_door` 1枚をドロップ。
+- **木のトラップドア**: `OAK_TRAPDOOR_CLOSED=58` / `OAK_TRAPDOOR_OPEN=59`。`oak_trapdoor` は板材6個 `['PPP','PPP']` で2枚。右クリックで水平板⇄縦板に切替、壊すと `oak_trapdoor` をドロップ。
+- **検証**: `npm.cmd run check` 成功。生成物 `src/game.generated.js` は assemble で更新済み。
+- **次に続ける順番**: フェンス / フェンスゲート（右クリック開閉） / 石壁 → 階段 / ハーフブロック → はしご / 看板 / ガラス板。将来的にはブロックID差分ではなく、向き・ヒンジ・上付き/下付きなどを座標メタデータとして保存すると本家により近くなる。
 
 ## 2026-07-07 第9弾: バケツ（水/溶岩の汲み取り・設置、牛乳）
 

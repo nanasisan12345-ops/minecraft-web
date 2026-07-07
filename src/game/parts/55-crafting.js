@@ -8,6 +8,8 @@
     { out: 'crafting_table', n: 1, pattern: ['PP', 'PP'], keys: { P: 'planks' } },
     { out: 'furnace', n: 1, pattern: ['CCC', 'C C', 'CCC'], keys: { C: 'cobblestone' } },
     { out: 'chest', n: 1, pattern: ['PPP', 'P P', 'PPP'], keys: { P: 'planks' } },
+    { out: 'oak_door', n: 3, pattern: ['PP', 'PP', 'PP'], keys: { P: 'planks' } },
+    { out: 'oak_trapdoor', n: 2, pattern: ['PPP', 'PPP'], keys: { P: 'planks' } },
     { out: 'torch', n: 4, pattern: ['O', 'S'], keys: { O: 'coal', S: 'stick' } },
     { out: 'cloth', n: 1, pattern: ['FF', 'FF'], keys: { F: 'fiber' } },
     { out: 'bread', n: 1, pattern: ['WWW'], keys: { W: 'wheat' } },

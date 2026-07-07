@@ -22,6 +22,8 @@
     chest:          { name: 'チェスト', cat: 'block', block: CHEST, fuel: 1.5 },
     bed:            { name: 'ベッド', cat: 'block', block: BED },
     lantern:        { name: 'ランタン', cat: 'block', block: LANTERN },
+    oak_door:       { name: '木のドア', cat: 'block', block: OAK_DOOR_Z_CLOSED, fuel: 1.5 },
+    oak_trapdoor:   { name: '木のトラップドア', cat: 'block', block: OAK_TRAPDOOR_CLOSED, fuel: 1.5 },
     glow_crystal:   { name: '発光結晶', cat: 'block', block: GLOW_CRYSTAL },
     gold_block:     { name: '金ブロック', cat: 'block', block: GOLD_BLOCK },
     iron_block:     { name: '鉄ブロック', cat: 'block', block: IRON_BLOCK },
@@ -87,11 +89,16 @@
   const ITEM_FOR_BLOCK = [];
   for (const [id, def] of Object.entries(ITEM_DEFS)) if (def.block != null) ITEM_FOR_BLOCK[def.block] = id;
   for (let b = 0; b < TYPES.length; b++) {
-    if (ITEM_FOR_BLOCK[b] || !TYPES[b] || TYPES[b].solid === false) continue;
+    if (ITEM_FOR_BLOCK[b] || !TYPES[b] || TYPES[b].solid === false || TYPES[b].noAutoItem) continue;
     const id = `block_${b}`;
     ITEM_DEFS[id] = { name: TYPES[b].name, cat: 'block', block: b };
     ITEM_FOR_BLOCK[b] = id;
   }
+  for (const b of [OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP]) {
+    ITEM_FOR_BLOCK[b] = 'oak_door';
+  }
+  ITEM_FOR_BLOCK[OAK_TRAPDOOR_CLOSED] = 'oak_trapdoor';
+  ITEM_FOR_BLOCK[OAK_TRAPDOOR_OPEN] = 'oak_trapdoor';
   function itemDef(id) { return ITEM_DEFS[id] || null; }
   function itemLabel(id) { const d = ITEM_DEFS[id]; return d ? d.name : String(id); }
   function maxStack(id) {

@@ -17,6 +17,7 @@ let CHUNK_SIZE = 24, CHUNK_Y_MIN = -64, CHUNK_Y_MAX = 319;
 let typeCount = 0;
 let transparent = [];
 let groupCounts = [];
+let blockModels = [];
 let explicitBlocks = new Map();
 let explicitAir = new Set();
 let explicitEdits = new Map();
@@ -540,23 +541,76 @@ function makeMeshBuildState() {
   });
 }
 
-function addBlockFaceToState(state, x, y, z, f) {
-  const fd = FACE_DEFS[f];
-  const group = state.positions.length === 1 ? 0 : fd.m;
+function addQuadToState(state, verts, normal, uvCoords, mat = 0) {
+  const group = state.positions.length === 1 ? 0 : Math.max(0, Math.min(state.positions.length - 1, mat | 0));
   const pos = state.positions[group], norm = state.normals[group], uv = state.uvs[group], idx = state.indices[group];
   const base = pos.length / 3;
-  for (const p of fd.v) {
-    pos.push(x + p[0], y + p[1], z + p[2]);
-    norm.push(fd.n[0], fd.n[1], fd.n[2]);
+  for (const p of verts) {
+    pos.push(p[0], p[1], p[2]);
+    norm.push(normal[0], normal[1], normal[2]);
   }
-  uv.push(...fd.uv);
+  uv.push(...uvCoords);
   idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
-function addBlockToState(build, x, y, z, t) {
+function addBlockFaceToState(state, x, y, z, f) {
+  const fd = FACE_DEFS[f];
+  addQuadToState(state, fd.v.map(p => [x + p[0], y + p[1], z + p[2]]), fd.n, fd.uv, fd.m);
+}
+
+function addBoxPartToState(state, x, y, z, part) {
+  const b = part && part.box;
+  if (!b || b.length < 6) return false;
+  const x0 = x + b[0], y0 = y + b[1], z0 = z + b[2];
+  const x1 = x + b[3], y1 = y + b[4], z1 = z + b[5];
+  if (x1 <= x0 || y1 <= y0 || z1 <= z0) return false;
+  const uvCoords = part.uv || FACE_DEFS[0].uv;
+  const faces = [
+    [[x1,y0,z0], [x1,y1,z0], [x1,y1,z1], [x1,y0,z1]],
+    [[x0,y0,z0], [x0,y0,z1], [x0,y1,z1], [x0,y1,z0]],
+    [[x0,y1,z0], [x0,y1,z1], [x1,y1,z1], [x1,y1,z0]],
+    [[x0,y0,z0], [x1,y0,z0], [x1,y0,z1], [x0,y0,z1]],
+    [[x0,y0,z1], [x1,y0,z1], [x1,y1,z1], [x0,y1,z1]],
+    [[x0,y0,z0], [x0,y1,z0], [x1,y1,z0], [x1,y0,z0]],
+  ];
+  for (let f = 0; f < FACE_DEFS.length; f++) {
+    const fd = FACE_DEFS[f];
+    addQuadToState(state, faces[f], fd.n, uvCoords, part.mat ?? fd.m);
+  }
+  return true;
+}
+
+function addCrossPartToState(state, x, y, z, part) {
+  const r = part.r ?? 0.5;
+  const y0 = y + (part.y0 ?? 0);
+  const y1 = y + (part.y1 ?? 1);
+  const cx = x + 0.5, cz = z + 0.5;
+  const uvCoords = part.uv || FACE_DEFS[0].uv;
+  const m = part.mat ?? 0;
+  const d = Math.SQRT1_2;
+  addQuadToState(state, [[cx - r,y0,cz - r], [cx - r,y1,cz - r], [cx + r,y1,cz + r], [cx + r,y0,cz + r]], [-d, 0, d], uvCoords, m);
+  addQuadToState(state, [[cx - r,y0,cz + r], [cx - r,y1,cz + r], [cx + r,y1,cz - r], [cx + r,y0,cz - r]], [d, 0, d], uvCoords, m);
+  return true;
+}
+
+function addModelToState(state, x, y, z, model) {
   let added = false;
+  for (const part of model) {
+    if (part.kind === 'cross') added = addCrossPartToState(state, x, y, z, part) || added;
+    else added = addBoxPartToState(state, x, y, z, part) || added;
+  }
+  if (added) state.blocks++;
+}
+
+function addBlockToState(build, x, y, z, t) {
   const state = build[t];
   if (!state) return;
+  const model = blockModels[t];
+  if (model) {
+    addModelToState(state, x, y, z, model);
+    return;
+  }
+  let added = false;
   for (let f = 0; f < FACE_DEFS.length; f++) {
     if (!faceVisible(x, y, z, t, f)) continue;
     addBlockFaceToState(state, x, y, z, f);
@@ -645,6 +699,7 @@ function loadPayload(payload) {
   typeCount = payload.typeCount || 0;
   transparent = payload.transparent || [];
   groupCounts = payload.groupCounts || [];
+  blockModels = payload.blockModels || [];
   explicitBlocks = new Map();
   explicitAir = new Set();
   explicitEdits = new Map();
