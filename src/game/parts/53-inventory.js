@@ -24,6 +24,9 @@
     lantern:        { name: 'ランタン', cat: 'block', block: LANTERN },
     oak_door:       { name: '木のドア', cat: 'block', block: OAK_DOOR_Z_CLOSED, fuel: 1.5 },
     oak_trapdoor:   { name: '木のトラップドア', cat: 'block', block: OAK_TRAPDOOR_CLOSED, fuel: 1.5 },
+    oak_fence:      { name: '木のフェンス', cat: 'block', block: OAK_FENCE, fuel: 1.5 },
+    oak_fence_gate: { name: '木のフェンスゲート', cat: 'block', block: OAK_FENCE_GATE_Z_CLOSED, fuel: 1.5 },
+    cobblestone_wall: { name: '丸石の壁', cat: 'block', block: COBBLESTONE_WALL },
     glow_crystal:   { name: '発光結晶', cat: 'block', block: GLOW_CRYSTAL },
     gold_block:     { name: '金ブロック', cat: 'block', block: GOLD_BLOCK },
     iron_block:     { name: '鉄ブロック', cat: 'block', block: IRON_BLOCK },
@@ -94,11 +97,15 @@
     ITEM_DEFS[id] = { name: TYPES[b].name, cat: 'block', block: b };
     ITEM_FOR_BLOCK[b] = id;
   }
-  for (const b of [OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP]) {
+  for (const b of [OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_DOOR_S_CLOSED, OAK_DOOR_S_CLOSED_TOP, OAK_DOOR_S_OPEN, OAK_DOOR_S_OPEN_TOP, OAK_DOOR_W_CLOSED, OAK_DOOR_W_CLOSED_TOP, OAK_DOOR_W_OPEN, OAK_DOOR_W_OPEN_TOP]) {
     ITEM_FOR_BLOCK[b] = 'oak_door';
   }
   ITEM_FOR_BLOCK[OAK_TRAPDOOR_CLOSED] = 'oak_trapdoor';
   ITEM_FOR_BLOCK[OAK_TRAPDOOR_OPEN] = 'oak_trapdoor';
+  ITEM_FOR_BLOCK[OAK_FENCE_GATE_Z_CLOSED] = 'oak_fence_gate';
+  ITEM_FOR_BLOCK[OAK_FENCE_GATE_Z_OPEN] = 'oak_fence_gate';
+  ITEM_FOR_BLOCK[OAK_FENCE_GATE_X_CLOSED] = 'oak_fence_gate';
+  ITEM_FOR_BLOCK[OAK_FENCE_GATE_X_OPEN] = 'oak_fence_gate';
   function itemDef(id) { return ITEM_DEFS[id] || null; }
   function itemLabel(id) { const d = ITEM_DEFS[id]; return d ? d.name : String(id); }
   function maxStack(id) {

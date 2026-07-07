@@ -95,6 +95,11 @@
   addEventListener('keydown', e => {
     // コンテナ（インベントリ/作業台/かまど/チェスト）を開いている間
     if (isContainerOpen()) {
+      if (e.code === 'KeyQ' && typeof dropInventoryItem === 'function') {
+        dropInventoryItem(e.ctrlKey || e.metaKey);
+        e.preventDefault();
+        return;
+      }
       if (e.code === 'Escape' || e.code === 'Tab' || e.code === 'KeyE') closeContainer();
       e.preventDefault();
       return;
@@ -125,6 +130,11 @@
     // インベントリ開閉
     if (started && (e.code === 'Tab' || (e.code === 'KeyE' && !(typeof RAVE !== 'undefined' && RAVE.on)))) {
       toggleInventoryScreen();
+      e.preventDefault();
+      return;
+    }
+    if (started && e.code === 'KeyQ' && (e.ctrlKey || e.metaKey || !(typeof RAVE !== 'undefined' && RAVE.on))) {
+      dropSelectedItem(e.ctrlKey || e.metaKey);
       e.preventDefault();
       return;
     }

@@ -74,6 +74,20 @@
     { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 57
     { name: '木のトラップドア', color: 0xa8743d, icon: T.trapdoor, mats: faceMats(T.trapdoor, { transparent: true, alphaTest: 0.18 }), transparent: true }, // 58
     { name: '開いた木のトラップドア', color: 0xa8743d, icon: T.trapdoor, mats: faceMats(T.trapdoor, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 59
+    { name: '木のフェンス', color: 0xa8743d, icon: T.planks, mats: faceMats(T.planks), transparent: true, collisionHeight: 1.5 }, // 60
+    { name: '木のフェンスゲート', color: 0xa8743d, icon: T.planks, mats: faceMats(T.planks), transparent: true, collisionHeight: 1.5 }, // 61
+    { name: '開いた木のフェンスゲート', color: 0xa8743d, icon: T.planks, mats: faceMats(T.planks), transparent: true, solid: false, noAutoItem: true }, // 62
+    { name: '木のフェンスゲート', color: 0xa8743d, icon: T.planks, mats: faceMats(T.planks), transparent: true, collisionHeight: 1.5, noAutoItem: true }, // 63
+    { name: '開いた木のフェンスゲート', color: 0xa8743d, icon: T.planks, mats: faceMats(T.planks), transparent: true, solid: false, noAutoItem: true }, // 64
+    { name: '丸石の壁', color: 0x7d8286, icon: T.cobble, mats: faceMats(T.cobble), transparent: true, collisionHeight: 1.5 }, // 65
+    { name: '木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 66
+    { name: '木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 67
+    { name: '開いた木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 68
+    { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 69
+    { name: '木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 70
+    { name: '木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 71
+    { name: '開いた木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 72
+    { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 73
   ];
   const GRASS = 0, DIRT = 1, STONE = 2, LOG = 3, LEAVES = 4, SAND = 5, PLANKS = 6, BRICK = 7, GLASS = 8, WATER = 9, SNOW = 10;
   const COAL_ORE = 11, IRON_ORE = 12, GOLD_ORE = 13, DIAMOND_ORE = 14, TORCH = 15;
@@ -90,6 +104,10 @@
   const OAK_DOOR_Z_CLOSED = 50, OAK_DOOR_Z_CLOSED_TOP = 51, OAK_DOOR_Z_OPEN = 52, OAK_DOOR_Z_OPEN_TOP = 53;
   const OAK_DOOR_X_CLOSED = 54, OAK_DOOR_X_CLOSED_TOP = 55, OAK_DOOR_X_OPEN = 56, OAK_DOOR_X_OPEN_TOP = 57;
   const OAK_TRAPDOOR_CLOSED = 58, OAK_TRAPDOOR_OPEN = 59;
+  const OAK_FENCE = 60, OAK_FENCE_GATE_Z_CLOSED = 61, OAK_FENCE_GATE_Z_OPEN = 62, OAK_FENCE_GATE_X_CLOSED = 63, OAK_FENCE_GATE_X_OPEN = 64;
+  const COBBLESTONE_WALL = 65;
+  const OAK_DOOR_S_CLOSED = 66, OAK_DOOR_S_CLOSED_TOP = 67, OAK_DOOR_S_OPEN = 68, OAK_DOOR_S_OPEN_TOP = 69;
+  const OAK_DOOR_W_CLOSED = 70, OAK_DOOR_W_CLOSED_TOP = 71, OAK_DOOR_W_OPEN = 72, OAK_DOOR_W_OPEN_TOP = 73;
 
   TYPES[TORCH].model = [
     { box: [0.43, 0.00, 0.43, 0.57, 0.72, 0.57] },
@@ -137,13 +155,60 @@
   TYPES[SAPLING].model = [
     { kind: 'cross', y0: 0.00, y1: 0.82, r: 0.38 },
   ];
-  TYPES[OAK_DOOR_Z_CLOSED].model = [{ box: [0.00, 0.00, 0.4375, 1.00, 1.00, 0.5625] }];
-  TYPES[OAK_DOOR_Z_CLOSED_TOP].model = [{ box: [0.00, 0.00, 0.4375, 1.00, 1.00, 0.5625] }];
-  TYPES[OAK_DOOR_Z_OPEN].model = [{ box: [0.4375, 0.00, 0.00, 0.5625, 1.00, 1.00] }];
-  TYPES[OAK_DOOR_Z_OPEN_TOP].model = [{ box: [0.4375, 0.00, 0.00, 0.5625, 1.00, 1.00] }];
-  TYPES[OAK_DOOR_X_CLOSED].model = [{ box: [0.4375, 0.00, 0.00, 0.5625, 1.00, 1.00] }];
-  TYPES[OAK_DOOR_X_CLOSED_TOP].model = [{ box: [0.4375, 0.00, 0.00, 0.5625, 1.00, 1.00] }];
-  TYPES[OAK_DOOR_X_OPEN].model = [{ box: [0.00, 0.00, 0.4375, 1.00, 1.00, 0.5625] }];
-  TYPES[OAK_DOOR_X_OPEN_TOP].model = [{ box: [0.00, 0.00, 0.4375, 1.00, 1.00, 0.5625] }];
+  function setDoorShape(lower, upper, box) {
+    TYPES[lower].model = [{ box }];
+    TYPES[upper].model = [{ box }];
+    TYPES[lower].collisionBoxes = [box];
+    TYPES[upper].collisionBoxes = [box];
+  }
+  setDoorShape(OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, [0.00, 0.00, 0.0000, 1.00, 1.00, 0.1875]);
+  setDoorShape(OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, [0.0000, 0.00, 0.00, 0.1875, 1.00, 1.00]);
+  setDoorShape(OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, [0.8125, 0.00, 0.00, 1.00, 1.00, 1.00]);
+  setDoorShape(OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, [0.00, 0.00, 0.0000, 1.00, 1.00, 0.1875]);
+  setDoorShape(OAK_DOOR_S_CLOSED, OAK_DOOR_S_CLOSED_TOP, [0.00, 0.00, 0.8125, 1.00, 1.00, 1.00]);
+  setDoorShape(OAK_DOOR_S_OPEN, OAK_DOOR_S_OPEN_TOP, [0.8125, 0.00, 0.00, 1.00, 1.00, 1.00]);
+  setDoorShape(OAK_DOOR_W_CLOSED, OAK_DOOR_W_CLOSED_TOP, [0.0000, 0.00, 0.00, 0.1875, 1.00, 1.00]);
+  setDoorShape(OAK_DOOR_W_OPEN, OAK_DOOR_W_OPEN_TOP, [0.00, 0.00, 0.8125, 1.00, 1.00, 1.00]);
   TYPES[OAK_TRAPDOOR_CLOSED].model = [{ box: [0.00, 0.00, 0.00, 1.00, 0.1875, 1.00] }];
   TYPES[OAK_TRAPDOOR_OPEN].model = [{ box: [0.00, 0.00, 0.8125, 1.00, 1.00, 1.00] }];
+  TYPES[OAK_FENCE].model = [
+    { box: [0.3750, 0.00, 0.3750, 0.6250, 1.50, 0.6250] },
+    { box: [0.0000, 0.35, 0.4063, 1.0000, 0.50, 0.5938] },
+    { box: [0.0000, 0.75, 0.4063, 1.0000, 0.90, 0.5938] },
+    { box: [0.4063, 0.35, 0.0000, 0.5938, 0.50, 1.0000] },
+    { box: [0.4063, 0.75, 0.0000, 0.5938, 0.90, 1.0000] },
+  ];
+  TYPES[OAK_FENCE_GATE_Z_CLOSED].model = [
+    { box: [0.0625, 0.00, 0.3750, 0.2500, 1.50, 0.6250] },
+    { box: [0.7500, 0.00, 0.3750, 0.9375, 1.50, 0.6250] },
+    { box: [0.1875, 0.35, 0.4063, 0.8125, 0.50, 0.5938] },
+    { box: [0.1875, 0.75, 0.4063, 0.8125, 0.90, 0.5938] },
+  ];
+  TYPES[OAK_FENCE_GATE_Z_OPEN].model = [
+    { box: [0.0625, 0.00, 0.3750, 0.2500, 1.50, 0.6250] },
+    { box: [0.7500, 0.00, 0.3750, 0.9375, 1.50, 0.6250] },
+    { box: [0.0625, 0.35, 0.0000, 0.2500, 0.50, 0.6250] },
+    { box: [0.0625, 0.75, 0.0000, 0.2500, 0.90, 0.6250] },
+    { box: [0.7500, 0.35, 0.3750, 0.9375, 0.50, 1.0000] },
+    { box: [0.7500, 0.75, 0.3750, 0.9375, 0.90, 1.0000] },
+  ];
+  TYPES[OAK_FENCE_GATE_X_CLOSED].model = [
+    { box: [0.3750, 0.00, 0.0625, 0.6250, 1.50, 0.2500] },
+    { box: [0.3750, 0.00, 0.7500, 0.6250, 1.50, 0.9375] },
+    { box: [0.4063, 0.35, 0.1875, 0.5938, 0.50, 0.8125] },
+    { box: [0.4063, 0.75, 0.1875, 0.5938, 0.90, 0.8125] },
+  ];
+  TYPES[OAK_FENCE_GATE_X_OPEN].model = [
+    { box: [0.3750, 0.00, 0.0625, 0.6250, 1.50, 0.2500] },
+    { box: [0.3750, 0.00, 0.7500, 0.6250, 1.50, 0.9375] },
+    { box: [0.0000, 0.35, 0.0625, 0.6250, 0.50, 0.2500] },
+    { box: [0.0000, 0.75, 0.0625, 0.6250, 0.90, 0.2500] },
+    { box: [0.3750, 0.35, 0.7500, 1.0000, 0.50, 0.9375] },
+    { box: [0.3750, 0.75, 0.7500, 1.0000, 0.90, 0.9375] },
+  ];
+  TYPES[COBBLESTONE_WALL].model = [
+    { box: [0.2500, 0.00, 0.2500, 0.7500, 1.00, 0.7500] },
+    { box: [0.0000, 0.00, 0.3125, 1.0000, 0.8125, 0.6875] },
+    { box: [0.3125, 0.00, 0.0000, 0.6875, 0.8125, 1.0000] },
+    { box: [0.3125, 0.8125, 0.3125, 0.6875, 1.0000, 0.6875] },
+  ];

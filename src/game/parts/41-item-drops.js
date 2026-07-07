@@ -40,6 +40,31 @@
       grounded: false, restY: null, spin: Math.random() * Math.PI * 2,
       pickupDelay: 0.45,
     });
+    return ITEM_DROPS[ITEM_DROPS.length - 1];
+  }
+  function spawnThrownItemDrop(id, n = 1, dur) {
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const d = spawnItemDrop(player.pos.x + dir.x * 0.65 - 0.5, player.pos.y - 0.95 + dir.y * 0.2, player.pos.z + dir.z * 0.65 - 0.5, id, n, dur, 300);
+    if (!d) return null;
+    d.vx = dir.x * 4.2 + rnd(-0.25, 0.25);
+    d.vy = Math.max(0.6, 1.2 + dir.y * 3.0);
+    d.vz = dir.z * 4.2 + rnd(-0.25, 0.25);
+    d.pickupDelay = 1.0;
+    d.grounded = false;
+    return d;
+  }
+  function dropSelectedItem(fullStack = false) {
+    if (!started || SURVIVAL.dead) return false;
+    const s = selectedItem();
+    if (!s) { thock(80); return false; }
+    const amount = fullStack ? s.n : 1;
+    if (!spawnThrownItemDrop(s.id, amount, s.dur)) return false;
+    s.n -= amount;
+    if (s.n <= 0) INV[selected] = null;
+    invChanged();
+    thock(150);
+    if (typeof setDebugToast === 'function') setDebugToast(`${ITEM_DEFS[s.id].name} を捨てた`, 0.9);
+    return true;
   }
   // 落下地点の地面の高さ（ブロック上面）を探す
   function dropGroundY(x, y, z) {

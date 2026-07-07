@@ -9,7 +9,7 @@
     const dx = sx !== 0 ? 1 / Math.abs(dir.x) : Infinity, dy = sy !== 0 ? 1 / Math.abs(dir.y) : Infinity, dz = sz !== 0 ? 1 / Math.abs(dir.z) : Infinity;
     let nx = 0, ny = 0, nz = 0, t = 0;
     for (let i = 0; i < 256 && t <= REACH; i++) {
-      if (isSolid(x, y, z)) return { block: [x, y, z], normal: [nx, ny, nz] };
+      if (isTargetableBlock(x, y, z)) return { block: [x, y, z], normal: [nx, ny, nz] };
       if (tx < ty) { if (tx < tz) { x += sx; t = tx; tx += dx; nx = -sx; ny = 0; nz = 0; } else { z += sz; t = tz; tz += dz; nx = 0; ny = 0; nz = -sz; } }
       else { if (ty < tz) { y += sy; t = ty; ty += dy; nx = 0; ny = -sy; nz = 0; } else { z += sz; t = tz; tz += dz; nx = 0; ny = 0; nz = -sz; } }
     }
@@ -32,20 +32,34 @@
     }
     return null;
   }
+  function isTargetableBlock(x, y, z) {
+    const type = blockAt(x, y, z);
+    return type !== undefined && (TYPES[type].solid !== false || isInteractableBlock(type));
+  }
 
   const DOOR_INFO = new Map([
-    [OAK_DOOR_Z_CLOSED, { axis: 'z', open: false, top: false }],
-    [OAK_DOOR_Z_CLOSED_TOP, { axis: 'z', open: false, top: true }],
-    [OAK_DOOR_Z_OPEN, { axis: 'z', open: true, top: false }],
-    [OAK_DOOR_Z_OPEN_TOP, { axis: 'z', open: true, top: true }],
-    [OAK_DOOR_X_CLOSED, { axis: 'x', open: false, top: false }],
-    [OAK_DOOR_X_CLOSED_TOP, { axis: 'x', open: false, top: true }],
-    [OAK_DOOR_X_OPEN, { axis: 'x', open: true, top: false }],
-    [OAK_DOOR_X_OPEN_TOP, { axis: 'x', open: true, top: true }],
+    [OAK_DOOR_Z_CLOSED, { facing: 'n', open: false, top: false }],
+    [OAK_DOOR_Z_CLOSED_TOP, { facing: 'n', open: false, top: true }],
+    [OAK_DOOR_Z_OPEN, { facing: 'n', open: true, top: false }],
+    [OAK_DOOR_Z_OPEN_TOP, { facing: 'n', open: true, top: true }],
+    [OAK_DOOR_X_CLOSED, { facing: 'e', open: false, top: false }],
+    [OAK_DOOR_X_CLOSED_TOP, { facing: 'e', open: false, top: true }],
+    [OAK_DOOR_X_OPEN, { facing: 'e', open: true, top: false }],
+    [OAK_DOOR_X_OPEN_TOP, { facing: 'e', open: true, top: true }],
+    [OAK_DOOR_S_CLOSED, { facing: 's', open: false, top: false }],
+    [OAK_DOOR_S_CLOSED_TOP, { facing: 's', open: false, top: true }],
+    [OAK_DOOR_S_OPEN, { facing: 's', open: true, top: false }],
+    [OAK_DOOR_S_OPEN_TOP, { facing: 's', open: true, top: true }],
+    [OAK_DOOR_W_CLOSED, { facing: 'w', open: false, top: false }],
+    [OAK_DOOR_W_CLOSED_TOP, { facing: 'w', open: false, top: true }],
+    [OAK_DOOR_W_OPEN, { facing: 'w', open: true, top: false }],
+    [OAK_DOOR_W_OPEN_TOP, { facing: 'w', open: true, top: true }],
   ]);
   function isDoorBlock(type) { return DOOR_INFO.has(type); }
-  function doorTypes(axis, open) {
-    if (axis === 'x') return open ? [OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP] : [OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP];
+  function doorTypes(facing, open) {
+    if (facing === 's') return open ? [OAK_DOOR_S_OPEN, OAK_DOOR_S_OPEN_TOP] : [OAK_DOOR_S_CLOSED, OAK_DOOR_S_CLOSED_TOP];
+    if (facing === 'e') return open ? [OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP] : [OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP];
+    if (facing === 'w') return open ? [OAK_DOOR_W_OPEN, OAK_DOOR_W_OPEN_TOP] : [OAK_DOOR_W_CLOSED, OAK_DOOR_W_CLOSED_TOP];
     return open ? [OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP] : [OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP];
   }
   function doorPairAt(x, y, z, type = blockAt(x, y, z)) {
@@ -58,10 +72,13 @@
     return { x, y: by, z, info: bottomInfo };
   }
   function chooseDoorBaseType(normal) {
-    if (Math.abs(normal[0]) > 0) return OAK_DOOR_X_CLOSED;
-    if (Math.abs(normal[2]) > 0) return OAK_DOOR_Z_CLOSED;
+    if (normal[0] > 0) return OAK_DOOR_W_CLOSED;
+    if (normal[0] < 0) return OAK_DOOR_X_CLOSED;
+    if (normal[2] > 0) return OAK_DOOR_Z_CLOSED;
+    if (normal[2] < 0) return OAK_DOOR_S_CLOSED;
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    return Math.abs(dir.x) > Math.abs(dir.z) ? OAK_DOOR_X_CLOSED : OAK_DOOR_Z_CLOSED;
+    if (Math.abs(dir.x) > Math.abs(dir.z)) return dir.x > 0 ? OAK_DOOR_W_CLOSED : OAK_DOOR_X_CLOSED;
+    return dir.z > 0 ? OAK_DOOR_Z_CLOSED : OAK_DOOR_S_CLOSED;
   }
   function setDoorPair(x, y, z, lower, upper) {
     const lowerId = key(x, y, z), upperId = key(x, y + 1, z);
@@ -72,7 +89,7 @@
   function toggleDoorAt(x, y, z, type) {
     const pair = doorPairAt(x, y, z, type);
     if (!pair) return false;
-    const [lower, upper] = doorTypes(pair.info.axis, !pair.info.open);
+    const [lower, upper] = doorTypes(pair.info.facing, !pair.info.open);
     setDoorPair(pair.x, pair.y, pair.z, lower, upper);
     thock(pair.info.open ? 180 : 260);
     if (typeof setDebugToast === 'function') setDebugToast(pair.info.open ? 'ドアを閉めた' : 'ドアを開けた', 1.0);
@@ -93,9 +110,9 @@
   function placeDoorFromTarget(tg) {
     const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
     if (y < CHUNK_Y_MIN || y + 1 > CHUNK_Y_MAX) return false;
-    if (isSolid(x, y, z) || isSolid(x, y + 1, z) || overlapsPlayer(x, y, z) || overlapsPlayer(x, y + 1, z)) return false;
+    if (isPlacementBlocked(x, y, z) || isPlacementBlocked(x, y + 1, z) || overlapsPlayer(x, y, z) || overlapsPlayer(x, y + 1, z)) return false;
     const lower = chooseDoorBaseType(tg.normal);
-    const upper = lower === OAK_DOOR_X_CLOSED ? OAK_DOOR_X_CLOSED_TOP : OAK_DOOR_Z_CLOSED_TOP;
+    const [, upper] = doorTypes(DOOR_INFO.get(lower).facing, false);
     const s = selectedItem();
     if (!s) return false;
     s.n -= 1;
@@ -118,11 +135,65 @@
     if (typeof setDebugToast === 'function') setDebugToast(type === OAK_TRAPDOOR_CLOSED ? 'トラップドアを開けた' : 'トラップドアを閉めた', 1.0);
     return true;
   }
+  const FENCE_GATE_INFO = new Map([
+    [OAK_FENCE_GATE_Z_CLOSED, { axis: 'z', open: false }],
+    [OAK_FENCE_GATE_Z_OPEN, { axis: 'z', open: true }],
+    [OAK_FENCE_GATE_X_CLOSED, { axis: 'x', open: false }],
+    [OAK_FENCE_GATE_X_OPEN, { axis: 'x', open: true }],
+  ]);
+  function isFenceGateBlock(type) { return FENCE_GATE_INFO.has(type); }
+  function fenceGateType(axis, open) {
+    if (axis === 'x') return open ? OAK_FENCE_GATE_X_OPEN : OAK_FENCE_GATE_X_CLOSED;
+    return open ? OAK_FENCE_GATE_Z_OPEN : OAK_FENCE_GATE_Z_CLOSED;
+  }
+  function chooseFenceGateBaseType(normal) {
+    if (Math.abs(normal[0]) > 0) return OAK_FENCE_GATE_X_CLOSED;
+    if (Math.abs(normal[2]) > 0) return OAK_FENCE_GATE_Z_CLOSED;
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    return Math.abs(dir.x) > Math.abs(dir.z) ? OAK_FENCE_GATE_X_CLOSED : OAK_FENCE_GATE_Z_CLOSED;
+  }
+  function toggleFenceGateAt(x, y, z, type) {
+    const info = FENCE_GATE_INFO.get(type);
+    if (!info) return false;
+    const next = fenceGateType(info.axis, !info.open);
+    const id = key(x, y, z);
+    setEdit(id, next); saveEditsSoon();
+    setBlock(x, y, z, next);
+    requestEditedBlockRebuild(x, y, z);
+    thock(info.open ? 180 : 260);
+    if (typeof setDebugToast === 'function') setDebugToast(info.open ? 'フェンスゲートを閉めた' : 'フェンスゲートを開けた', 1.0);
+    return true;
+  }
+  function placeFenceGateFromTarget(tg) {
+    const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
+    const type = chooseFenceGateBaseType(tg.normal);
+    if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) return false;
+    if (isPlacementBlocked(x, y, z) || overlapsPlayer(x, y, z, type)) return false;
+    const s = selectedItem();
+    if (!s) return false;
+    s.n -= 1;
+    if (s.n <= 0) INV[selected] = null;
+    invChanged();
+    setEdit(key(x, y, z), type); saveEditsSoon();
+    setBlock(x, y, z, type);
+    requestEditedBlockRebuild(x, y, z);
+    thock(260);
+    if (typeof progressEvent === 'function') progressEvent('place', 'oak_fence_gate');
+    return true;
+  }
+  function isInteractableBlock(type) {
+    return isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type);
+  }
+  function isPlacementBlocked(x, y, z) {
+    const type = blockAt(x, y, z);
+    return type !== undefined && (TYPES[type].solid !== false || isInteractableBlock(type));
+  }
 
   /* --- ブロックごとの適正ツール / 硬さ / 必要ツールレベル --- */
   function blockPreferredTool(type) {
-    if ([STONE, COBBLESTONE, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK].includes(type)) return 'pickaxe';
-    if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN, OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_TRAPDOOR_CLOSED, OAK_TRAPDOOR_OPEN].includes(type)) return 'axe';
+    if ([STONE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK].includes(type)) return 'pickaxe';
+    if (isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type) || type === OAK_FENCE) return 'axe';
+    if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN, OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_TRAPDOOR_CLOSED, OAK_TRAPDOOR_OPEN, OAK_FENCE, OAK_FENCE_GATE_Z_CLOSED, OAK_FENCE_GATE_Z_OPEN, OAK_FENCE_GATE_X_CLOSED, OAK_FENCE_GATE_X_OPEN].includes(type)) return 'axe';
     if ([DIRT, GRASS, SAND, SNOW, FARMLAND].includes(type)) return 'shovel';
     return null;
   }
@@ -140,6 +211,8 @@
     [OAK_DOOR_Z_CLOSED, 1.0], [OAK_DOOR_Z_CLOSED_TOP, 1.0], [OAK_DOOR_Z_OPEN, 1.0], [OAK_DOOR_Z_OPEN_TOP, 1.0],
     [OAK_DOOR_X_CLOSED, 1.0], [OAK_DOOR_X_CLOSED_TOP, 1.0], [OAK_DOOR_X_OPEN, 1.0], [OAK_DOOR_X_OPEN_TOP, 1.0],
     [OAK_TRAPDOOR_CLOSED, 0.9], [OAK_TRAPDOOR_OPEN, 0.9],
+    [OAK_FENCE, 1.0], [OAK_FENCE_GATE_Z_CLOSED, 1.0], [OAK_FENCE_GATE_Z_OPEN, 1.0], [OAK_FENCE_GATE_X_CLOSED, 1.0], [OAK_FENCE_GATE_X_OPEN, 1.0],
+    [COBBLESTONE_WALL, 2.6],
   ]);
   // 掘ってもドロップしない（必要ツールレベル未満）判定。tier: 1木 2石 3鉄 4ダイヤ
   function requiredToolTier(type) {
@@ -156,7 +229,7 @@
   }
   // 破壊にかかる秒数。適正ツールを持っていると速い。
   function miningTime(type) {
-    const base = BLOCK_HARDNESS.get(type) || 1.2;
+    const base = isDoorBlock(type) ? 1.0 : (BLOCK_HARDNESS.get(type) || 1.2);
     const tool = blockPreferredTool(type);
     if (!tool) return Math.min(base, 1.2);
     const held = heldToolInfo();
@@ -170,6 +243,7 @@
   function blockDrops(type) {
     if (isDoorBlock(type)) return [['oak_door', 1]];
     if (isTrapdoorBlock(type)) return [['oak_trapdoor', 1]];
+    if (isFenceGateBlock(type)) return [['oak_fence_gate', 1]];
     if (type === STONE) return [['cobblestone', 1]];
     if (type === COAL_ORE) return [['coal', 1]];
     if (type === IRON_ORE) return [['raw_iron', 1]];
@@ -279,7 +353,7 @@
   function updateMining(dt, tg) {
     if (!mouseHeld.left || !started || SURVIVAL.dead || !tg || isContainerOpen()) { resetMining(); return; }
     const [x, y, z] = tg.block, id = key(x, y, z), t = blockAt(x, y, z);
-    if (t === undefined || TYPES[t].solid === false) { resetMining(); return; }
+    if (t === undefined || (TYPES[t].solid === false && !isInteractableBlock(t))) { resetMining(); return; }
     if (MINING.id !== id) { MINING.active = true; MINING.id = id; MINING.progress = 0; MINING.tap = 0; }
     const total = Math.max(0.08, miningTime(t));
     MINING.progress += dt / total;
@@ -336,8 +410,8 @@
     if (s.id === 'water_bucket' || s.id === 'lava_bucket') {
       const tg = pickTarget(); if (!tg) return false;
       const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
-      if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX || isSolid(x, y, z) || overlapsPlayer(x, y, z)) return false;
       const type = s.id === 'lava_bucket' ? LAVA : WATER;
+      if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX || isPlacementBlocked(x, y, z) || overlapsPlayer(x, y, z, type)) return false;
       setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z);
       INV[selected] = mkItem('bucket'); invChanged(); thock(240); return true;
     }
@@ -390,6 +464,7 @@
       if (hitType === TNT) { igniteTNT(bx, by, bz); return; }   // TNTを右クリックで着火
       if (isDoorBlock(hitType)) { toggleDoorAt(bx, by, bz, hitType); return; }
       if (isTrapdoorBlock(hitType)) { toggleTrapdoorAt(bx, by, bz, hitType); return; }
+      if (isFenceGateBlock(hitType)) { toggleFenceGateAt(bx, by, bz, hitType); return; }
     }
     // バケツ（水/溶岩/牛乳）
     if (tryUseBucket()) return;
@@ -414,16 +489,17 @@
     // 食べ物を持っていたら食べる
     if (def && def.food) { eatSelectedFood(); return; }
     if (tg && def && def.id === 'oak_door') { placeDoorFromTarget(tg); return; }
+    if (tg && def && def.id === 'oak_fence_gate') { placeFenceGateFromTarget(tg); return; }
     // ブロック設置
     if (!tg || !def || def.block == null) { if (def && def.block == null) thock(90); return; }
     const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
     if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) return;
-    if (isSolid(x, y, z) || overlapsPlayer(x, y, z)) return;
+    const type = def.block;
+    if (isPlacementBlocked(x, y, z) || overlapsPlayer(x, y, z, type)) return;
     const s = selectedItem();
     s.n -= 1;
     if (s.n <= 0) INV[selected] = null;
     invChanged();
-    const type = def.block;
     registerPlacedLight(x, y, z, type);
     setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z); thock(260);
     if (typeof progressEvent === 'function') progressEvent('place', ITEM_FOR_BLOCK[type]);

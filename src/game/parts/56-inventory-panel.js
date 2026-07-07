@@ -19,7 +19,7 @@
   cursorItemEl.id = 'cursorItem';
   document.body.appendChild(cursorItemEl);
 
-  const UI = { mode: null, ctx: null, craftCells: [], craftW: 0, cursor: null, dragFrom: null };
+  const UI = { mode: null, ctx: null, craftCells: [], craftW: 0, cursor: null, dragFrom: null, mouseX: 0, mouseY: 0 };
   function isContainerOpen() { return UI.mode !== null; }
 
   function slotArrayFor(src) {
@@ -195,6 +195,8 @@
     if (UI.cursor) renderSlotContent(cursorItemEl, UI.cursor);
   }
   addEventListener('mousemove', e => {
+    UI.mouseX = e.clientX;
+    UI.mouseY = e.clientY;
     if (!UI.cursor) return;
     cursorItemEl.style.left = `${e.clientX + 6}px`;
     cursorItemEl.style.top = `${e.clientY + 6}px`;
@@ -203,6 +205,32 @@
   function containerChanged() {
     if (UI.mode === 'chest' || UI.mode === 'furnace') markSaveDirty();
     invChanged(); // ホットバー/保存/再描画（refreshOpenPanels経由）
+  }
+  function dropInventoryItem(fullStack = false) {
+    if (!UI.mode) return false;
+    if (UI.cursor) {
+      const amount = fullStack ? UI.cursor.n : 1;
+      if (!spawnThrownItemDrop(UI.cursor.id, amount, UI.cursor.dur)) return false;
+      UI.cursor.n -= amount;
+      if (UI.cursor.n <= 0) UI.cursor = null;
+      renderCursorItem();
+      containerChanged();
+      thock(150);
+      return true;
+    }
+    const el = document.elementFromPoint(UI.mouseX, UI.mouseY);
+    const slot = el && el.closest ? el.closest('.inv-slot') : null;
+    if (!slot || !invScreen.contains(slot) || slot.dataset.src === 'result') return false;
+    const src = slot.dataset.src, idx = +slot.dataset.idx;
+    const item = getSlot(src, idx);
+    if (!item) return false;
+    const amount = fullStack ? item.n : 1;
+    if (!spawnThrownItemDrop(item.id, amount, item.dur)) return false;
+    item.n -= amount;
+    if (item.n <= 0) setSlot(src, idx, null);
+    containerChanged();
+    thock(150);
+    return true;
   }
 
   function takeCraftResult() {

@@ -209,6 +209,7 @@
     mobs: () => MOBS,
     drops: () => ITEM_DROPS,
     drop: (id, n = 1) => spawnItemDrop(Math.floor(player.pos.x) + 2, Math.floor(player.pos.y), Math.floor(player.pos.z), id, n),
+    dropSelected: (full = false) => dropSelectedItem(!!full),
     day: DAY,
     setTime: (t) => { DAY.time = t; },
     damage: (n) => damagePlayer(n, 'デバッグ'),

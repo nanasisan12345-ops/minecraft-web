@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 6;
+  const MESH_WORKER_VERSION = 8;
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {
