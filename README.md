@@ -118,33 +118,33 @@ Minecraft風のサバイバルゲームとして遊べます。ゲームルー�
 | 完成品 | 数 | 材料 | 配置 |
 |---|---:|---|---|
 | 板材 | 4 | 丸太 x1 | <code>丸</code> |
-| 棒 | 4 | 板材 x2 | <code>板<br>板</code> |
-| 松明 | 4 | 石炭 x1、棒 x1 | <code>炭<br>棒</code> |
-| 布 | 1 | 繊維 x4 | <code>繊繊<br>繊繊</code> |
-| 石レンガ | 4 | 石 x4 | <code>石石<br>石石</code> |
+| 棒 | 4 | 板材 x2 | <code>板</code><br><code>板</code> |
+| 松明 | 4 | 石炭 x1、棒 x1 | <code>炭</code><br><code>棒</code> |
+| 布 | 1 | 繊維 x4 | <code>繊繊</code><br><code>繊繊</code> |
+| 石レンガ | 4 | 石 x4 | <code>石石</code><br><code>石石</code> |
 | パン | 1 | 小麦 x3 | <code>麦麦麦</code> |
 
 #### 設置ブロック・道具台
 
 | 完成品 | 数 | 材料 | 配置 |
 |---|---:|---|---|
-| 作業台 | 1 | 板材 x4 | <code>板板<br>板板</code> |
-| かまど | 1 | 丸石 x8 | <code>丸丸丸<br>丸・丸<br>丸丸丸</code> |
-| チェスト | 1 | 板材 x8 | <code>板板板<br>板・板<br>板板板</code> |
-| 木のドア | 3 | 板材 x6 | <code>板板<br>板板<br>板板</code> |
-| 木のトラップドア | 2 | 板材 x6 | <code>板板板<br>板板板</code> |
-| ベッド | 1 | 布 x3、板材 x3 | <code>布布布<br>板板板</code> |
-| TNT | 1 | 火薬 x5、砂 x4 | <code>火砂火<br>砂火砂<br>火砂火</code> |
-| バケツ | 1 | 鉄インゴット x3 | <code>鉄・鉄<br>・鉄・</code> |
+| 作業台 | 1 | 板材 x4 | <code>板板</code><br><code>板板</code> |
+| かまど | 1 | 丸石 x8 | <code>丸丸丸</code><br><code>丸・丸</code><br><code>丸丸丸</code> |
+| チェスト | 1 | 板材 x8 | <code>板板板</code><br><code>板・板</code><br><code>板板板</code> |
+| 木のドア | 3 | 板材 x6 | <code>板板</code><br><code>板板</code><br><code>板板</code> |
+| 木のトラップドア | 2 | 板材 x6 | <code>板板板</code><br><code>板板板</code> |
+| ベッド | 1 | 布 x3、板材 x3 | <code>布布布</code><br><code>板板板</code> |
+| TNT | 1 | 火薬 x5、砂 x4 | <code>火砂火</code><br><code>砂火砂</code><br><code>火砂火</code> |
+| バケツ | 1 | 鉄インゴット x3 | <code>鉄・鉄</code><br><code>・鉄・</code> |
 
 #### 鉱物ブロック
 
 | 完成品 | 数 | 材料 | 配置 |
 |---|---:|---|---|
-| 鉄ブロック | 1 | 鉄インゴット x9 | <code>鉄鉄鉄<br>鉄鉄鉄<br>鉄鉄鉄</code> |
-| 金ブロック | 1 | 金インゴット x9 | <code>金金金<br>金金金<br>金金金</code> |
-| ダイヤブロック | 1 | ダイヤ x9 | <code>ダダダ<br>ダダダ<br>ダダダ</code> |
-| 石炭ブロック | 1 | 石炭 x9 | <code>炭炭炭<br>炭炭炭<br>炭炭炭</code> |
+| 鉄ブロック | 1 | 鉄インゴット x9 | <code>鉄鉄鉄</code><br><code>鉄鉄鉄</code><br><code>鉄鉄鉄</code> |
+| 金ブロック | 1 | 金インゴット x9 | <code>金金金</code><br><code>金金金</code><br><code>金金金</code> |
+| ダイヤブロック | 1 | ダイヤ x9 | <code>ダダダ</code><br><code>ダダダ</code><br><code>ダダダ</code> |
+| 石炭ブロック | 1 | 石炭 x9 | <code>炭炭炭</code><br><code>炭炭炭</code><br><code>炭炭炭</code> |
 | 鉄/金/ダイヤ/石炭に戻す | 9 | 各ブロック x1 | <code>ブ</code> |
 
 9個から1ブロックにまとめて収納でき、1ブロックから9個に戻せます。石炭ブロックはかまど燃料としても使えます。
@@ -153,26 +153,26 @@ Minecraft風のサバイバルゲームとして遊べます。ゲームルー�
 
 | 完成品 | 数 | 材料 | 配置 |
 |---|---:|---|---|
-| ツルハシ（木/石/鉄/ダイヤ） | 1 | 素材 x3、棒 x2 | <code>素素素<br>・棒・<br>・棒・</code> |
-| 斧（木/石/鉄） | 1 | 素材 x3、棒 x2 | <code>素素<br>素棒<br>・棒</code> |
-| シャベル（木/石/鉄） | 1 | 素材 x1、棒 x2 | <code>素<br>棒<br>棒</code> |
-| クワ（木/石/鉄） | 1 | 素材 x2、棒 x2 | <code>素素<br>棒・<br>棒・</code> |
+| ツルハシ（木/石/鉄/ダイヤ） | 1 | 素材 x3、棒 x2 | <code>素素素</code><br><code>・棒・</code><br><code>・棒・</code> |
+| 斧（木/石/鉄） | 1 | 素材 x3、棒 x2 | <code>素素</code><br><code>素棒</code><br><code>・棒</code> |
+| シャベル（木/石/鉄） | 1 | 素材 x1、棒 x2 | <code>素</code><br><code>棒</code><br><code>棒</code> |
+| クワ（木/石/鉄） | 1 | 素材 x2、棒 x2 | <code>素素</code><br><code>棒・</code><br><code>棒・</code> |
 
 #### 武器・矢
 
 | 完成品 | 数 | 材料 | 配置 |
 |---|---:|---|---|
-| 剣（木/石/鉄/ダイヤ） | 1 | 素材 x2、棒 x1 | <code>素<br>素<br>棒</code> |
-| 弓 | 1 | 棒 x3、繊維 x3 | <code>・棒繊<br>棒・繊<br>・棒繊</code> |
-| 矢 | 4 | 丸石 x1、棒 x1、繊維 x1 | <code>丸<br>棒<br>繊</code> |
+| 剣（木/石/鉄/ダイヤ） | 1 | 素材 x2、棒 x1 | <code>素</code><br><code>素</code><br><code>棒</code> |
+| 弓 | 1 | 棒 x3、繊維 x3 | <code>・棒繊</code><br><code>棒・繊</code><br><code>・棒繊</code> |
+| 矢 | 4 | 丸石 x1、棒 x1、繊維 x1 | <code>丸</code><br><code>棒</code><br><code>繊</code> |
 
 #### 防具
 
 | 完成品 | 数 | 材料 | 配置 |
 |---|---:|---|---|
-| 布の服 | 1 | 布 x8 | <code>布・布<br>布布布<br>布布布</code> |
-| 鉄の鎧 | 1 | 鉄インゴット x8 | <code>鉄・鉄<br>鉄鉄鉄<br>鉄鉄鉄</code> |
-| ダイヤの鎧 | 1 | ダイヤ x8 | <code>ダ・ダ<br>ダダダ<br>ダダダ</code> |
+| 布の服 | 1 | 布 x8 | <code>布・布</code><br><code>布布布</code><br><code>布布布</code> |
+| 鉄の鎧 | 1 | 鉄インゴット x8 | <code>鉄・鉄</code><br><code>鉄鉄鉄</code><br><code>鉄鉄鉄</code> |
+| ダイヤの鎧 | 1 | ダイヤ x8 | <code>ダ・ダ</code><br><code>ダダダ</code><br><code>ダダダ</code> |
 
 防具の被ダメージ軽減は、布の服が12%、鉄の鎧が30%、ダイヤの鎧が42%です。装備すると見た目にも反映されます。
 
