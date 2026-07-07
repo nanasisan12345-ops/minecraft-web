@@ -18,7 +18,7 @@
 
   /* --- ブロックごとの適正ツール / 硬さ / 必要ツールレベル --- */
   function blockPreferredTool(type) {
-    if ([STONE, COBBLESTONE, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK].includes(type)) return 'pickaxe';
+    if ([STONE, COBBLESTONE, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK].includes(type)) return 'pickaxe';
     if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN].includes(type)) return 'axe';
     if ([DIRT, GRASS, SAND, SNOW, FARMLAND].includes(type)) return 'shovel';
     return null;
@@ -33,11 +33,12 @@
     [VERMILION, 1.4], [PLASTER, 1.4], [ROOF_TILE, 2.2], [GOLD_BLOCK, 2.6], [COPPER_ROOF, 2.2],
     [TATAMI, 0.7], [SHOJI, 0.4], [NOREN, 0.35], [PAPER_LANTERN, 0.3],
     [BRONZE, 2.4], [BRONZE_DARK, 2.4],
+    [IRON_BLOCK, 3.0], [DIAMOND_BLOCK, 3.4], [COAL_BLOCK, 3.0],
   ]);
   // 掘ってもドロップしない（必要ツールレベル未満）判定。tier: 1木 2石 3鉄 4ダイヤ
   function requiredToolTier(type) {
-    if ([IRON_ORE].includes(type)) return 2;                        // 鉄鉱石: 石ツルハシ以上
-    if ([GOLD_ORE, DIAMOND_ORE].includes(type)) return 3;           // 金/ダイヤ鉱石: 鉄ツルハシ以上
+    if ([IRON_ORE, IRON_BLOCK].includes(type)) return 2;            // 鉄鉱石/鉄ブロック: 石ツルハシ以上
+    if ([GOLD_ORE, DIAMOND_ORE, GOLD_BLOCK, DIAMOND_BLOCK].includes(type)) return 3; // 金/ダイヤ鉱石・ブロック: 鉄ツルハシ以上
     if (blockPreferredTool(type) === 'pickaxe') return 1;           // 石系: 何かしらのツルハシが必要
     return 0;
   }

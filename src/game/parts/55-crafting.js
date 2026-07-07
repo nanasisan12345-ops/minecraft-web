@@ -14,6 +14,15 @@
     { out: 'bed', n: 1, pattern: ['CCC', 'PPP'], keys: { C: 'cloth', P: 'planks' } },
     { out: 'stone_brick', n: 4, pattern: ['TT', 'TT'], keys: { T: 'stone' } },
     { out: 'tnt', n: 1, pattern: ['GSG', 'SGS', 'GSG'], keys: { G: 'gunpowder', S: 'sand' } },
+    // 鉱物の収納ブロック（9個 → 1ブロック、逆に1ブロック → 9個）
+    { out: 'iron_block', n: 1, pattern: ['MMM', 'MMM', 'MMM'], keys: { M: 'iron_ingot' } },
+    { out: 'iron_ingot', n: 9, pattern: ['B'], keys: { B: 'iron_block' } },
+    { out: 'gold_block', n: 1, pattern: ['MMM', 'MMM', 'MMM'], keys: { M: 'gold_ingot' } },
+    { out: 'gold_ingot', n: 9, pattern: ['B'], keys: { B: 'gold_block' } },
+    { out: 'diamond_block', n: 1, pattern: ['MMM', 'MMM', 'MMM'], keys: { M: 'diamond' } },
+    { out: 'diamond', n: 9, pattern: ['B'], keys: { B: 'diamond_block' } },
+    { out: 'coal_block', n: 1, pattern: ['MMM', 'MMM', 'MMM'], keys: { M: 'coal' } },
+    { out: 'coal', n: 9, pattern: ['B'], keys: { B: 'coal_block' } },
     // ツルハシ
     { out: 'wood_pickaxe', n: 1, pattern: ['MMM', ' S ', ' S '], keys: { M: 'planks', S: 'stick' } },
     { out: 'stone_pickaxe', n: 1, pattern: ['MMM', ' S ', ' S '], keys: { M: 'cobblestone', S: 'stick' } },

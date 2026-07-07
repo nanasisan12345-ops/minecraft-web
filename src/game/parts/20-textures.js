@@ -110,6 +110,27 @@
       g.fillStyle = 'rgba(255,245,180,0.35)'; g.fillRect(0, 0, S, 2); g.fillRect(0, 0, 2, S);
       dots(g, S, 0xfff0a0, 0.05, 1.1);
     }),
+    ironBlock: makeTex((g, S) => {                         // 磨いた鉄ブロック
+      noise(g, S, 0xd0d5da, 0.94, 1.06);
+      g.fillStyle = 'rgba(255,255,255,0.42)'; g.fillRect(0, 0, S, 2); g.fillRect(0, 0, 2, S);
+      g.fillStyle = 'rgba(120,128,136,0.5)'; g.fillRect(0, S - 2, S, 2); g.fillRect(S - 2, 0, 2, S);
+      dots(g, S, 0xf1f4f7, 0.03, 1.1);
+    }),
+    diamondBlock: makeTex((g, S) => {                      // 磨いたダイヤブロック（宝石の粒）
+      noise(g, S, 0x66d8e6, 0.9, 1.08);
+      g.fillStyle = 'rgba(232,255,255,0.42)'; g.fillRect(0, 0, S, 2); g.fillRect(0, 0, 2, S);
+      g.fillStyle = 'rgba(40,120,140,0.42)'; g.fillRect(0, S - 2, S, 2); g.fillRect(S - 2, 0, 2, S);
+      for (const [cx, cy] of [[8, 9], [21, 7], [13, 20], [24, 23], [6, 24]]) {
+        g.fillStyle = tint(0x9af0fb, 1.1); g.fillRect(cx, cy, 3, 3);
+        g.fillStyle = '#ffffff'; g.fillRect(cx + 1, cy + 1, 1, 1);
+      }
+    }),
+    coalBlock: makeTex((g, S) => {                         // 石炭ブロック
+      noise(g, S, 0x2a2c30, 0.78, 1.22);
+      dots(g, S, 0x141518, 0.12, 0.85);
+      dots(g, S, 0x4a4d52, 0.04, 1.1);
+      g.fillStyle = 'rgba(96,102,110,0.22)'; g.fillRect(0, 0, S, 1); g.fillRect(0, 0, 1, S);
+    }),
     copperRoof: makeTex((g, S) => {                        // 緑青の銅瓦（天守の屋根）
       noise(g, S, 0x4a9e86, 0.9, 1.08); const r = S / 8;
       for (let row = 0; row * r < S; row++) { const y = row * r; g.fillStyle = tint(0x2f7a64, 0.92); g.fillRect(0, y, S, 1); }
@@ -360,5 +381,5 @@
   TX.lava.wrapS = TX.lava.wrapT = THREE.RepeatWrapping;
   TX.cactus.userData.normalMap = normalFromCanvas(TX.cactus.image, 2.2);
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
-  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'farmland', 'furnaceLit', 'tntSide', 'tntTop'])
+  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'farmland', 'furnaceLit', 'tntSide', 'tntTop', 'ironBlock', 'diamondBlock', 'coalBlock'])
     TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);

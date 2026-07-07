@@ -24,6 +24,9 @@
     lantern:        { name: 'ランタン', cat: 'block', block: LANTERN },
     glow_crystal:   { name: '発光結晶', cat: 'block', block: GLOW_CRYSTAL },
     gold_block:     { name: '金ブロック', cat: 'block', block: GOLD_BLOCK },
+    iron_block:     { name: '鉄ブロック', cat: 'block', block: IRON_BLOCK },
+    diamond_block:  { name: 'ダイヤブロック', cat: 'block', block: DIAMOND_BLOCK },
+    coal_block:     { name: '石炭ブロック', cat: 'block', block: COAL_BLOCK, fuel: 72 },
     roof_tile:      { name: '瓦', cat: 'block', block: ROOF_TILE },
     // --- 素材 ---
     stick:        { name: '棒', cat: 'material', fuel: 0.5 },

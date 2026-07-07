@@ -6,7 +6,7 @@
 
 ## 🚩 現在地（次セッションはここから）
 
-- **2026-07-07: 動物の繁殖を実装し、`npm.cmd run check` 成功・プレビュー実測OK。まだ push していない**（次の作業でコミット→push→デプロイ確認）。前回までのコミットは `4fa1044`（Time-of-day skies）。ステージ済みの `HANDOFF.md`/`MINECRAFT_GAP_PLAN.md`（第5弾のドキュメント）は doc 単独 push しない方針なので、この繁殖コミットに同梱する。生成物 `src/game.generated.js` と `.claude/` は gitignore。
+- **2026-07-07: 動物の繁殖（第6弾）＋鉱物ブロック（第7弾）を実装、`npm.cmd run check` 成功・プレビュー実測OK**。繁殖はコミット `adc7149`（ローカル）としてコミット済みだが **push はガードで保留中**（main への直接 push が自動モードでブロック。ユーザーに手動 push か権限許可を確認中）。鉱物ブロックはまだコミットしていない。前回までのコミットは `4fa1044`（Time-of-day skies）。生成物 `src/game.generated.js` と `.claude/` は gitignore。
 - **やってきたこと（新しい順・各セクションに詳細あり）**:
   1. サバイバル全面再設計（インベントリ36スロット/クラフト/かまど/HP空腹/敵MOB/チェスト/ベッド/村人取引/進捗/統合セーブ）
   2. 第2弾: ドロップ実体化・死亡ドロップ・弓矢・防具
@@ -14,15 +14,16 @@
   4. 第4弾: クリーパー・爆発(explodeAt)・TNT・苗木で植林
   5. 第5弾: 時間帯で変わる空（朝焼け/夕焼け/夜空の3パノラマ生成＋クロスフェード）＋夜の暗さ修正（雨の夜が明るいバグ）
   6. 第6弾: 動物の繁殖（餌やりで恋愛モード→同種2体で子供が生まれ時間で成長）
+  7. 第7弾: 鉱物の収納/建材ブロック（鉄/ダイヤ/石炭ブロック。9個⇄1で相互クラフト、石炭ブロックは燃料）
 - **ユーザー対応済みの指摘/バグ**: インベントリを閉じるとポインタが出る→再ロック修正、ホットバーのアイテムが枠外に飛び出す→CSS修正＋ドラッグ&ドロップ追加、敵が昼にも出る/多すぎ→暗所判定＋数削減、朝に敵が燃えない→焼失を本家挙動に、夜に雨で明るい→霧/背景を夜は暗く。
-- **次にやると良い候補（バックログ）**: 防具の見た目反映（三人称/一人称）、バケツ（水/溶岩汲み）、鉄以上の建材、洞窟の光量ベースの本格スポーン抑制、モブの水泳/落下。ユーザーは「どんどん実装続けて」というスタンス。
+- **次にやると良い候補（バックログ）**: 防具の見た目反映（三人称/一人称）、バケツ（水/溶岩汲み）、洞窟の光量ベースの本格スポーン抑制、モブの水泳/落下。ユーザーは「どんどん実装続けて」というスタンス。
 - **検証のコツ（重要）**: プレビュータブがバックグラウンド化すると rAF がスロットルして `updateDayNight` 等が止まり、`__mcDbg.setTime` が効かなく見える。計測は必ず `preview_stop`→`preview_start` でフォアグラウンドにしてから。`window.__mcDbg`（82-weather-and-loop.js 末尾）に give/inv/save/survival/mobs/spawn/day/setTime/damage/tryRecipe/farmTest/growCrops/litFurnaceTest/explode/tntTest/plantTree/growSaplings/mobKinds/mobFuse/skyView/setWeather/fogInfo/breedTest/animals/growBabies などテスト用フックあり。
 - **コミットのコツ**: コミットメッセージに二重引用符 `"` を含めると PowerShell のヒアストリングが壊れる。`git commit -F <ファイル>` を使うのが安全（scratchdir にメッセージを書いて渡す）。
 
 ### サバイバル実装のファイル早見表（どこを触るか）
 
 - `20-textures.js`: 32pxドット絵テクスチャ。新ブロックのテクスチャはここに追加し、末尾の normalMap 生成リストにも名前を足す。
-- `22-block-types.js`: `TYPES[]`（描画マテリアル）と各ブロックの `const` 定数、`ITEM_FOR_BLOCK` 用。現在の最大インデックスは 46（SAPLING）。ブロック追加はここ。solid:false transparent は水/作物/苗木と同じ扱い。
+- `22-block-types.js`: `TYPES[]`（描画マテリアル）と各ブロックの `const` 定数、`ITEM_FOR_BLOCK` 用。現在の最大インデックスは 49（COAL_BLOCK）。ブロック追加はここ。solid:false transparent は水/作物/苗木と同じ扱い。
 - `33-save-state.js`: 統合セーブ `SAVE`（1オブジェクト→localStorage `mc_save_<seed>`）。保存対象を増やすときはここに枠を足し、`collectSaveState()`（51）で動的値を回収。ブロック編集は別キー `mc_edits_<seed>`（32-world-window.js）。
 - `39-hostile-mobs.js`: 敵MOB（`MOB_DEFS`/`MOB_MAKERS`）、スポーン制御(`trySpawnMobs`)、AI(`updateMob`)、戦闘(`tryMeleeAttack`/`damageMobBy`)、弓矢、**共有爆発 `explodeAt`**、TNT(`igniteTNT`/`updateTNT`)。新モブはここに maker+def+スポーン抽選+（必要なら）updateMob 分岐。
 - `37-animals.js`: 友好動物。HP/ドロップ/`damageAnimal`。**繁殖**（`BREED_FOOD`/`feedAnimal`/`pickAnimalTarget`/`tryBreedPairs`/`spawnBaby`、`makeAnimal(kind, baby)`）。子供の成長/恋愛モードは `updateAnimal` 内。
@@ -36,6 +37,13 @@
 - `56-inventory-panel.js`: コンテナUI（インベントリ/2x2/3x3作業台/かまど/チェスト/防具スロット）。ドラッグ&ドロップ・カーソル持ち。
 - `56-hotbar-ui.js`: 9枠ホットバー。 `59-progress.js`: 進捗21段。 `82-weather-and-loop.js`: メインループ配線＋天候＋空の色制御＋`__mcDbg`。
 - **鉄則**: `src/game.generated.js` は自動生成（`npm run assemble`）なので触らない。ファイルは番号順(アルファベット順)に結合され、関数宣言はモジュール全体でホイストされるので番号をまたいだ呼び出しOK。ただし top-level 実行時の変数参照は定義順に注意。音楽会場(`60-rave-venues.js`/`70-music.js`)と `gikopoi2/`・`hallucinate/` は対象外。
+
+## 2026-07-07 第7弾: 鉱物の収納/建材ブロック（鉄/ダイヤ/石炭）
+
+- ユーザー「他の実装は？」を受けてバックログの「鉄以上の建材」を実装。既存の金ブロック(31)に加え、新ブロック **IRON_BLOCK=47 / DIAMOND_BLOCK=48 / COAL_BLOCK=49** を追加（ブロック追加の定番フロー通り）。
+- **触ったファイル**: `20-textures.js`（`ironBlock`/`diamondBlock`/`coalBlock` の Canvas テクスチャ＋末尾 normalMap リスト）、`22-block-types.js`（TYPES 3件＋const）、`53-inventory.js`（ITEM_DEFS に `iron_block`/`diamond_block`/`coal_block`。石炭ブロックは `fuel: 72`＝石炭9個ぶん。`ITEM_FOR_BLOCK` は自動登録）、`55-crafting.js`（9個→1ブロック＝`['MMM','MMM','MMM']`、1ブロック→9個＝`['B']` を鉄/金/ダイヤ/石炭ぶん。金ブロックも今回クラフト可能に）、`52-raycast.js`（`blockPreferredTool` にツルハシ追加、`BLOCK_HARDNESS` 3.0/3.4/3.0、`requiredToolTier` で鉄ブロック=2/金・ダイヤブロック=3。ドロップは `blockDrops` の `ITEM_FOR_BLOCK` フォールバックで自身を落とす）。
+- **設計メモ**: 収納圧縮（9インゴット→1ブロック）と建材の両用。石炭ブロックはかまど燃料としても機能（`updateFurnaces` が `ITEM_DEFS[id].fuel` を汎用的に読む）。金ブロックの必要ツールも本家寄せで鉄ツルハシ以上に引き上げた（構造物の装飾用金ブロックにも波及するが、より正確な挙動）。
+- **検証**: `npm.cmd run check` 成功（TYPES はモジュール load 時に構築＝テクスチャ未定義なら load で例外→console error 0 で健全）。フォアグラウンドのプレビューで `__mcDbg.tryRecipe` により8レシピすべて一致（9→1×4、1→9×4）を実測、`give` で3ブロックを付与→インベントリUIで3種のアイコン（銀の鉄／シアンのダイヤ／黒の石炭）が正しく描画されるのをスクショ確認。console error/warn なし。設置/採掘は既存ブロックと同一の汎用経路（`interactOrPlace` の設置・`blockDrops` のフォールバック）なので個別検証は省略。
 
 ## 2026-07-07 第6弾: 動物の繁殖（餌やり→子供→成長）
 

@@ -60,6 +60,9 @@
     { name: 'かまど(点火)', color: 0x757a7d, icon: T.furnaceLit, mats: faceMats(T.furnaceLit, { emissive: 0xff6a24, emissiveIntensity: 0.55 }) }, // 44
     { name: 'TNT', color: 0xc0392b, icon: T.tntSide, mats: faceMats([T.tntSide, T.tntSide, T.tntTop, T.tntTop, T.tntSide, T.tntSide]) }, // 45
     { name: '苗木', color: 0x3f8a2e, icon: T.sapling, mats: faceMats(T.sapling, { transparent: true, depthWrite: false }), transparent: true, solid: false }, // 46
+    { name: '鉄ブロック', color: 0xd0d5da, icon: T.ironBlock, mats: faceMats(T.ironBlock, { shininess: 26, specular: 0x6a7076 }) }, // 47
+    { name: 'ダイヤブロック', color: 0x66d8e6, icon: T.diamondBlock, mats: faceMats(T.diamondBlock, { shininess: 30, specular: 0x226677 }) }, // 48
+    { name: '石炭ブロック', color: 0x26282c, icon: T.coalBlock, mats: faceMats(T.coalBlock) }, // 49
   ];
   const GRASS = 0, DIRT = 1, STONE = 2, LOG = 3, LEAVES = 4, SAND = 5, PLANKS = 6, BRICK = 7, GLASS = 8, WATER = 9, SNOW = 10;
   const COAL_ORE = 11, IRON_ORE = 12, GOLD_ORE = 13, DIAMOND_ORE = 14, TORCH = 15;
@@ -72,3 +75,4 @@
   const COBBLESTONE = 39, BED = 40;
   const FARMLAND = 41, WHEAT_YOUNG = 42, WHEAT_RIPE = 43, FURNACE_LIT = 44;
   const TNT = 45, SAPLING = 46;
+  const IRON_BLOCK = 47, DIAMOND_BLOCK = 48, COAL_BLOCK = 49;
