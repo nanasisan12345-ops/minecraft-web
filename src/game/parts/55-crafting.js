@@ -23,6 +23,8 @@
     { out: 'diamond', n: 9, pattern: ['B'], keys: { B: 'diamond_block' } },
     { out: 'coal_block', n: 1, pattern: ['MMM', 'MMM', 'MMM'], keys: { M: 'coal' } },
     { out: 'coal', n: 9, pattern: ['B'], keys: { B: 'coal_block' } },
+    // バケツ（鉄インゴット3個をV字に）
+    { out: 'bucket', n: 1, pattern: ['M M', ' M '], keys: { M: 'iron_ingot' } },
     // ツルハシ
     { out: 'wood_pickaxe', n: 1, pattern: ['MMM', ' S ', ' S '], keys: { M: 'planks', S: 'stick' } },
     { out: 'stone_pickaxe', n: 1, pattern: ['MMM', ' S ', ' S '], keys: { M: 'cobblestone', S: 'stick' } },

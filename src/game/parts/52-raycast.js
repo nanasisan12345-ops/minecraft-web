@@ -15,6 +15,23 @@
     }
     return null;
   }
+  // バケツ用: 手前の水/溶岩ブロックを拾う（非solidなので通常のpickTargetでは当たらない）
+  function pickLiquidTarget() {
+    const o = camera.position, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    let x = Math.floor(o.x), y = Math.floor(o.y), z = Math.floor(o.z);
+    const sx = Math.sign(dir.x), sy = Math.sign(dir.y), sz = Math.sign(dir.z);
+    let tx = intbound(o.x, dir.x), ty = intbound(o.y, dir.y), tz = intbound(o.z, dir.z);
+    const dx = sx !== 0 ? 1 / Math.abs(dir.x) : Infinity, dy = sy !== 0 ? 1 / Math.abs(dir.y) : Infinity, dz = sz !== 0 ? 1 / Math.abs(dir.z) : Infinity;
+    let nx = 0, ny = 0, nz = 0, t = 0;
+    for (let i = 0; i < 256 && t <= REACH; i++) {
+      const bt = blockAt(x, y, z);
+      if (bt === WATER || bt === LAVA) return { block: [x, y, z], type: bt, normal: [nx, ny, nz] };
+      if (bt !== undefined && TYPES[bt].solid !== false) return null;  // 液体より手前に固体があれば汲めない
+      if (tx < ty) { if (tx < tz) { x += sx; t = tx; tx += dx; nx = -sx; ny = 0; nz = 0; } else { z += sz; t = tz; tz += dz; nx = 0; ny = 0; nz = -sz; } }
+      else { if (ty < tz) { y += sy; t = ty; ty += dy; nx = 0; ny = -sy; nz = 0; } else { z += sz; t = tz; tz += dz; nx = 0; ny = 0; nz = -sz; } }
+    }
+    return null;
+  }
 
   /* --- ブロックごとの適正ツール / 硬さ / 必要ツールレベル --- */
   function blockPreferredTool(type) {
@@ -200,6 +217,42 @@
     thock(420);
   }
 
+  /* --- バケツ: 水/溶岩を汲む・置く、牛から牛乳、牛乳を飲む --- */
+  function tryUseBucket() {
+    const s = selectedItem(); if (!s) return false;
+    if (s.id === 'bucket') {
+      // 牛を右クリックで牛乳
+      const at = typeof pickAnimalTarget === 'function' ? pickAnimalTarget() : null;
+      if (at && at.userData.kind === 'cow' && !at.userData.baby) {
+        INV[selected] = mkItem('milk_bucket'); invChanged(); thock(300); return true;
+      }
+      // 水/溶岩を汲む
+      const lq = pickLiquidTarget();
+      if (lq) {
+        INV[selected] = mkItem(lq.type === LAVA ? 'lava_bucket' : 'water_bucket'); invChanged();
+        // プレイヤーが置いた液体(edit)なら汲んだら消す（自然の水源は無限のまま）
+        const lid = key(lq.block[0], lq.block[1], lq.block[2]);
+        if (edits.get(lid) === lq.type) { setEdit(lid, -1); saveEditsSoon(); setBlock(lq.block[0], lq.block[1], lq.block[2], null); requestEditedBlockRebuild(lq.block[0], lq.block[1], lq.block[2]); }
+        thock(300); return true;
+      }
+      return false;
+    }
+    if (s.id === 'water_bucket' || s.id === 'lava_bucket') {
+      const tg = pickTarget(); if (!tg) return false;
+      const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
+      if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX || isSolid(x, y, z) || overlapsPlayer(x, y, z)) return false;
+      const type = s.id === 'lava_bucket' ? LAVA : WATER;
+      setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z);
+      INV[selected] = mkItem('bucket'); invChanged(); thock(240); return true;
+    }
+    if (s.id === 'milk_bucket') {
+      SURVIVAL.hunger = Math.min(20, SURVIVAL.hunger + 1);
+      if (typeof updateSurvivalHud === 'function') updateSurvivalHud();
+      INV[selected] = mkItem('bucket'); invChanged(); thock(360); return true;
+    }
+    return false;
+  }
+
   /* --- 右クリック: インタラクション or 設置 or 食べる --- */
   function interactOrPlace() {
     if (SURVIVAL.dead || isContainerOpen()) return;
@@ -240,6 +293,8 @@
       if (hitType === BED) { trySleepInBed(bx, by, bz); return; }
       if (hitType === TNT) { igniteTNT(bx, by, bz); return; }   // TNTを右クリックで着火
     }
+    // バケツ（水/溶岩/牛乳）
+    if (tryUseBucket()) return;
     // 弓を持っていたら撃つ
     const def = selectedItemDef();
     if (def && def.tool === 'bow') { shootPlayerArrow(); return; }

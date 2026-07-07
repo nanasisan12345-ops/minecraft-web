@@ -44,6 +44,10 @@
     bone:         { name: '骨', cat: 'material' },
     slime_ball:   { name: 'スライム玉', cat: 'material' },
     gunpowder:    { name: '火薬', cat: 'material' },
+    bucket:       { name: 'バケツ', cat: 'material', stack: 1 },
+    water_bucket: { name: '水入りバケツ', cat: 'material', stack: 1 },
+    lava_bucket:  { name: '溶岩入りバケツ', cat: 'material', stack: 1 },
+    milk_bucket:  { name: '牛乳', cat: 'material', stack: 1 },
     tnt:          { name: 'TNT', cat: 'block', block: TNT },
     sapling:      { name: '苗木', cat: 'block', block: SAPLING, fuel: 0.5 },
     // --- 食料 ---
@@ -283,6 +287,14 @@
       if (id === 'apple') px(15, 4, 3, 5, '#5a8a3a');
       if (id === 'bread') { px(8, 14, 16, 2, '#a06a2e'); px(8, 19, 16, 2, '#a06a2e'); }
       if (id === 'raw_meat' || id === 'cooked_meat') px(20, 12, 4, 10, '#f2e6d8');
+    } else if (id === 'bucket' || id.endsWith('_bucket')) {
+      const fill = id === 'water_bucket' ? '#3a78d8' : id === 'lava_bucket' ? '#ff7a2a' : id === 'milk_bucket' ? '#f4f2ec' : null;
+      const body = '#b9bec3', light = '#dce0e4', dark = '#7c8288';
+      px(8, 6, 2, 7, dark); px(22, 6, 2, 7, dark); px(9, 5, 14, 2, dark);   // 取っ手
+      px(7, 12, 18, 3, dark);                                                // 縁
+      if (fill) px(9, 13, 14, 4, fill);                                      // 中身
+      px(9, 15, 14, 11, body); px(9, 15, 3, 11, light);                      // 本体
+      px(11, 26, 10, 2, dark);                                              // 底
     } else {
       const colors = {
         stick: '#8a5a2b', coal: '#2e3236', raw_iron: '#c78a55', iron_ingot: '#d8dde2',

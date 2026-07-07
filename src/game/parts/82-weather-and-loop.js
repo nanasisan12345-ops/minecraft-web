@@ -257,4 +257,6 @@
     growBabies: (sec) => { for (const a of ANIMALS) if (a.userData.baby) a.userData.growth = Math.max(0, a.userData.growth - sec); },
     // 防具の見た目テスト: 指定の鎧を装備し三人称へ切替
     equipArmor: (id = 'iron_armor') => { SAVE.armor = id ? mkItem(id) : null; markSaveDirty(); if (!CAMERA_VIEW.thirdPerson) toggleThirdPerson(); return { armor: SAVE.armor, thirdPerson: CAMERA_VIEW.thirdPerson }; },
+    // バケツテスト: 足元近くに水源を1つ置き、そこから汲めるか確認
+    bucketPlace: () => { const x = Math.floor(player.pos.x) + 2, z = Math.floor(player.pos.z); let y = Math.floor(player.pos.y); while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--; const wy = y + 1; setEdit(key(x, wy, z), WATER); setBlock(x, wy, z, WATER); requestEditedBlockRebuild(x, wy, z); return { x, y: wy, z, placed: blockAt(x, wy, z) === WATER }; },
   };

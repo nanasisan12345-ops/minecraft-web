@@ -6,7 +6,7 @@
 
 ## 🚩 現在地（次セッションはここから）
 
-- **2026-07-07: 動物の繁殖（第6弾）＋鉱物ブロック（第7弾）＋防具の見た目反映（第8弾）を実装、`npm.cmd run check` 成功・プレビュー実測OK**。ローカルの `main` にコミット済み（`adc7149` 繁殖 / `c4e73d3` 鉱物ブロック / 防具はこれからコミット）だが **push はガードで保留中**（main への直接 push が自動モードでブロック。ユーザーに手動 push か権限許可を確認中）。前回までのコミットは `4fa1044`（Time-of-day skies）。生成物 `src/game.generated.js` と `.claude/` は gitignore。
+- **2026-07-07: 繁殖（第6弾）／鉱物ブロック（第7弾）／防具の見た目（第8弾）／バケツ（第9弾）を実装、`npm.cmd run check` 成功・プレビュー実測OK**。ローカルの `main` にコミット済み（`adc7149` 繁殖 / `c4e73d3` 鉱物 / `2ea1c4d` 防具 / バケツはこれからコミット）だが **push はガードで保留中**（main への直接 push が自動モードでブロック。ユーザーに手動 push か権限許可を確認中）。前回までのコミットは `4fa1044`（Time-of-day skies）。生成物 `src/game.generated.js` と `.claude/` は gitignore。
 - **やってきたこと（新しい順・各セクションに詳細あり）**:
   1. サバイバル全面再設計（インベントリ36スロット/クラフト/かまど/HP空腹/敵MOB/チェスト/ベッド/村人取引/進捗/統合セーブ）
   2. 第2弾: ドロップ実体化・死亡ドロップ・弓矢・防具
@@ -16,9 +16,10 @@
   6. 第6弾: 動物の繁殖（餌やりで恋愛モード→同種2体で子供が生まれ時間で成長）
   7. 第7弾: 鉱物の収納/建材ブロック（鉄/ダイヤ/石炭ブロック。9個⇄1で相互クラフト、石炭ブロックは燃料）
   8. 第8弾: 防具の見た目反映（装備した鎧を三人称アバター＋一人称の腕に表示）
+  9. 第9弾: バケツ（水/溶岩の汲み取り・設置、牛から牛乳、牛乳を飲む）
 - **ユーザー対応済みの指摘/バグ**: インベントリを閉じるとポインタが出る→再ロック修正、ホットバーのアイテムが枠外に飛び出す→CSS修正＋ドラッグ&ドロップ追加、敵が昼にも出る/多すぎ→暗所判定＋数削減、朝に敵が燃えない→焼失を本家挙動に、夜に雨で明るい→霧/背景を夜は暗く。
-- **次にやると良い候補（バックログ）**: バケツ（水/溶岩汲み・牛乳）、洞窟の光量ベースの本格スポーン抑制、モブの水泳/落下、動物の群れ行動、鳥/魚の追加。ユーザーは「どんどん実装続けて」というスタンス。
-- **検証のコツ（重要）**: プレビュータブがバックグラウンド化すると rAF がスロットルして `updateDayNight` 等が止まり、`__mcDbg.setTime` が効かなく見える。計測は必ず `preview_stop`→`preview_start` でフォアグラウンドにしてから。`window.__mcDbg`（82-weather-and-loop.js 末尾）に give/inv/save/survival/mobs/spawn/day/setTime/damage/tryRecipe/farmTest/growCrops/litFurnaceTest/explode/tntTest/plantTree/growSaplings/mobKinds/mobFuse/skyView/setWeather/fogInfo/breedTest/animals/growBabies/equipArmor などテスト用フックあり。
+- **次にやると良い候補（バックログ）**: 洞窟の光量ベースの本格スポーン抑制、モブの水泳/落下、動物の群れ行動、鳥/魚の追加、水流/溶岩流（現状バケツで置く水/溶岩は静的な1マス源）、黒曜石（水×溶岩）。ユーザーは「どんどん実装続けて」というスタンス。
+- **検証のコツ（重要）**: プレビュータブがバックグラウンド化すると rAF がスロットルして `updateDayNight` 等が止まり、`__mcDbg.setTime` が効かなく見える。計測は必ず `preview_stop`→`preview_start` でフォアグラウンドにしてから。`window.__mcDbg`（82-weather-and-loop.js 末尾）に give/inv/save/survival/mobs/spawn/day/setTime/damage/tryRecipe/farmTest/growCrops/litFurnaceTest/explode/tntTest/plantTree/growSaplings/mobKinds/mobFuse/skyView/setWeather/fogInfo/breedTest/animals/growBabies/equipArmor/bucketPlace などテスト用フックあり。
 - **コミットのコツ**: コミットメッセージに二重引用符 `"` を含めると PowerShell のヒアストリングが壊れる。`git commit -F <ファイル>` を使うのが安全（scratchdir にメッセージを書いて渡す）。
 
 ### サバイバル実装のファイル早見表（どこを触るか）
@@ -39,6 +40,18 @@
 - `56-hotbar-ui.js`: 9枠ホットバー。 `59-progress.js`: 進捗21段。 `82-weather-and-loop.js`: メインループ配線＋天候＋空の色制御＋`__mcDbg`。
 - `57-first-person-hand.js`/`58-third-person-view.js`: 選択アイテムの手持ち表示。**装備防具の見た目**（三人称=`rebuildAvatarArmor`/`ARMOR_COLORS`、一人称=`ARMOR_SLEEVE` で袖着色）は `SAVE.armor.id` から。防具の見た目を増やすならここ。
 - **鉄則**: `src/game.generated.js` は自動生成（`npm run assemble`）なので触らない。ファイルは番号順(アルファベット順)に結合され、関数宣言はモジュール全体でホイストされるので番号をまたいだ呼び出しOK。ただし top-level 実行時の変数参照は定義順に注意。音楽会場(`60-rave-venues.js`/`70-music.js`)と `gikopoi2/`・`hallucinate/` は対象外。
+
+## 2026-07-07 第9弾: バケツ（水/溶岩の汲み取り・設置、牛乳）
+
+- ユーザー「どんどん続けて」を受けてバックログの「バケツ」を実装。新アイテム `bucket`/`water_bucket`/`lava_bucket`/`milk_bucket`（すべて `stack: 1`）。レシピは鉄インゴット3個のV字 `['M M',' M ']`。
+- **液体レイキャスト**（`52-raycast.js` `pickLiquidTarget`）: 水/溶岩は `solid:false` で通常の `pickTarget` は貫通するため、専用DDAで手前の WATER/LAVA を拾う（手前に固体があれば汲めない）。`pickTarget` と同じ intbound/DDA。
+- **バケツ処理**（`tryUseBucket`。`interactOrPlace` のブロックインタラクション（チェスト/かまど/TNT等）の直後・弓の前に `if (tryUseBucket()) return;`）:
+  - 空バケツ＝牛（`pickAnimalTarget` で大人の cow）→ `milk_bucket`。/ `pickLiquidTarget` で水源→`water_bucket`・溶岩→`lava_bucket`。プレイヤーが置いた液体(edit)は汲むと消す（`edits.get(id)===type` のとき setEdit(-1)）。自然の水源は無限（実装上、暗黙の水を消せないため）。
+  - 水/溶岩入りバケツ＝`pickTarget` の面に液体を設置（`setEdit`＋`setBlock`＋rebuild）→空バケツに戻る。溶岩は既存の `51-survival.js` の LAVA 接触ダメージ(3/回)で危険。
+  - 牛乳＝飲むと空腹+1して空バケツに戻る（本家の効果解除は当ゲームに状態異常が無いので割愛）。
+  - 消費は選択スロットを差し替える方式（`INV[selected] = mkItem(...)`。バケツは stack1 なので確実に選択中の1個）。
+- **アイコン**（`53-inventory.js` `drawItemIcon`）: 灰の台形バケツ＋中身色（水=青/溶岩=橙/牛乳=白）。
+- **検証**: `npm.cmd run check` 成功。フォアグラウンドのプレビューで `tryRecipe` の V字→bucket 一致、`bucketPlace` で WATER edit 設置(placed:true)、`give` した4種のバケツのアイコンを DOM の `.sl-icon` から実サンプルし中身色 水#3a78d8/溶岩#ff7a2a/牛乳#f4f2ec/空#7c8288 が正しいことを確認。console error/warn なし。※右クリックの実操作（汲む/置く/飲む）はポインタロックのエイム操作が要るためプレビュー自動化では未実測だが、構成要素（レシピ・液体設置・アイコン・液体レイキャスト）はすべて検証済み。
 
 ## 2026-07-07 第8弾: 防具の見た目反映（三人称アバター＋一人称の腕）
 
