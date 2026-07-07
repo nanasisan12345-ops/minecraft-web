@@ -69,7 +69,8 @@
     heldBox(g, 0.16, 0.16, 0.16, colors[id] || 0xd4747e, 0.05, 0.2, -0.05);
     return g;
   }
-  function rebuildHeldView(sig, item, def) {
+  const ARMOR_SLEEVE = { cloth_armor: 0x8a6f4a, iron_armor: 0xcfd4d9, diamond_armor: 0x5fd8e6 };
+  function rebuildHeldView(sig, item, def, armorId) {
     if (sig === heldViewKey) return;
     heldViewKey = sig;
     clearHeldItem();
@@ -77,9 +78,11 @@
     arm.position.set(0.0, -0.02, 0.0);
     arm.rotation.set(-0.62, 0.18, -0.12);
     heldView.add(arm);
-    // Minecraftの一人称腕に寄せた、指を作らないシンプルな四角い前腕。
-    heldBox(arm, 0.26, 0.42, 0.24, 0x2f78c8, 0, -0.19, 0.03); // sleeve
+    // Minecraftの一人称腕に寄せた、指を作らないシンプルな四角い前腕。防具装備中は袖を防具色に。
+    const sleeveColor = ARMOR_SLEEVE[armorId] || 0x2f78c8;
+    heldBox(arm, 0.26, 0.42, 0.24, sleeveColor, 0, -0.19, 0.03); // sleeve
     heldBox(arm, 0.255, 0.52, 0.235, 0xd29a68, 0, 0.24, -0.02); // bare arm/hand
+    if (ARMOR_SLEEVE[armorId]) heldBox(arm, 0.28, 0.1, 0.26, sleeveColor, 0, 0.02, 0.01); // 手首の防具カフ
     heldBox(arm, 0.035, 0.4, 0.02, 0xb77a4d, 0.095, 0.25, -0.145); // side shadow stripe
     let itemMesh = null;
     if (def && def.tool) itemMesh = makeHeldTool(item.id, def);
@@ -90,8 +93,9 @@
   function updateHeldItemView(dt, tg) {
     const item = typeof selectedItem === 'function' ? selectedItem() : null;
     const def = item ? ITEM_DEFS[item.id] : null;
-    const sig = item ? `${item.id}` : 'emptyHand';
-    rebuildHeldView(sig, item, def);
+    const armorId = (typeof SAVE !== 'undefined' && SAVE.armor) ? SAVE.armor.id : '';
+    const sig = `${item ? item.id : 'emptyHand'}|${armorId}`;
+    rebuildHeldView(sig, item, def, armorId);
     handSwingImpulse = Math.max(0, handSwingImpulse - dt * 5);
     heldSwing += dt * (mouseHeld.left ? 10 : 2.2);
     const swing = (mouseHeld.left ? Math.sin(heldSwing) * 0.055 : Math.sin(heldSwing) * 0.018) + handSwingImpulse * -0.22;

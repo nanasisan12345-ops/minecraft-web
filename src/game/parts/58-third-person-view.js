@@ -52,6 +52,35 @@
       avatarParts.held.add(m);
     }
   }
+  // 装備中の防具をアバターに重ねて表示する（各部位の少し大きい殻）
+  const ARMOR_COLORS = { cloth_armor: 0x8a6f4a, iron_armor: 0xcfd4d9, diamond_armor: 0x5fd8e6 };
+  let avatarArmorKey = '';
+  const avatarArmorMeshes = [];
+  function clearAvatarArmor() {
+    while (avatarArmorMeshes.length) {
+      const m = avatarArmorMeshes.pop();
+      if (m.parent) m.parent.remove(m);
+      if (m.geometry) m.geometry.dispose();
+    }
+  }
+  function armorPiece(parent, sx, sy, sz, color, x, y, z) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), avatarMat(color));
+    m.position.set(x, y, z); m.castShadow = true;
+    parent.add(m); avatarArmorMeshes.push(m); return m;
+  }
+  function rebuildAvatarArmor(id) {
+    if (id === avatarArmorKey) return;
+    avatarArmorKey = id;
+    clearAvatarArmor();
+    const col = ARMOR_COLORS[id]; if (!col) return;   // 未装備なら殻なし
+    const p = avatarParts;
+    armorPiece(p.head, 0.47, 0.30, 0.47, col, 0, 0.09, 0);   // 兜（頭の上部）
+    armorPiece(p.body, 0.62, 0.66, 0.34, col, 0, 0.04, 0);   // 胸当て
+    armorPiece(p.armL, 0.22, 0.34, 0.24, col, 0, 0.13, 0);   // 肩・腕当て
+    armorPiece(p.armR, 0.22, 0.34, 0.24, col, 0, 0.13, 0);
+    armorPiece(p.legL, 0.26, 0.42, 0.26, col, 0, 0.10, 0);   // 脚甲
+    armorPiece(p.legR, 0.26, 0.42, 0.26, col, 0, 0.10, 0);
+  }
   function toggleThirdPerson() {
     CAMERA_VIEW.thirdPerson = !CAMERA_VIEW.thirdPerson;
     resetMining();
@@ -72,6 +101,7 @@
     avatarParts.head.rotation.x = THREE.MathUtils.clamp(pitch * 0.35, -0.35, 0.35);
     const held = typeof selectedItem === 'function' ? selectedItem() : null;
     rebuildAvatarHeld(held ? held.id : '');
+    rebuildAvatarArmor(typeof SAVE !== 'undefined' && SAVE.armor ? SAVE.armor.id : '');
   }
   function updateCameraView(dt, tg) {
     updatePlayerAvatar(dt, tg);

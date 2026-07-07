@@ -6,7 +6,7 @@
 
 ## 🚩 現在地（次セッションはここから）
 
-- **2026-07-07: 動物の繁殖（第6弾）＋鉱物ブロック（第7弾）を実装、`npm.cmd run check` 成功・プレビュー実測OK**。繁殖はコミット `adc7149`（ローカル）としてコミット済みだが **push はガードで保留中**（main への直接 push が自動モードでブロック。ユーザーに手動 push か権限許可を確認中）。鉱物ブロックはまだコミットしていない。前回までのコミットは `4fa1044`（Time-of-day skies）。生成物 `src/game.generated.js` と `.claude/` は gitignore。
+- **2026-07-07: 動物の繁殖（第6弾）＋鉱物ブロック（第7弾）＋防具の見た目反映（第8弾）を実装、`npm.cmd run check` 成功・プレビュー実測OK**。ローカルの `main` にコミット済み（`adc7149` 繁殖 / `c4e73d3` 鉱物ブロック / 防具はこれからコミット）だが **push はガードで保留中**（main への直接 push が自動モードでブロック。ユーザーに手動 push か権限許可を確認中）。前回までのコミットは `4fa1044`（Time-of-day skies）。生成物 `src/game.generated.js` と `.claude/` は gitignore。
 - **やってきたこと（新しい順・各セクションに詳細あり）**:
   1. サバイバル全面再設計（インベントリ36スロット/クラフト/かまど/HP空腹/敵MOB/チェスト/ベッド/村人取引/進捗/統合セーブ）
   2. 第2弾: ドロップ実体化・死亡ドロップ・弓矢・防具
@@ -15,9 +15,10 @@
   5. 第5弾: 時間帯で変わる空（朝焼け/夕焼け/夜空の3パノラマ生成＋クロスフェード）＋夜の暗さ修正（雨の夜が明るいバグ）
   6. 第6弾: 動物の繁殖（餌やりで恋愛モード→同種2体で子供が生まれ時間で成長）
   7. 第7弾: 鉱物の収納/建材ブロック（鉄/ダイヤ/石炭ブロック。9個⇄1で相互クラフト、石炭ブロックは燃料）
+  8. 第8弾: 防具の見た目反映（装備した鎧を三人称アバター＋一人称の腕に表示）
 - **ユーザー対応済みの指摘/バグ**: インベントリを閉じるとポインタが出る→再ロック修正、ホットバーのアイテムが枠外に飛び出す→CSS修正＋ドラッグ&ドロップ追加、敵が昼にも出る/多すぎ→暗所判定＋数削減、朝に敵が燃えない→焼失を本家挙動に、夜に雨で明るい→霧/背景を夜は暗く。
-- **次にやると良い候補（バックログ）**: 防具の見た目反映（三人称/一人称）、バケツ（水/溶岩汲み）、洞窟の光量ベースの本格スポーン抑制、モブの水泳/落下。ユーザーは「どんどん実装続けて」というスタンス。
-- **検証のコツ（重要）**: プレビュータブがバックグラウンド化すると rAF がスロットルして `updateDayNight` 等が止まり、`__mcDbg.setTime` が効かなく見える。計測は必ず `preview_stop`→`preview_start` でフォアグラウンドにしてから。`window.__mcDbg`（82-weather-and-loop.js 末尾）に give/inv/save/survival/mobs/spawn/day/setTime/damage/tryRecipe/farmTest/growCrops/litFurnaceTest/explode/tntTest/plantTree/growSaplings/mobKinds/mobFuse/skyView/setWeather/fogInfo/breedTest/animals/growBabies などテスト用フックあり。
+- **次にやると良い候補（バックログ）**: バケツ（水/溶岩汲み・牛乳）、洞窟の光量ベースの本格スポーン抑制、モブの水泳/落下、動物の群れ行動、鳥/魚の追加。ユーザーは「どんどん実装続けて」というスタンス。
+- **検証のコツ（重要）**: プレビュータブがバックグラウンド化すると rAF がスロットルして `updateDayNight` 等が止まり、`__mcDbg.setTime` が効かなく見える。計測は必ず `preview_stop`→`preview_start` でフォアグラウンドにしてから。`window.__mcDbg`（82-weather-and-loop.js 末尾）に give/inv/save/survival/mobs/spawn/day/setTime/damage/tryRecipe/farmTest/growCrops/litFurnaceTest/explode/tntTest/plantTree/growSaplings/mobKinds/mobFuse/skyView/setWeather/fogInfo/breedTest/animals/growBabies/equipArmor などテスト用フックあり。
 - **コミットのコツ**: コミットメッセージに二重引用符 `"` を含めると PowerShell のヒアストリングが壊れる。`git commit -F <ファイル>` を使うのが安全（scratchdir にメッセージを書いて渡す）。
 
 ### サバイバル実装のファイル早見表（どこを触るか）
@@ -36,7 +37,16 @@
 - `55-crafting.js`: `RECIPES`(pattern/keys形式)＋`matchRecipe`、かまど精錬(`SMELT_RESULT`/`updateFurnaces`/`syncFurnaceVisual`)、チェスト状態。レシピ追加はここ。
 - `56-inventory-panel.js`: コンテナUI（インベントリ/2x2/3x3作業台/かまど/チェスト/防具スロット）。ドラッグ&ドロップ・カーソル持ち。
 - `56-hotbar-ui.js`: 9枠ホットバー。 `59-progress.js`: 進捗21段。 `82-weather-and-loop.js`: メインループ配線＋天候＋空の色制御＋`__mcDbg`。
+- `57-first-person-hand.js`/`58-third-person-view.js`: 選択アイテムの手持ち表示。**装備防具の見た目**（三人称=`rebuildAvatarArmor`/`ARMOR_COLORS`、一人称=`ARMOR_SLEEVE` で袖着色）は `SAVE.armor.id` から。防具の見た目を増やすならここ。
 - **鉄則**: `src/game.generated.js` は自動生成（`npm run assemble`）なので触らない。ファイルは番号順(アルファベット順)に結合され、関数宣言はモジュール全体でホイストされるので番号をまたいだ呼び出しOK。ただし top-level 実行時の変数参照は定義順に注意。音楽会場(`60-rave-venues.js`/`70-music.js`)と `gikopoi2/`・`hallucinate/` は対象外。
+
+## 2026-07-07 第8弾: 防具の見た目反映（三人称アバター＋一人称の腕）
+
+- ユーザー「続けて」を受けてバックログの「防具の見た目反映」を実装。装備した鎧（`SAVE.armor`＝布/鉄/ダイヤの1スロット）をプレイヤーの見た目に反映。
+- **三人称**（`58-third-person-view.js`）: `rebuildAvatarArmor(id)` が兜/胸当て/肩腕当て/脚甲を各部位メッシュ（`avatarParts.head/body/armL/armR/legL/legR`）の**子として**少し大きい殻を重ねる（＝腕脚の歩行回転にそのまま追従）。色は `ARMOR_COLORS`（布=革茶 0x8a6f4a / 鉄=銀灰 0xcfd4d9 / ダイヤ=シアン 0x5fd8e6）。`avatarArmorKey` で id 変化時だけ再構築し、`avatarArmorMeshes` で geometry を dispose。`updatePlayerAvatar` から毎フレーム呼ぶ。
+- **一人称**（`57-first-person-hand.js`）: `rebuildHeldView` に `armorId` を渡し、袖の色を `ARMOR_SLEEVE` の鎧色にして手首のカフ（帯）を追加。手持ちの `sig` に armorId を含めて防具変更で再構築されるようにした。
+- **検証**（`__mcDbg.equipArmor(id)` で装備＋三人称へ切替）: フォアグラウンドのプレビューで鉄の鎧＝銀灰、ダイヤの鎧＝シアンのフル装備アバターをスクショ確認（兜・胸当て・肩腕・脚甲すべて色分け、素の前腕とシャツが少し覗く）。`npm.cmd run check` 成功、console error/warn なし。※一人称のカフは手が画面右下に寄るので見えづらいが、袖色は装備で変わる。
+- 次に増やすなら: 防具の耐久で見た目にヒビ、部位ごとの防具（頭/胴/脚/足）に分割、革の染色。
 
 ## 2026-07-07 第7弾: 鉱物の収納/建材ブロック（鉄/ダイヤ/石炭）
 

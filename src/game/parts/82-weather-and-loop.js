@@ -255,4 +255,6 @@
     },
     animals: () => ANIMALS.map(a => ({ kind: a.userData.kind, baby: !!a.userData.baby, love: +(a.userData.love || 0).toFixed(1), cd: +(a.userData.breedCooldown || 0).toFixed(1), scale: +a.scale.x.toFixed(2) })),
     growBabies: (sec) => { for (const a of ANIMALS) if (a.userData.baby) a.userData.growth = Math.max(0, a.userData.growth - sec); },
+    // 防具の見た目テスト: 指定の鎧を装備し三人称へ切替
+    equipArmor: (id = 'iron_armor') => { SAVE.armor = id ? mkItem(id) : null; markSaveDirty(); if (!CAMERA_VIEW.thirdPerson) toggleThirdPerson(); return { armor: SAVE.armor, thirdPerson: CAMERA_VIEW.thirdPerson }; },
   };
