@@ -209,6 +209,18 @@
       thock(180);
       return;
     }
+    // 動物への餌やり（繁殖）: 手前の動物を優先。餌が合えば消費して恋愛モードへ
+    const heldDef = selectedItemDef();
+    if (heldDef && typeof pickAnimalTarget === 'function') {
+      const animalTg = pickAnimalTarget();
+      if (animalTg && feedAnimal(animalTg, heldDef)) {
+        const s = selectedItem();
+        s.n -= 1;
+        if (s.n <= 0) INV[selected] = null;
+        invChanged();
+        return;
+      }
+    }
     const tg = pickTarget();
     if (tg) {
       const [bx, by, bz] = tg.block;

@@ -1,14 +1,50 @@
 # HANDOFF
 
-最終更新: 2026-07-06
+最終更新: 2026-07-07
 
 ---
 
 ## 🚩 現在地（次セッションはここから）
 
-- **2026-07-06: サバイバルゲームとしての全面再設計を実施**（ユーザー指示「中途半端なサバイバル要素を白紙に戻してMinecraftに近い体験に作り直す」）。詳細は下の「2026-07-06 サバイバル全面再設計」を参照。
-- 実装後にユーザーがプレビューで実プレイし、木こり→クラフト→作業台の序盤ループが動くことを確認。報告バグ「インベントリを閉じるとポインタが出て視点操作がおかしい」は、①パネルを閉じる操作内で `relockPointerForGame()`（canvas.requestPointerLock）を呼ぶ、②ポインタ非ロック中は mousemove で視点を回さない、③非ロック中のクリックはロック復帰に消費して誤採掘しない、の3点で修正済み。
-- `npm.cmd run check` 成功（42ファイル）。プレビューで console error/warn なし。
+- **2026-07-07: 動物の繁殖を実装し、`npm.cmd run check` 成功・プレビュー実測OK。まだ push していない**（次の作業でコミット→push→デプロイ確認）。前回までのコミットは `4fa1044`（Time-of-day skies）。ステージ済みの `HANDOFF.md`/`MINECRAFT_GAP_PLAN.md`（第5弾のドキュメント）は doc 単独 push しない方針なので、この繁殖コミットに同梱する。生成物 `src/game.generated.js` と `.claude/` は gitignore。
+- **やってきたこと（新しい順・各セクションに詳細あり）**:
+  1. サバイバル全面再設計（インベントリ36スロット/クラフト/かまど/HP空腹/敵MOB/チェスト/ベッド/村人取引/進捗/統合セーブ）
+  2. 第2弾: ドロップ実体化・死亡ドロップ・弓矢・防具
+  3. 第3弾: 農業（クワ/耕地/小麦）・かまど点火表示・昼夜を約24分に・敵を減らす・日光焼失を本家挙動に
+  4. 第4弾: クリーパー・爆発(explodeAt)・TNT・苗木で植林
+  5. 第5弾: 時間帯で変わる空（朝焼け/夕焼け/夜空の3パノラマ生成＋クロスフェード）＋夜の暗さ修正（雨の夜が明るいバグ）
+  6. 第6弾: 動物の繁殖（餌やりで恋愛モード→同種2体で子供が生まれ時間で成長）
+- **ユーザー対応済みの指摘/バグ**: インベントリを閉じるとポインタが出る→再ロック修正、ホットバーのアイテムが枠外に飛び出す→CSS修正＋ドラッグ&ドロップ追加、敵が昼にも出る/多すぎ→暗所判定＋数削減、朝に敵が燃えない→焼失を本家挙動に、夜に雨で明るい→霧/背景を夜は暗く。
+- **次にやると良い候補（バックログ）**: 防具の見た目反映（三人称/一人称）、バケツ（水/溶岩汲み）、鉄以上の建材、洞窟の光量ベースの本格スポーン抑制、モブの水泳/落下。ユーザーは「どんどん実装続けて」というスタンス。
+- **検証のコツ（重要）**: プレビュータブがバックグラウンド化すると rAF がスロットルして `updateDayNight` 等が止まり、`__mcDbg.setTime` が効かなく見える。計測は必ず `preview_stop`→`preview_start` でフォアグラウンドにしてから。`window.__mcDbg`（82-weather-and-loop.js 末尾）に give/inv/save/survival/mobs/spawn/day/setTime/damage/tryRecipe/farmTest/growCrops/litFurnaceTest/explode/tntTest/plantTree/growSaplings/mobKinds/mobFuse/skyView/setWeather/fogInfo/breedTest/animals/growBabies などテスト用フックあり。
+- **コミットのコツ**: コミットメッセージに二重引用符 `"` を含めると PowerShell のヒアストリングが壊れる。`git commit -F <ファイル>` を使うのが安全（scratchdir にメッセージを書いて渡す）。
+
+### サバイバル実装のファイル早見表（どこを触るか）
+
+- `20-textures.js`: 32pxドット絵テクスチャ。新ブロックのテクスチャはここに追加し、末尾の normalMap 生成リストにも名前を足す。
+- `22-block-types.js`: `TYPES[]`（描画マテリアル）と各ブロックの `const` 定数、`ITEM_FOR_BLOCK` 用。現在の最大インデックスは 46（SAPLING）。ブロック追加はここ。solid:false transparent は水/作物/苗木と同じ扱い。
+- `33-save-state.js`: 統合セーブ `SAVE`（1オブジェクト→localStorage `mc_save_<seed>`）。保存対象を増やすときはここに枠を足し、`collectSaveState()`（51）で動的値を回収。ブロック編集は別キー `mc_edits_<seed>`（32-world-window.js）。
+- `39-hostile-mobs.js`: 敵MOB（`MOB_DEFS`/`MOB_MAKERS`）、スポーン制御(`trySpawnMobs`)、AI(`updateMob`)、戦闘(`tryMeleeAttack`/`damageMobBy`)、弓矢、**共有爆発 `explodeAt`**、TNT(`igniteTNT`/`updateTNT`)。新モブはここに maker+def+スポーン抽選+（必要なら）updateMob 分岐。
+- `37-animals.js`: 友好動物。HP/ドロップ/`damageAnimal`。**繁殖**（`BREED_FOOD`/`feedAnimal`/`pickAnimalTarget`/`tryBreedPairs`/`spawnBaby`、`makeAnimal(kind, baby)`）。子供の成長/恋愛モードは `updateAnimal` 内。
+- `46-day-night.js`: 昼夜(`DAY`)。1日24分(`speed 1/1440`)、ラベル閾値、`dayAmt/nightAmt/sunriseAmt/sunsetAmt`（空クロスフェード用）。
+- `14-sky.js`: 空。`photoSky`(昼写真)/`photoOvercast`(曇天)/`photoSunrise`/`photoSunset`/`photoNight`（Canvas生成、`makeSkyPano`）。空を増やすならここ＋82の opacity 制御。
+- `48-farming.js`: 農業(クワ/耕地/小麦=`SAVE.crops`)＋植林(苗木/`growTree`=`SAVE.saplings`)。植物系はここ。
+- `51-survival.js`: HP/空腹/ダメージ(`damagePlayer` 防具軽減つき)/死亡/リスポーン/`collectSaveState`。
+- `52-raycast.js`: レイキャスト/採掘(`finishBreak`・硬さ・適正ツール・ドロップ表)/右クリック(`interactOrPlace`=設置/使用/食べる/農業/TNT着火/ベッド/コンテナ open)。ブロック操作系はここ。
+- `53-inventory.js`: **アイテム一元定義 `ITEM_DEFS`**（block/material/tool/weapon/armor/food）、36スロット `INV`、`giveItem/takeItems/mergeIntoSlots`、アイコン描画 `drawItemIcon`。アイテム追加はここ。
+- `55-crafting.js`: `RECIPES`(pattern/keys形式)＋`matchRecipe`、かまど精錬(`SMELT_RESULT`/`updateFurnaces`/`syncFurnaceVisual`)、チェスト状態。レシピ追加はここ。
+- `56-inventory-panel.js`: コンテナUI（インベントリ/2x2/3x3作業台/かまど/チェスト/防具スロット）。ドラッグ&ドロップ・カーソル持ち。
+- `56-hotbar-ui.js`: 9枠ホットバー。 `59-progress.js`: 進捗21段。 `82-weather-and-loop.js`: メインループ配線＋天候＋空の色制御＋`__mcDbg`。
+- **鉄則**: `src/game.generated.js` は自動生成（`npm run assemble`）なので触らない。ファイルは番号順(アルファベット順)に結合され、関数宣言はモジュール全体でホイストされるので番号をまたいだ呼び出しOK。ただし top-level 実行時の変数参照は定義順に注意。音楽会場(`60-rave-venues.js`/`70-music.js`)と `gikopoi2/`・`hallucinate/` は対象外。
+
+## 2026-07-07 第6弾: 動物の繁殖（餌やり→子供→成長）
+
+- ユーザーがバックログから「動物の繁殖」を選択。すべて `37-animals.js` 内で自己完結（動物は保存されずプレイヤー付近に湧く一時的存在なので、繁殖結果もセーブ不要）。
+- **餌の対応**（`BREED_FOOD`）: 牛/羊/鹿=`wheat`、豚=`wheat`か`wheat_seeds`、鶏/カモ=`wheat_seeds`。それ以外（リス/熊/ハリネズミ/スズメ）は繁殖不可。
+- **餌やり**（`52-raycast.js` の `interactOrPlace` 冒頭、村人会話の次）: `pickAnimalTarget()`（カメラ正面 REACH 内の動物を1体拾う。ブロックより手前を優先）で動物を拾い、`feedAnimal(a, def)` が餌一致なら true。true のとき選択スロットを1個消費。大人=恋愛モード(`u.love=22s`)へ、子供=成長を `BABY_GROW_TIME*0.2` 早める。クールダウン中/既に恋愛中は餌を無駄にしないよう false。
+- **繁殖成立**（`tryBreedPairs`、`updateAnimals` 末尾で毎フレーム1組まで）: 恋愛モードの同種2体が約2.6ブロック以内で `spawnBaby`。両親は `love=0`＋`breedCooldown=90s`。恋愛中の個体は `nearestLovePartner` の方へ steer するので確実に近づく（`updateAnimal` 内）。ハートは pink の `burst`（`heartBurst`）。
+- **子供**（`makeAnimal(kind, true)`）: `baby=true`/`growth=BABY_GROW_TIME(150s)`、スケールは大人の0.5倍から線形に成長し、成長完了で `baby=false`＋通常スケール＋`breedCooldown=90s`。子供は倒してもドロップしない（`damageAnimal` で `!u.baby` ガード）。
+- **検証**（`__mcDbg` に `breedTest(kind)`/`animals()`/`growBabies(sec)` 追加）: フォアグラウンドのプレビューで、牛/豚を恋愛モードで2体出す→即座に半分サイズ(scale≈親×0.5)の子供が誕生・両親 cd≈90 を実測。`growBabies` で成長させると次フレームで `baby=false`・通常スケール(1.16)・cd リセットを確認。`npm.cmd run check` 成功、console error/warn なし。※タブがバックグラウンドだと love が減らない/湧かないので計測は必ず foreground（stop→start）。
 
 ## 2026-07-06: サバイバル全面再設計（インベントリ/クラフト/かまど/戦闘/敵MOB/チェスト/ベッド/進捗/セーブ）
 

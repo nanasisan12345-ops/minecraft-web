@@ -39,6 +39,84 @@
     hedgehog: [['raw_meat', 0, 1]],
     sparrow: [['fiber', 0, 1]],
   };
+  // 繁殖: 対応する餌を右クリックで与えると恋愛モード→近くの同種と子供が生まれる
+  const BREED_FOOD = {
+    cow: ['wheat'], sheep: ['wheat'], pig: ['wheat', 'wheat_seeds'], deer: ['wheat'],
+    chicken: ['wheat_seeds'], duck: ['wheat_seeds'],
+  };
+  const LOVE_TIME = 22;          // 恋愛モードの持続（秒）
+  const BREED_COOLDOWN = 90;     // 繁殖後・成長後の再繁殖クールダウン（秒）
+  const BABY_GROW_TIME = 150;    // 子供が大人になるまで（秒）
+  const heartBurst = (a) => burst(a.position.x - 0.5, a.position.y + 0.2, a.position.z - 0.5, 0xff5fa8);
+  // カメラ正面の動物を1体拾う（餌やり用。ブロックより手前を優先）
+  function pickAnimalTarget() {
+    if (!ANIMALS.length) return null;
+    const origin = camera.position, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    let best = null;
+    for (const a of ANIMALS) {
+      const center = a.position.clone().add(new THREE.Vector3(0, 0.4, 0));
+      const to = center.sub(origin);
+      const along = to.dot(dir);
+      if (along < 0.25 || along > REACH + 0.8) continue;
+      const miss = to.addScaledVector(dir, -along).length();
+      if (miss > 0.75) continue;
+      if (!best || along < best.dist) best = { animal: a, dist: along };
+    }
+    return best ? best.animal : null;
+  }
+  // 餌を与える。与えられたら true（アイテムを1個消費する）
+  function feedAnimal(a, def) {
+    const u = a.userData, foods = BREED_FOOD[u.kind];
+    if (!foods || !def || !foods.includes(def.id)) return false;
+    if (u.baby) {                      // 子供に与えると成長が早まる
+      u.growth = Math.max(0, (u.growth || 0) - BABY_GROW_TIME * 0.2);
+      heartBurst(a); thock(300);
+      return true;
+    }
+    if ((u.breedCooldown || 0) > 0 || (u.love || 0) > 0) return false;   // 餌を無駄にしない
+    u.love = LOVE_TIME;
+    heartBurst(a); thock(300);
+    return true;
+  }
+  function nearestLovePartner(a) {
+    const u = a.userData;
+    let best = null, bestD = 16 * 16;
+    for (const o of ANIMALS) {
+      if (o === a) continue;
+      const ou = o.userData;
+      if (ou.kind !== u.kind || ou.baby || (ou.love || 0) <= 0) continue;
+      const d = (o.position.x - a.position.x) ** 2 + (o.position.z - a.position.z) ** 2;
+      if (d < bestD) { bestD = d; best = o; }
+    }
+    return best;
+  }
+  function spawnBaby(kind, x, y, z) {
+    if (ANIMALS.length >= ANIMAL_MAX + 8) return;   // 大人の上限より少しだけ緩める
+    const baby = makeAnimal(kind, true);
+    baby.position.set(x, y, z);
+    baby.userData.home.set(x, y, z);
+    scene.add(baby); ANIMALS.push(baby);
+    return baby;
+  }
+  // 恋愛モードの同種2体が近づいたら子供を生む
+  function tryBreedPairs() {
+    for (const a of ANIMALS) {
+      const u = a.userData;
+      if (u.baby || (u.love || 0) <= 0 || (u.breedCooldown || 0) > 0) continue;
+      const partner = nearestLovePartner(a);
+      if (!partner) continue;
+      const pu = partner.userData;
+      const near = (partner.position.x - a.position.x) ** 2 + (partner.position.z - a.position.z) ** 2 < 2.6 * 2.6;
+      if (!near) continue;
+      u.love = 0; pu.love = 0;
+      u.breedCooldown = BREED_COOLDOWN; pu.breedCooldown = BREED_COOLDOWN;
+      const mx = (a.position.x + partner.position.x) / 2, mz = (a.position.z + partner.position.z) / 2;
+      const gy = heightAt(Math.floor(mx), Math.floor(mz)) + 1;
+      spawnBaby(u.kind, mx, gy, mz);
+      heartBurst(a); heartBurst(partner);
+      break;   // 1フレームに1組まで
+    }
+  }
   function damageAnimal(a, dmg, dir) {
     const u = a.userData;
     if (u.hp == null) u.hp = ANIMAL_HP[u.kind] || 6;
@@ -46,7 +124,7 @@
     burst(a.position.x - 0.5, a.position.y + 0.4, a.position.z - 0.5, 0xcc4444);
     thock(200);
     if (u.hp <= 0) {
-      for (const [id, lo, hi] of (ANIMAL_DROPS[u.kind] || [])) {
+      if (!u.baby) for (const [id, lo, hi] of (ANIMAL_DROPS[u.kind] || [])) {   // 子供は何も落とさない（本家挙動）
         const n = lo + (Math.random() * (hi - lo + 1) | 0);
         if (n > 0) spawnItemDrop(Math.floor(a.position.x), Math.floor(a.position.y) + 1, Math.floor(a.position.z), id, n);
       }
@@ -79,7 +157,7 @@
   function animalAngleDelta(a, b) {
     return Math.atan2(Math.sin(b - a), Math.cos(b - a));
   }
-  function makeAnimal(kind) {
+  function makeAnimal(kind, baby = false) {
     const cfg = ANIMAL_TYPES[kind], g = new THREE.Group();
     const leg = (x, z, color, h = 0.34) => animalBox(g, 0.12, h, 0.12, color, x, h * 0.5, z);
     const eyes = (y, z, color = 0x111111) => {
@@ -208,7 +286,9 @@
       animalBox(g, 0.18, 0.14, 0.08, 0x775337, 0, 0.42, 0.28);
     }
     const behavior = ANIMAL_BEHAVIOR[kind] || ANIMAL_BEHAVIOR.sheep;
-    g.scale.setScalar(behavior.scale);
+    g.userData.baby = baby;
+    g.userData.growth = baby ? BABY_GROW_TIME : 0;
+    g.scale.setScalar(behavior.scale * (baby ? 0.5 : 1));
     g.userData.kind = kind; g.userData.home = new THREE.Vector3(); g.userData.behavior = behavior; g.userData.dir = Math.random() * Math.PI * 2; g.userData.turnTo = g.userData.dir; g.userData.nextTurn = rnd(behavior.turnMin, behavior.turnMax); g.userData.idleTime = rnd(0, behavior.pauseMax * 0.5); g.userData.blockedCooldown = 0; g.userData.flapTime = 0; g.userData.flightTime = 0; g.userData.flightDuration = 0; g.userData.flightCooldown = kind === 'sparrow' ? rnd(2.0, 6.0) : 0; g.userData.walkPhase = Math.random() * Math.PI * 2; g.userData.speed = behavior.speed;
     g.rotation.y = g.userData.dir + Math.PI;
     return g;
@@ -245,6 +325,21 @@
   }
   function updateAnimal(animal, dt) {
     const u = animal.userData, b = u.behavior || ANIMAL_BEHAVIOR.sheep;
+    u.breedCooldown = Math.max(0, (u.breedCooldown || 0) - dt);
+    // 子供の成長: 小さいスケールから徐々に大人サイズへ
+    if (u.baby) {
+      u.growth = Math.max(0, (u.growth || 0) - dt);
+      const t = 1 - u.growth / BABY_GROW_TIME;
+      animal.scale.setScalar(b.scale * (0.5 + 0.5 * t));
+      if (u.growth <= 0) { u.baby = false; animal.scale.setScalar(b.scale); u.breedCooldown = BREED_COOLDOWN; }
+    }
+    // 恋愛モード: ハートを出しつつ相手へ向かう
+    if ((u.love || 0) > 0 && !u.baby) {
+      u.love = Math.max(0, u.love - dt);
+      if (Math.random() < dt * 1.5) heartBurst(animal);
+      const partner = nearestLovePartner(animal);
+      if (partner) { u.turnTo = Math.atan2(partner.position.x - animal.position.x, partner.position.z - animal.position.z); u.idleTime = 0; }
+    }
     u.nextTurn -= dt;
     u.idleTime = Math.max(0, (u.idleTime || 0) - dt);
     u.blockedCooldown = Math.max(0, (u.blockedCooldown || 0) - dt);
@@ -313,4 +408,5 @@
       }
       updateAnimal(a, dt);
     }
+    tryBreedPairs();
   }

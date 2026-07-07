@@ -246,4 +246,13 @@
     fogInfo: () => ({ fog: '#' + scene.fog.color.getHexString(), bg: '#' + scene.background.getHexString(), near: scene.fog.near, far: scene.fog.far }),
     spawn: (kind) => { const x = Math.floor(player.pos.x) + 6, z = Math.floor(player.pos.z); let y = Math.floor(player.pos.y); while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--; spawnMobAt(kind, x, y, z, false); const m = MOBS[MOBS.length - 1]; return { kind, count: MOBS.length, pos: m.position.toArray().map(n => +n.toFixed(1)) }; },
     mobFuse: () => { const c = MOBS.find(m => m.userData.kind === 'creeper'); return c ? { hp: c.userData.hp, fuse: +(c.userData.fuse || 0).toFixed(2), scale: +c.scale.x.toFixed(2) } : null; },
+    // 繁殖テスト: 同種2体を足元近くに出し、恋愛モードにして生まれるか確認
+    breedTest: (kind = 'cow') => {
+      const x = Math.floor(player.pos.x) + 2, z = Math.floor(player.pos.z);
+      const gy = heightAt(x, z) + 1;
+      for (let i = 0; i < 2; i++) { const a = makeAnimal(kind); a.position.set(x + i, gy, z); a.userData.home.set(x + i, gy, z); a.userData.love = 22; scene.add(a); ANIMALS.push(a); }
+      return { kind, count: ANIMALS.length };
+    },
+    animals: () => ANIMALS.map(a => ({ kind: a.userData.kind, baby: !!a.userData.baby, love: +(a.userData.love || 0).toFixed(1), cd: +(a.userData.breedCooldown || 0).toFixed(1), scale: +a.scale.x.toFixed(2) })),
+    growBabies: (sec) => { for (const a of ANIMALS) if (a.userData.baby) a.userData.growth = Math.max(0, a.userData.growth - sec); },
   };
