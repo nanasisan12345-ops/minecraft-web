@@ -145,7 +145,7 @@
     if (cur === want) return;
     if (edits.get(id) === FURNACE || edits.get(id) === FURNACE_LIT) { setEdit(id, want); saveEditsSoon(); }
     setBlock(x, y, z, want);
-    requestEditedBlockRebuild(x, y, z);
+    requestEditedBlockRebuild(x, y, z, FURNACE_LIT); // 点火⇄消火は光レベルが変わるので広域再メッシュ
   }
   function updateFurnaces(dt) {
     let changed = false;

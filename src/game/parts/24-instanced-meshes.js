@@ -16,8 +16,18 @@
     { n: [ 0,  0, -1], m: 5, v: [[0,0,0], [0,1,0], [1,1,0], [1,0,0]], uv: [0,0, 0,1, 1,1, 1,0] },
   ];
 
+  // チャンク地形専用マテリアル: ライトエンジンが焼いた頂点カラーを乗せるため vertexColors を
+  // 有効にしたクローンを使う。TYPES.mats 本体はアイテムドロップ/手持ち表示と共有していて、
+  // そちらのジオメトリには color 属性が無い（vertexColors を直に立てると真っ黒になる）ので触らない。
+  function litChunkMats(ty) {
+    if (!ty._litMats) {
+      const lit = (m) => { const c = m.clone(); c.vertexColors = true; return c; };
+      ty._litMats = Array.isArray(ty.mats) ? ty.mats.map(lit) : lit(ty.mats);
+    }
+    return ty._litMats;
+  }
   function makeChunkMesh(ty) {
-    const mesh = new THREE.Mesh(new THREE.BufferGeometry(), ty.mats);
+    const mesh = new THREE.Mesh(new THREE.BufferGeometry(), litChunkMats(ty));
     mesh.visible = false;
     mesh.castShadow = false;
     mesh.receiveShadow = !ty.transparent;

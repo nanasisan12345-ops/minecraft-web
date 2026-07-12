@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 8;
+  const MESH_WORKER_VERSION = 10; // 9-10: ライトエンジン（頂点カラー焼き込み）を追加・高速化
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {
@@ -55,19 +55,46 @@
         positions: Array.from({ length: groupCount }, () => []),
         normals: Array.from({ length: groupCount }, () => []),
         uvs: Array.from({ length: groupCount }, () => []),
+        colors: Array.from({ length: groupCount }, () => []),
         indices: Array.from({ length: groupCount }, () => []),
         blocks: 0,
       };
     });
   }
 
-  function addQuadToState(state, verts, normal, uvCoords, mat = 0) {
+  // フォールバック（ワーカー不可時）用の簡易ライト: 頭上が空いていれば太陽光、
+  // 塞がっていれば暗所として扱う。BFS 伝播はワーカー経路が担うので、ここは列単位の近似でよい。
+  let mainLightMemo = null;
+  function mainSkyOpen(x, y, z) {
+    const memoKey = x + ',' + y + ',' + z;
+    if (mainLightMemo) {
+      const m = mainLightMemo.get(memoKey);
+      if (m !== undefined) return m;
+    }
+    let open = true;
+    const yTop = Math.min(CHUNK_Y_MAX, y + 56);
+    for (let yy = y + 1; yy <= yTop; yy++) {
+      const t = blockAt(x, yy, z);
+      if (t !== undefined && !TYPES[t].transparent && !TYPES[t].model) { open = false; break; }
+    }
+    if (mainLightMemo) mainLightMemo.set(memoKey, open);
+    return open;
+  }
+  function mainFaceLight(x, y, z) {
+    const v = mainSkyOpen(x, y, z) ? 1 : 0.08;
+    return [v, v, v];
+  }
+
+  const WHITE_LIGHT = [1, 1, 1];
+  function addQuadToState(state, verts, normal, uvCoords, mat = 0, rgb = WHITE_LIGHT) {
     const group = state.positions.length === 1 ? 0 : Math.max(0, Math.min(state.positions.length - 1, mat | 0));
     const pos = state.positions[group], norm = state.normals[group], uv = state.uvs[group], idx = state.indices[group];
+    const col = state.colors[group];
     const base = pos.length / 3;
     for (const p of verts) {
       pos.push(p[0], p[1], p[2]);
       norm.push(normal[0], normal[1], normal[2]);
+      col.push(rgb[0], rgb[1], rgb[2]);
     }
     uv.push(...uvCoords);
     idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
@@ -75,10 +102,11 @@
 
   function addBlockFaceToState(state, x, y, z, f) {
     const fd = FACE_DEFS[f];
-    addQuadToState(state, fd.v.map(p => [x + p[0], y + p[1], z + p[2]]), fd.n, fd.uv, fd.m);
+    const rgb = mainFaceLight(x + fd.n[0], y + fd.n[1], z + fd.n[2]);
+    addQuadToState(state, fd.v.map(p => [x + p[0], y + p[1], z + p[2]]), fd.n, fd.uv, fd.m, rgb);
   }
 
-  function addBoxPartToState(state, x, y, z, part) {
+  function addBoxPartToState(state, x, y, z, part, rgbIn) {
     const b = part && part.box;
     if (!b || b.length < 6) return false;
     const x0 = x + b[0], y0 = y + b[1], z0 = z + b[2];
@@ -95,12 +123,12 @@
     ];
     for (let f = 0; f < FACE_DEFS.length; f++) {
       const fd = FACE_DEFS[f];
-      addQuadToState(state, faces[f], fd.n, uvCoords, part.mat ?? fd.m);
+      addQuadToState(state, faces[f], fd.n, uvCoords, part.mat ?? fd.m, rgbIn);
     }
     return true;
   }
 
-  function addCrossPartToState(state, x, y, z, part) {
+  function addCrossPartToState(state, x, y, z, part, rgbIn) {
     const r = part.r ?? 0.5;
     const y0 = y + (part.y0 ?? 0);
     const y1 = y + (part.y1 ?? 1);
@@ -108,16 +136,17 @@
     const uvCoords = part.uv || FACE_DEFS[0].uv;
     const m = part.mat ?? 0;
     const d = Math.SQRT1_2;
-    addQuadToState(state, [[cx - r,y0,cz - r], [cx - r,y1,cz - r], [cx + r,y1,cz + r], [cx + r,y0,cz + r]], [-d, 0, d], uvCoords, m);
-    addQuadToState(state, [[cx - r,y0,cz + r], [cx - r,y1,cz + r], [cx + r,y1,cz - r], [cx + r,y0,cz - r]], [d, 0, d], uvCoords, m);
+    addQuadToState(state, [[cx - r,y0,cz - r], [cx - r,y1,cz - r], [cx + r,y1,cz + r], [cx + r,y0,cz + r]], [-d, 0, d], uvCoords, m, rgbIn);
+    addQuadToState(state, [[cx - r,y0,cz + r], [cx - r,y1,cz + r], [cx + r,y1,cz - r], [cx + r,y0,cz - r]], [d, 0, d], uvCoords, m, rgbIn);
     return true;
   }
 
   function addModelToState(state, x, y, z, model) {
+    const rgb = mainFaceLight(x, y, z);
     let added = false;
     for (const part of model) {
-      if (part.kind === 'cross') added = addCrossPartToState(state, x, y, z, part) || added;
-      else added = addBoxPartToState(state, x, y, z, part) || added;
+      if (part.kind === 'cross') added = addCrossPartToState(state, x, y, z, part, rgb) || added;
+      else added = addBoxPartToState(state, x, y, z, part, rgb) || added;
     }
     if (added) state.blocks++;
   }
@@ -141,22 +170,24 @@
 
   function buildGeometry(state) {
     const geo = new THREE.BufferGeometry();
-    const pos = [], norm = [], uv = [], idx = [];
+    const pos = [], norm = [], uv = [], col = [], idx = [];
     for (let g = 0; g < state.positions.length; g++) {
       const gp = state.positions[g];
       if (!gp.length) continue;
       const vertexOffset = pos.length / 3;
       const indexStart = idx.length;
       for (let i = 0; i < gp.length; i++) pos.push(gp[i]);
-      const gn = state.normals[g], guv = state.uvs[g], gi = state.indices[g];
+      const gn = state.normals[g], guv = state.uvs[g], gc = state.colors[g], gi = state.indices[g];
       for (let i = 0; i < gn.length; i++) norm.push(gn[i]);
       for (let i = 0; i < guv.length; i++) uv.push(guv[i]);
+      for (let i = 0; i < gc.length; i++) col.push(gc[i]);
       for (let i = 0; i < gi.length; i++) idx.push(gi[i] + vertexOffset);
       geo.addGroup(indexStart, gi.length, g);
     }
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     geo.setIndex(idx);
     geo.computeBoundingSphere();
     return geo;
@@ -173,6 +204,10 @@
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    // 頂点カラー（ライトエンジンの焼き込み）。旧バージョンのキャッシュには無いので白で埋める
+    const colSrc = part.colors ? asF32(part.colors) : null;
+    const col = colSrc && colSrc.length === pos.length ? colSrc : new Float32Array(pos.length).fill(1);
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     for (const g of part.groups || []) geo.addGroup(g.start, g.count, g.material);
     geo.computeBoundingSphere();
@@ -191,6 +226,7 @@
   }
 
   function buildChunkState(cx, cz) {
+    mainLightMemo = new Map();
     const build = makeMeshBuildState();
     const b = chunkBounds(cx, cz);
     for (let x = b.x0; x <= b.x1; x++) for (let z = b.z0; z <= b.z1; z++) {
@@ -288,6 +324,12 @@
         applyChunkState(pending.cx, pending.cz, buildChunkState(pending.cx, pending.cz));
         return;
       }
+      if (msg.probeLight) { try { (window.__mcLastProbes = window.__mcLastProbes || []).push(msg.probeLight); } catch (e) {} }
+      if (typeof msg.ms === 'number') {
+        meshWorkerStats.lastBuildMs = Math.round(msg.ms * 10) / 10;
+        meshWorkerStats.maxBuildMs = Math.max(meshWorkerStats.maxBuildMs || 0, meshWorkerStats.lastBuildMs);
+        meshWorkerStats.avgBuildMs = Math.round(((meshWorkerStats.avgBuildMs || msg.ms) * 0.9 + msg.ms * 0.1) * 10) / 10;
+      }
       if (chunkBuildVersions.get(pending.key) !== pending.version) return;
       meshApplyQueue.push({ cx: pending.cx, cz: pending.cz, key: pending.key, version: pending.version, cacheKey: pending.cacheKey, packed: msg.packed, fromCache: false });
     };
@@ -326,9 +368,13 @@
   function collectMeshPayload(cx, cz) {
     const b = chunkBounds(cx, cz);
     const x0 = b.x0 - 1, x1 = b.x1 + 1, z0 = b.z0 - 1, z1 = b.z1 + 1;
+    // ライトエンジンはチャンク外周 LIGHT_PAD(=6, world-mesh-worker.js) まで光を解くので、
+    // 明示ブロック/空気/編集はその範囲まで渡す（範囲がハッシュに入るため、隣接チャンクの
+    // 光源設置/破壊でもキャッシュキーが変わり正しく再ビルドされる）
+    const lx0 = b.x0 - 6, lx1 = b.x1 + 6, lz0 = b.z0 - 6, lz1 = b.z1 + 6;
     const blocks = [], airs = [], editEntries = [], blockedColumns = [];
     let hash = 2166136261 >>> 0;
-    const includeXYZ = (x, y, z) => x >= x0 && x <= x1 && z >= z0 && z <= z1 && y >= CHUNK_Y_MIN - 1 && y <= CHUNK_Y_MAX + 1;
+    const includeXYZ = (x, y, z) => x >= lx0 && x <= lx1 && z >= lz0 && z <= lz1 && y >= CHUNK_Y_MIN - 1 && y <= CHUNK_Y_MAX + 1;
     // world/airBlocks/edits はプレイ範囲が広がるほど巨大化するので、全件走査せず
     // このチャンク±1に触れうる3x3チャンク分のインデックスだけ見る（パディングは1マスなので必ずここに収まる）。
     for (let ncx = cx - 1; ncx <= cx + 1; ncx++) for (let ncz = cz - 1; ncz <= cz + 1; ncz++) {
@@ -373,6 +419,8 @@
       transparent: TYPES.map(t => !!t.transparent),
       groupCounts: TYPES.map(t => Array.isArray(t.mats) ? t.mats.length : 1),
       blockModels: TYPES.map(t => t.model || null),
+      lightLevels: TYPES.map(t => t.lightLevel || 0),
+      probe: (typeof window !== 'undefined' && window.__mcLightProbe) || null, // デバッグ: ワーカー内の光値を覗く
       blocks,
       airs,
       edits: editEntries,
@@ -483,10 +531,16 @@
     startRebuildJob(keys, x0, x1, z0, z1);
   }
 
-  function requestEditedBlockRebuild(x, y, z) {
+  function requestEditedBlockRebuild(x, y, z, emitType) {
     if (typeof noteColumnY === 'function') noteColumnY(x, y, z);
+    // 光源ブロックの設置/破壊は半径14ブロックまで明るさが変わるので、
+    // その範囲に重なるチャンクも再メッシュしてライトの継ぎ目を消す
+    const curT = blockAt(x, y, z);
+    const lit = (emitType != null && TYPES[emitType] && TYPES[emitType].lightLevel > 0) ||
+      (curT !== undefined && TYPES[curT].lightLevel > 0);
+    const r = lit ? 14 : 1;
     const keys = new Set();
-    for (const dx of [-1, 0, 1]) for (const dz of [-1, 0, 1]) keys.add(chunkKey(chunkCoord(x + dx), chunkCoord(z + dz)));
+    for (const dx of [-r, 0, r]) for (const dz of [-r, 0, r]) keys.add(chunkKey(chunkCoord(x + dx), chunkCoord(z + dz)));
     for (const id of keys) {
       const [cx, cz] = id.split(',').map(Number);
       rebuildChunk(cx, cz);

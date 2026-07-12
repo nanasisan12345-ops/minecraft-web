@@ -260,4 +260,35 @@
     equipArmor: (id = 'iron_armor') => { SAVE.armor = id ? mkItem(id) : null; markSaveDirty(); if (!CAMERA_VIEW.thirdPerson) toggleThirdPerson(); return { armor: SAVE.armor, thirdPerson: CAMERA_VIEW.thirdPerson }; },
     // バケツテスト: 足元近くに水源を1つ置き、そこから汲めるか確認
     bucketPlace: () => { const x = Math.floor(player.pos.x) + 2, z = Math.floor(player.pos.z); let y = Math.floor(player.pos.y); while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--; const wy = y + 1; setEdit(key(x, wy, z), WATER); setBlock(x, wy, z, WATER); requestEditedBlockRebuild(x, wy, z); return { x, y: wy, z, placed: blockAt(x, wy, z) === WATER }; },
+    // ライトエンジン確認: 任意ブロックを近くに設置（松明の光テスト等。t はブロックID）
+    placeAt: (t = TORCH, dx = 2, dy = 0, dz = 0) => {
+      const x = Math.floor(player.pos.x) + dx, z = Math.floor(player.pos.z) + dz;
+      const y = Math.floor(player.pos.y) + dy;
+      setEdit(key(x, y, z), t); setBlock(x, y, z, t); requestEditedBlockRebuild(x, y, z, t);
+      return { x, y, z, type: TYPES[t] && TYPES[t].name };
+    },
+    breakAt: (dx = 2, dy = 0, dz = 0) => {
+      const x = Math.floor(player.pos.x) + dx, z = Math.floor(player.pos.z) + dz;
+      const y = Math.floor(player.pos.y) + dy;
+      const t = blockAt(x, y, z);
+      setEdit(key(x, y, z), -1); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z, t);
+      return { x, y, z, was: t != null ? TYPES[t] && TYPES[t].name : null };
+    },
+    // ライトエンジン確認: 現在地の空の見え方＋近くの発光ブロック＋直近チャンクビルド時間。
+    // 実際の頂点カラーはワーカーが焼くので、ここでは判定材料（遮蔽と光源距離）を返す
+    lightAt: (dx = 0, dy = 0, dz = 0) => {
+      const px = Math.floor(player.pos.x) + dx, py = Math.floor(player.pos.y) + dy, pz = Math.floor(player.pos.z) + dz;
+      let covered = false;
+      for (let yy = py + 1; yy <= Math.min(CHUNK_Y_MAX, py + 56); yy++) {
+        const t = blockAt(px, yy, pz);
+        if (t !== undefined && !TYPES[t].transparent && !TYPES[t].model) { covered = true; break; }
+      }
+      let emitter = null;
+      for (let x = px - 14; x <= px + 14 && !emitter; x++) for (let z = pz - 14; z <= pz + 14 && !emitter; z++) for (let y = Math.max(CHUNK_Y_MIN, py - 10); y <= Math.min(CHUNK_Y_MAX, py + 10); y++) {
+        const t = blockAt(x, y, z);
+        if (t !== undefined && TYPES[t].lightLevel > 0) { emitter = { type: TYPES[t].name, level: TYPES[t].lightLevel, dist: +Math.hypot(x - px, y - py, z - pz).toFixed(1) }; break; }
+      }
+      const st = window.__mcMeshWorkerStats || {};
+      return { pos: [px, py, pz], coveredFromSky: covered, nearestEmitter: emitter, lastBuildMs: st.lastBuildMs, avgBuildMs: st.avgBuildMs, maxBuildMs: st.maxBuildMs };
+    },
   };

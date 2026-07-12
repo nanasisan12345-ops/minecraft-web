@@ -109,6 +109,14 @@
   const OAK_DOOR_S_CLOSED = 66, OAK_DOOR_S_CLOSED_TOP = 67, OAK_DOOR_S_OPEN = 68, OAK_DOOR_S_OPEN_TOP = 69;
   const OAK_DOOR_W_CLOSED = 70, OAK_DOOR_W_CLOSED_TOP = 71, OAK_DOOR_W_OPEN = 72, OAK_DOOR_W_OPEN_TOP = 73;
 
+  // 発光ブロックの光レベル（本家準拠）。ライトエンジンが BFS 伝播して頂点カラーへ焼き込む
+  TYPES[TORCH].lightLevel = 14;
+  TYPES[LANTERN].lightLevel = 15;
+  TYPES[PAPER_LANTERN].lightLevel = 14;
+  TYPES[GLOW_CRYSTAL].lightLevel = 13;
+  TYPES[LAVA].lightLevel = 15;
+  TYPES[FURNACE_LIT].lightLevel = 13;
+
   TYPES[TORCH].model = [
     { box: [0.43, 0.00, 0.43, 0.57, 0.72, 0.57] },
     { box: [0.32, 0.62, 0.32, 0.68, 1.00, 0.68] },

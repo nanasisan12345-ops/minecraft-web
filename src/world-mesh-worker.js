@@ -18,6 +18,7 @@ let typeCount = 0;
 let transparent = [];
 let groupCounts = [];
 let blockModels = [];
+let lightLevels = [];
 let explicitBlocks = new Map();
 let explicitAir = new Set();
 let explicitEdits = new Map();
@@ -517,6 +518,189 @@ function blockAtStack(x, y, z) {
   return terrainBlockAtCol(x, y, z, columnDesc(x, z));
 }
 
+/* ==== ライトエンジン: skylight/blocklight を BFS で解き、面ごとに頂点カラーへ焼く ====
+   - skylight: 列ごとに空から降ろした直射(15)を種にして、段差・洞窟入口へ横 BFS で減衰伝播
+   - blocklight: 松明/ランタン/溶岩など lightLevels>0 のセルを種にして全方向 BFS
+   - 光量→輝度は本家近似 0.8^(15-L)。ブロックライトは暖色に寄せる
+   - 対象チャンクの外周 LIGHT_PAD ブロックまで解く（松明の半径14に対する近似。境界の
+     わずかな継ぎ目は隣接チャンクの再メッシュで埋まる） */
+const LIGHT_PAD = 6;
+const BRIGHT = new Float32Array(16);
+for (let i = 0; i <= 15; i++) BRIGHT[i] = Math.pow(0.8, 15 - i);
+let LGT = null; // { x0, z0, w, cols: [{ y0, top, f15, sky:Uint8Array, blk:Uint8Array }] }
+
+// stack 値（0=空気, それ以外=種+1）で「光を完全に遮るか」。フルキューブの不透過ブロックのみ遮る。
+// ガラス/水/作物/ドア/フェンス等（transparent または model 持ち）は透過。
+function lightOpaqueVal(v) {
+  return v !== 0 && !transparent[v - 1] && !blockModels[v - 1];
+}
+// 1ステップの減衰。水/溶岩の中は +1 余分に減る
+function lightCostVal(v) {
+  if (v === 0) return 1;
+  const t = v - 1;
+  return (t === WATER || t === LAVA) ? 2 : 1;
+}
+// 列の占有アクセサ。メッシュ対象（チャンク±1）は正確なスタック、外周パディング列は
+// 「高さ場＋海＋明示ブロック(edits/world/air)の上書き」による近似で済ませる。
+// 地形ノイズ（waterFeature/洞窟）を外周まで正確に解くとビルドが3倍以上遅くなるため。
+// 近似の影響は「チャンク境界の外の洞窟口/川からの光」がわずかにずれる程度で、
+// そのセル自体は隣のチャンクが自分のビルドで正確に照らす。
+function lightOverlayVal(x, y, z) {
+  const idk = xyzKey(x, y, z);
+  const edit = explicitEdits.get(idk);
+  if (edit < 0) return 0;
+  if (edit != null && edit >= 0) return edit + 1;
+  const eb = explicitBlocks.get(idk);
+  if (eb !== undefined) return eb + 1;
+  if (explicitAir.has(idk)) return 0;
+  return -1; // 上書きなし
+}
+function lightColValAt(c, x, y, z) {
+  if (c.exact) {
+    const s = c.stack;
+    if (y > s.y1) return 0;
+    if (y >= s.y0) return s.arr[y - s.y0];
+    return STONE + 1;
+  }
+  if (c.ov) {
+    const v = lightOverlayVal(x, y, z);
+    if (v >= 0) return v;
+  }
+  if (y <= c.h) return STONE + 1;
+  if (y <= SEA) return WATER + 1;
+  return 0;
+}
+function inLightDomain(x, z) {
+  return LGT && x >= LGT.x0 && x < LGT.x0 + LGT.w && z >= LGT.z0 && z < LGT.z0 + LGT.w;
+}
+function getLight(ch, x, y, z) {
+  if (!inLightDomain(x, z)) {
+    if (ch !== 0) return 0;
+    return y > heightAt(x, z) ? 15 : 0;   // 域外は高さだけで近似（面サンプルには使われない）
+  }
+  const c = LGT.cols[(x - LGT.x0) * LGT.w + (z - LGT.z0)];
+  if (y > c.top) return ch === 0 ? 15 : 0;
+  if (y < c.y0) return 0;
+  return (ch === 0 ? c.sky : c.blk)[y - c.y0];
+}
+
+// 列のスカイライト直射を種として敷き、blocklight 光源もキューに積む。
+// f15 = 直射15が届いている一番低い y（横伝播が必要な範囲の判定に使う）
+function seedLightColumn(x, z, bq, exact) {
+  let c;
+  if (exact) {
+    const s = columnStack(x, z);
+    const d = columnDesc(x, z);
+    const top = Math.min(CHUNK_Y_MAX + 1, Math.max(s.y1, d.h + 16)); // 面より上を横断する光の通り道ぶん余裕
+    c = { exact: true, stack: s, h: d.h, y0: s.y0, top };
+  } else {
+    const h = heightAt(x, z);
+    const b = columnYBounds.get(xzKey(x, z));
+    const ov = !!b;
+    const y0 = Math.max(CHUNK_Y_MIN, Math.min(b ? b.min - 1 : h, h - 2));
+    const top = Math.min(CHUNK_Y_MAX + 1, Math.max(Math.max(h, SEA), b ? b.max + 1 : h) + 16);
+    c = { exact: false, ov, h, y0, top };
+  }
+  const n = c.top - c.y0 + 1;
+  const sky = new Uint8Array(n), blk = new Uint8Array(n);
+  let cur = 15, f15 = c.top + 1;
+  for (let y = c.top; y >= c.y0; y--) {
+    const i = y - c.y0;
+    const v = lightColValAt(c, x, y, z);
+    if (v !== 0) {
+      const lv = lightLevels[v - 1] | 0;
+      if (lv > 0) { blk[i] = lv; bq.push(x, y, z, lv); }
+      if (lightOpaqueVal(v)) { cur = 0; sky[i] = 0; continue; }
+      const t = v - 1;
+      if (t === WATER || t === LAVA) cur = Math.max(0, cur - 1); // 水中は1ブロックごとに-1
+      else if (cur < 15) cur = Math.max(0, cur - 1);             // 直射(15)が崩れた後は下降でも-1
+    } else if (cur < 15) {
+      cur = Math.max(0, cur - 1);
+    }
+    if (cur === 15) f15 = y;
+    sky[i] = cur;
+  }
+  c.f15 = f15;
+  c.sky = sky;
+  c.blk = blk;
+  return c;
+}
+
+function propagateLight(ch, q) {
+  for (let qi = 0; qi < q.length; qi += 4) {
+    const x = q[qi], y = q[qi + 1], z = q[qi + 2], l = q[qi + 3];
+    if (getLight(ch, x, y, z) !== l) continue; // より明るい値で上書き済み
+    spreadLight(ch, q, x + 1, y, z, l);
+    spreadLight(ch, q, x - 1, y, z, l);
+    spreadLight(ch, q, x, y + 1, z, l);
+    spreadLight(ch, q, x, y - 1, z, l);
+    spreadLight(ch, q, x, y, z + 1, l);
+    spreadLight(ch, q, x, y, z - 1, l);
+  }
+}
+function spreadLight(ch, q, x, y, z, l) {
+  if (!inLightDomain(x, z)) return;
+  const c = LGT.cols[(x - LGT.x0) * LGT.w + (z - LGT.z0)];
+  if (y < c.y0 || y > c.top) return;
+  const v = lightColValAt(c, x, y, z);
+  if (lightOpaqueVal(v)) return;
+  const nl = l - lightCostVal(v);
+  if (nl <= 0) return;
+  const arr = ch === 0 ? c.sky : c.blk;
+  const i = y - c.y0;
+  if (arr[i] >= nl) return;
+  arr[i] = nl;
+  q.push(x, y, z, nl);
+}
+
+function computeLighting(cx, cz) {
+  const x0 = cx * CHUNK_SIZE - LIGHT_PAD, z0 = cz * CHUNK_SIZE - LIGHT_PAD;
+  const w = CHUNK_SIZE + LIGHT_PAD * 2;
+  // メッシュが実際にサンプルする チャンク±1 は正確な地形スタック、その外の
+  // パディング列は近似（コメント参照）で光だけ通す
+  const ex0 = cx * CHUNK_SIZE - 1, ex1 = cx * CHUNK_SIZE + CHUNK_SIZE;
+  const ez0 = cz * CHUNK_SIZE - 1, ez1 = cz * CHUNK_SIZE + CHUNK_SIZE;
+  LGT = { x0, z0, w, cols: new Array(w * w) };
+  const bq = [];
+  for (let x = x0; x < x0 + w; x++) for (let z = z0; z < z0 + w; z++) {
+    const exact = x >= ex0 && x <= ex1 && z >= ez0 && z <= ez1;
+    LGT.cols[(x - x0) * w + (z - z0)] = seedLightColumn(x, z, bq, exact);
+  }
+  // skylight の横伝播が必要なセルだけ種に積む。
+  // (a) 直射15のセルは「隣の列の f15 が自分より高い」高さ帯だけが境界（平地では何も積まれない）
+  // (b) 直射が崩れた後の 2..14 のセル（水中・洞窟の入り口下など）は数が少ないので個別に判定
+  const sq = [];
+  for (let x = x0; x < x0 + w; x++) for (let z = z0; z < z0 + w; z++) {
+    const c = LGT.cols[(x - x0) * w + (z - z0)];
+    const nf = (nx, nz) => {
+      if (nx < x0 || nx >= x0 + w || nz < z0 || nz >= z0 + w) return c.f15; // 域外は同高扱い＝境界にしない
+      return LGT.cols[(nx - x0) * w + (nz - z0)].f15;
+    };
+    const maxNeighborF15 = Math.max(nf(x + 1, z), nf(x - 1, z), nf(x, z + 1), nf(x, z - 1));
+    const upTo = Math.min(c.top, maxNeighborF15 - 1);
+    for (let y = c.f15; y <= upTo; y++) {
+      if (c.sky[y - c.y0] === 15) sq.push(x, y, z, 15);
+    }
+    // f15 より下の減衰帯（水中/庇の下）: 直下・水平の暗い隣へだけ種を積む
+    for (let y = Math.min(c.f15 - 1, c.top); y >= c.y0; y--) {
+      const s = c.sky[y - c.y0];
+      if (s < 2) continue;
+      if (getLight(0, x + 1, y, z) < s - 1 || getLight(0, x - 1, y, z) < s - 1 ||
+          getLight(0, x, y, z + 1) < s - 1 || getLight(0, x, y, z - 1) < s - 1 ||
+          getLight(0, x, y - 1, z) < s - 1) sq.push(x, y, z, s);
+    }
+  }
+  propagateLight(0, sq);
+  propagateLight(1, bq);
+}
+
+// 面が接する空気側セルの光 → 頂点カラー（ブロックライトは松明色の暖色に寄せる）
+function sampleFaceLight(x, y, z) {
+  const s = BRIGHT[getLight(0, x, y, z)];
+  const b = BRIGHT[getLight(1, x, y, z)];
+  return [Math.max(s, b), Math.max(s, b * 0.85), Math.max(s, b * 0.62)];
+}
+
 function occludes(x, y, z, self) {
   const nt = blockAtStack(x, y, z);
   if (nt === undefined) return false;
@@ -535,19 +719,23 @@ function makeMeshBuildState() {
       positions: Array.from({ length: groupCount }, () => []),
       normals: Array.from({ length: groupCount }, () => []),
       uvs: Array.from({ length: groupCount }, () => []),
+      colors: Array.from({ length: groupCount }, () => []),
       indices: Array.from({ length: groupCount }, () => []),
       blocks: 0,
     };
   });
 }
 
-function addQuadToState(state, verts, normal, uvCoords, mat = 0) {
+const WHITE_LIGHT = [1, 1, 1];
+function addQuadToState(state, verts, normal, uvCoords, mat = 0, rgb = WHITE_LIGHT) {
   const group = state.positions.length === 1 ? 0 : Math.max(0, Math.min(state.positions.length - 1, mat | 0));
   const pos = state.positions[group], norm = state.normals[group], uv = state.uvs[group], idx = state.indices[group];
+  const col = state.colors[group];
   const base = pos.length / 3;
   for (const p of verts) {
     pos.push(p[0], p[1], p[2]);
     norm.push(normal[0], normal[1], normal[2]);
+    col.push(rgb[0], rgb[1], rgb[2]);
   }
   uv.push(...uvCoords);
   idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
@@ -555,10 +743,11 @@ function addQuadToState(state, verts, normal, uvCoords, mat = 0) {
 
 function addBlockFaceToState(state, x, y, z, f) {
   const fd = FACE_DEFS[f];
-  addQuadToState(state, fd.v.map(p => [x + p[0], y + p[1], z + p[2]]), fd.n, fd.uv, fd.m);
+  const rgb = sampleFaceLight(x + fd.n[0], y + fd.n[1], z + fd.n[2]);
+  addQuadToState(state, fd.v.map(p => [x + p[0], y + p[1], z + p[2]]), fd.n, fd.uv, fd.m, rgb);
 }
 
-function addBoxPartToState(state, x, y, z, part) {
+function addBoxPartToState(state, x, y, z, part, rgb) {
   const b = part && part.box;
   if (!b || b.length < 6) return false;
   const x0 = x + b[0], y0 = y + b[1], z0 = z + b[2];
@@ -575,12 +764,12 @@ function addBoxPartToState(state, x, y, z, part) {
   ];
   for (let f = 0; f < FACE_DEFS.length; f++) {
     const fd = FACE_DEFS[f];
-    addQuadToState(state, faces[f], fd.n, uvCoords, part.mat ?? fd.m);
+    addQuadToState(state, faces[f], fd.n, uvCoords, part.mat ?? fd.m, rgb);
   }
   return true;
 }
 
-function addCrossPartToState(state, x, y, z, part) {
+function addCrossPartToState(state, x, y, z, part, rgb) {
   const r = part.r ?? 0.5;
   const y0 = y + (part.y0 ?? 0);
   const y1 = y + (part.y1 ?? 1);
@@ -588,16 +777,18 @@ function addCrossPartToState(state, x, y, z, part) {
   const uvCoords = part.uv || FACE_DEFS[0].uv;
   const m = part.mat ?? 0;
   const d = Math.SQRT1_2;
-  addQuadToState(state, [[cx - r,y0,cz - r], [cx - r,y1,cz - r], [cx + r,y1,cz + r], [cx + r,y0,cz + r]], [-d, 0, d], uvCoords, m);
-  addQuadToState(state, [[cx - r,y0,cz + r], [cx - r,y1,cz + r], [cx + r,y1,cz - r], [cx + r,y0,cz - r]], [d, 0, d], uvCoords, m);
+  addQuadToState(state, [[cx - r,y0,cz - r], [cx - r,y1,cz - r], [cx + r,y1,cz + r], [cx + r,y0,cz + r]], [-d, 0, d], uvCoords, m, rgb);
+  addQuadToState(state, [[cx - r,y0,cz + r], [cx - r,y1,cz + r], [cx + r,y1,cz - r], [cx + r,y0,cz - r]], [d, 0, d], uvCoords, m, rgb);
   return true;
 }
 
 function addModelToState(state, x, y, z, model) {
+  // モデルパーツ（松明/ドア/フェンス等）は自セルの光でフラットに照らす
+  const rgb = sampleFaceLight(x, y, z);
   let added = false;
   for (const part of model) {
-    if (part.kind === 'cross') added = addCrossPartToState(state, x, y, z, part) || added;
-    else added = addBoxPartToState(state, x, y, z, part) || added;
+    if (part.kind === 'cross') added = addCrossPartToState(state, x, y, z, part, rgb) || added;
+    else added = addBoxPartToState(state, x, y, z, part, rgb) || added;
   }
   if (added) state.blocks++;
 }
@@ -622,6 +813,7 @@ function addBlockToState(build, x, y, z, t) {
 function buildChunkState(cx, cz) {
   COL_CACHE = new Map();
   STACK_CACHE = new Map();
+  computeLighting(cx, cz);
   const build = makeMeshBuildState();
   const x0 = cx * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
   const x1 = x0 + CHUNK_SIZE - 1, z1 = z0 + CHUNK_SIZE - 1;
@@ -638,31 +830,35 @@ function buildChunkState(cx, cz) {
 }
 
 function packTypeState(state) {
-  let positionCount = 0, normalCount = 0, uvCount = 0, indexCount = 0;
+  let positionCount = 0, normalCount = 0, uvCount = 0, colorCount = 0, indexCount = 0;
   for (let g = 0; g < state.positions.length; g++) {
     positionCount += state.positions[g].length;
     normalCount += state.normals[g].length;
     uvCount += state.uvs[g].length;
+    colorCount += state.colors[g].length;
     indexCount += state.indices[g].length;
   }
   const positions = new Float32Array(positionCount);
   const normals = new Float32Array(normalCount);
   const uvs = new Float32Array(uvCount);
+  const colors = new Float32Array(colorCount);
   const indices = new Uint32Array(indexCount);
   const groups = [];
-  let po = 0, no = 0, uo = 0, io = 0, vertexOffset = 0;
+  let po = 0, no = 0, uo = 0, co = 0, io = 0, vertexOffset = 0;
   for (let g = 0; g < state.positions.length; g++) {
     const gp = state.positions[g];
     if (!gp.length) continue;
-    const gn = state.normals[g], gu = state.uvs[g], gi = state.indices[g];
+    const gn = state.normals[g], gu = state.uvs[g], gc = state.colors[g], gi = state.indices[g];
     positions.set(gp, po);
     normals.set(gn, no);
     uvs.set(gu, uo);
+    colors.set(gc, co);
     for (let i = 0; i < gi.length; i++) indices[io + i] = gi[i] + vertexOffset;
     groups.push({ start: io, count: gi.length, material: g });
     po += gp.length;
     no += gn.length;
     uo += gu.length;
+    co += gc.length;
     io += gi.length;
     vertexOffset += gp.length / 3;
   }
@@ -670,6 +866,7 @@ function packTypeState(state) {
     positions: positions.buffer,
     normals: normals.buffer,
     uvs: uvs.buffer,
+    colors: colors.buffer,
     indices: indices.buffer,
     groups,
     blocks: state.blocks,
@@ -700,6 +897,7 @@ function loadPayload(payload) {
   transparent = payload.transparent || [];
   groupCounts = payload.groupCounts || [];
   blockModels = payload.blockModels || [];
+  lightLevels = payload.lightLevels || [];
   explicitBlocks = new Map();
   explicitAir = new Set();
   explicitEdits = new Map();
@@ -732,11 +930,27 @@ function loadPayload(payload) {
 self.onmessage = (ev) => {
   const msg = ev.data || {};
   try {
+    const t0 = performance.now();
     loadPayload(msg.payload || {});
     const packed = packBuildState(buildChunkState(msg.payload.cx, msg.payload.cz));
+    const ms = performance.now() - t0;
+    let probeLight = null;
+    const pr = msg.payload.probe;
+    if (pr && Array.isArray(pr.cells)) {
+      probeLight = { cx: msg.payload.cx, cz: msg.payload.cz, cells: [] };
+      for (const [px, py, pz] of pr.cells) {
+        if (!inLightDomain(px, pz)) { probeLight.cells.push(null); continue; }
+        const c = LGT.cols[(px - LGT.x0) * LGT.w + (pz - LGT.z0)];
+        probeLight.cells.push({
+          p: [px, py, pz], exact: !!c.exact,
+          sky: getLight(0, px, py, pz), blk: getLight(1, px, py, pz),
+          val: lightColValAt(c, px, py, pz), f15: c.f15,
+        });
+      }
+    }
     const transfers = [];
-    for (const part of packed.parts) transfers.push(part.positions, part.normals, part.uvs, part.indices);
-    self.postMessage({ id: msg.id, packed }, transfers);
+    for (const part of packed.parts) transfers.push(part.positions, part.normals, part.uvs, part.colors, part.indices);
+    self.postMessage({ id: msg.id, packed, ms, probeLight }, transfers);
   } catch (err) {
     self.postMessage({ id: msg.id, error: err && err.message ? err.message : String(err) });
   }

@@ -348,7 +348,7 @@
       thock(150);
       return;
     }
-    setEdit(id, -1); saveEditsSoon(); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z); thock(150);
+    setEdit(id, -1); saveEditsSoon(); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z, t); thock(150);
   }
   function updateMining(dt, tg) {
     if (!mouseHeld.left || !started || SURVIVAL.dead || !tg || isContainerOpen()) { resetMining(); return; }
@@ -412,7 +412,7 @@
       const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
       const type = s.id === 'lava_bucket' ? LAVA : WATER;
       if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX || isPlacementBlocked(x, y, z) || overlapsPlayer(x, y, z, type)) return false;
-      setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z);
+      setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z, type);
       INV[selected] = mkItem('bucket'); invChanged(); thock(240); return true;
     }
     if (s.id === 'milk_bucket') {
@@ -501,6 +501,6 @@
     if (s.n <= 0) INV[selected] = null;
     invChanged();
     registerPlacedLight(x, y, z, type);
-    setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z); thock(260);
+    setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z, type); thock(260);
     if (typeof progressEvent === 'function') progressEvent('place', ITEM_FOR_BLOCK[type]);
   }
