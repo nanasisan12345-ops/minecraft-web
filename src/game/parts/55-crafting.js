@@ -18,6 +18,13 @@
     { out: 'bread', n: 1, pattern: ['WWW'], keys: { W: 'wheat' } },
     { out: 'bed', n: 1, pattern: ['CCC', 'PPP'], keys: { C: 'cloth', P: 'planks' } },
     { out: 'stone_brick', n: 4, pattern: ['TT', 'TT'], keys: { T: 'stone' } },
+    // 階段（素材6→4）とハーフブロック（素材3→6）
+    { out: 'oak_stairs', n: 4, pattern: ['M  ', 'MM ', 'MMM'], keys: { M: 'planks' } },
+    { out: 'cobblestone_stairs', n: 4, pattern: ['M  ', 'MM ', 'MMM'], keys: { M: 'cobblestone' } },
+    { out: 'stone_brick_stairs', n: 4, pattern: ['M  ', 'MM ', 'MMM'], keys: { M: 'stone_brick' } },
+    { out: 'oak_slab', n: 6, pattern: ['MMM'], keys: { M: 'planks' } },
+    { out: 'cobblestone_slab', n: 6, pattern: ['MMM'], keys: { M: 'cobblestone' } },
+    { out: 'stone_brick_slab', n: 6, pattern: ['MMM'], keys: { M: 'stone_brick' } },
     { out: 'tnt', n: 1, pattern: ['GSG', 'SGS', 'GSG'], keys: { G: 'gunpowder', S: 'sand' } },
     // 鉱物の収納ブロック（9個 → 1ブロック、逆に1ブロック → 9個）
     { out: 'iron_block', n: 1, pattern: ['MMM', 'MMM', 'MMM'], keys: { M: 'iron_ingot' } },

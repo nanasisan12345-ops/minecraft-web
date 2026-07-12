@@ -112,6 +112,43 @@
   const OAK_DOOR_W_CLOSED = 70, OAK_DOOR_W_CLOSED_TOP = 71, OAK_DOOR_W_OPEN = 72, OAK_DOOR_W_OPEN_TOP = 73;
   const BEDROCK = 74, DEEPSLATE = 75; // ワールド最下層の岩盤（破壊不可）と深層の石。worker側の同名定数と一致させること
 
+  // 階段(76-87): 素材×4方位（方位=高い半分がある側: 0=-z 1=+x 2=+z 3=-x）
+  // ハーフブロック(88-93): 素材×下付き/上付き。どれも設置向きはIDバリアントで表現（ドアと同方式）
+  const OAK_STAIRS = TYPES.length;       // 76 (oak 76-79 / cobble 80-83 / stonebrick 84-87)
+  for (const m of [
+    { name: '木の階段', tex: T.planks, color: 0xb5824a },
+    { name: '丸石の階段', tex: T.cobble, color: 0x7d8286 },
+    { name: '石レンガの階段', tex: T.stoneBrick, color: 0x868b8f },
+  ]) for (let dir = 0; dir < 4; dir++) {
+    TYPES.push({ name: m.name, color: m.color, icon: m.tex, mats: faceMats(m.tex), transparent: true, noAutoItem: true });
+  }
+  const OAK_SLAB = TYPES.length;         // 88 (oak 88-89 / cobble 90-91 / stonebrick 92-93。偶数=下付き 奇数=上付き)
+  for (const m of [
+    { name: '木のハーフブロック', tex: T.planks, color: 0xb5824a },
+    { name: '丸石のハーフブロック', tex: T.cobble, color: 0x7d8286 },
+    { name: '石レンガのハーフブロック', tex: T.stoneBrick, color: 0x868b8f },
+  ]) for (let up = 0; up < 2; up++) {
+    TYPES.push({ name: m.name, color: m.color, icon: m.tex, mats: faceMats(m.tex), transparent: true, noAutoItem: true });
+  }
+  const STAIR_TOP_BOX = [
+    [0.0, 0.5, 0.0, 1.0, 1.0, 0.5], // 0: -z 側が高い
+    [0.5, 0.5, 0.0, 1.0, 1.0, 1.0], // 1: +x
+    [0.0, 0.5, 0.5, 1.0, 1.0, 1.0], // 2: +z
+    [0.0, 0.5, 0.0, 0.5, 1.0, 1.0], // 3: -x
+  ];
+  for (let i = 0; i < 12; i++) {
+    const t = TYPES[OAK_STAIRS + i];
+    const top = STAIR_TOP_BOX[i % 4];
+    t.model = [{ box: [0, 0, 0, 1, 0.5, 1] }, { box: top }];
+    t.collisionBoxes = [[0, 0, 0, 1, 0.5, 1], top];
+  }
+  for (let i = 0; i < 6; i++) {
+    const t = TYPES[OAK_SLAB + i];
+    const box = (i % 2 === 1) ? [0, 0.5, 0, 1, 1, 1] : [0, 0, 0, 1, 0.5, 1];
+    t.model = [{ box }];
+    t.collisionBoxes = [box];
+  }
+
   // 発光ブロックの光レベル（本家準拠）。ライトエンジンが BFS 伝播して頂点カラーへ焼き込む
   TYPES[TORCH].lightLevel = 14;
   TYPES[LANTERN].lightLevel = 15;

@@ -7,6 +7,13 @@
 ## 🚩 現在地（次セッションはここから）
 
 - **今後の全実装は `計画書/`（手順書00〜23）に従うこと。設計判断のマスターは `ORCHESTRATION_PLAN.md`（§0-3 アーキテクチャ決定事項が最終判断基準）。**
+- **2026-07-12: 手順書05(C1)=階段・ハーフブロックを実装**（IDバリアント方式、ドアと同じ流儀）。
+  - **ブロックID**: 階段=76〜87（木76-79 / 丸石80-83 / 石レンガ84-87、各4方位。方位=高い半分がある側 0=-z 1=+x 2=+z 3=-x）。ハーフ=88〜93（木88-89 / 丸石90-91 / 石レンガ92-93、偶数=下付き・奇数=上付き）。定数 `OAK_STAIRS=76`/`OAK_SLAB=88`（22-block-types.js。TYPES.length ベースで push しているので**以後ブロックを追加するならこの2定数より前に入れないこと**。worker側は typeCount/transparent/blockModels をペイロード受けなので worker への定数追加は不要）。
+  - **形状/衝突**: 階段=下半分フル+上半分の半奥行きの2箱（model と collisionBoxes 同形）、ハーフ=上下どちらかの半箱。既存の 1.05 ステップアップ物理で 0.5 段差は自動で登れる（地形段差と同じ機構）。
+  - **設置**: アイテムは素材ごと1つ（`oak_stairs`/`cobblestone_stairs`/`stone_brick_stairs`/`oak_slab`/`cobblestone_slab`/`stone_brick_slab`、ITEM_DEFS に `stairs:true`/`slab:true` フラグ）。52-raycast.js の `placeStairsFromTarget`（視線水平方位→向きID）/`placeSlabFromTarget`（上面クリック=下付き・下面=上付き・側面=ヒット高さ0.5境界）。`interactOrPlace` の door/fence_gate 分岐の直後に配線。
+  - **採掘/ドロップ**: 硬さは元素材と同じ（木1.8/石系2.6）、適正ツール（木=斧・石系=ツルハシ、`blockPreferredTool` の先頭に分岐追加）。全バリアント→親アイテムを ITEM_FOR_BLOCK で登録（どの向きを壊しても素材の階段/ハーフ1個ドロップ）。
+  - **レシピ**: 階段=素材6個の階段形 `['M  ','MM ','MMM']`→4個、ハーフ=素材3個 `['MMM']`→6個（55-crafting.js）。
+  - **検証**: ページ内実測で 6レシピすべて一致（階段×4/ハーフ×6）、18バリアント全設置で正しい名前、`blockInfo` で全バリアントのドロップ=親アイテム1個・階段model/collision=2箱・ハーフ=1箱を確認、`npm run check` 成功、console error/warn 0。※ペインhiddenのため階段登坂・ハーフ上に立つ物理の目視は未確認 → **次回起動時に階段2連を歩いて登れること・下付きハーフの上に立てることを目視確認**。新フック: `stairFacing()`/`blockInfo(id)`。
 - **2026-07-12: 手順書23(C19)=岩盤・深層岩・深部洞窟の描画修正を実装**（「掘るとマップ外に落ちる」バグの根治。`MESH_WORKER_VERSION=13`）。
   - **岩盤 BEDROCK=74**: Y=-64全マス+−63〜−60はハッシュ減衰混在（実測 100/83/63/45/16% ≈ 設計 100/80/60/40/20%）。`TYPES[].unbreakable` フラグで採掘不可（`miningTime=Infinity`+`finishBreak`ガード）・爆発耐性（`explodeAt`除外。実測: 深層で威力3爆発→深層岩は消えるが−64は無傷）・アイテム化なし。生成式は 32-world-window.js と worker の `bedrockAt` で完全同一に保つこと。
   - **深層岩 DEEPSLATE=75**: y<0の基本石（y=0..8は石との遷移帯、`baseStoneAt`）。硬さ4.8(石の2倍)・ツルハシ適正・ドロップは自身（本家の「深層岩の丸石」は簡略化）。鉱石は既存ブロックのまま（簡略、意図的）。

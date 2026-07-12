@@ -181,6 +181,51 @@
     if (typeof progressEvent === 'function') progressEvent('place', 'oak_fence_gate');
     return true;
   }
+  /* --- 階段/ハーフブロックの設置（IDバリアント方式。ドアと同じ流儀） --- */
+  const isStairsBlock = (type) => type >= OAK_STAIRS && type < OAK_STAIRS + 12;
+  const isSlabBlock = (type) => type >= OAK_SLAB && type < OAK_SLAB + 6;
+  // プレイヤーの視線の水平方位（0=-z 1=+x 2=+z 3=-x）。階段は「向いている方向の奥が高くなる」
+  function horizontalFacingIndex() {
+    const d = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    return Math.abs(d.x) > Math.abs(d.z) ? (d.x > 0 ? 1 : 3) : (d.z > 0 ? 2 : 0);
+  }
+  function consumeSelectedAndPlace(x, y, z, type) {
+    const s = selectedItem(); if (!s) return false;
+    s.n -= 1; if (s.n <= 0) INV[selected] = null; invChanged();
+    setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z, type);
+    thock(260);
+    if (typeof progressEvent === 'function') progressEvent('place', ITEM_FOR_BLOCK[type]);
+    return true;
+  }
+  function placeStairsFromTarget(tg, def) {
+    const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
+    if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) return false;
+    const type = def.block + horizontalFacingIndex();
+    if (isPlacementBlocked(x, y, z) || overlapsPlayer(x, y, z, type)) return false;
+    return consumeSelectedAndPlace(x, y, z, type);
+  }
+  function placeSlabFromTarget(tg, def) {
+    const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
+    if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) return false;
+    let top;
+    if (tg.normal[1] === 1) top = false;        // 上面クリック → 下付き
+    else if (tg.normal[1] === -1) top = true;   // 下面クリック → 上付き
+    else {
+      // 側面クリック: 視線とクリック面の交点の高さで上下を決める（本家の挙動）
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      const useX = tg.normal[0] !== 0;
+      const plane = (useX ? tg.block[0] : tg.block[2]) + ((useX ? tg.normal[0] : tg.normal[2]) > 0 ? 1 : 0);
+      const o = useX ? player.pos.x : player.pos.z;
+      const dv = useX ? dir.x : dir.z;
+      let frac = 0.5;
+      if (Math.abs(dv) > 1e-6) frac = (player.pos.y + dir.y * ((plane - o) / dv)) - y;
+      top = frac >= 0.5;
+    }
+    const type = def.block + (top ? 1 : 0);
+    if (isPlacementBlocked(x, y, z) || overlapsPlayer(x, y, z, type)) return false;
+    return consumeSelectedAndPlace(x, y, z, type);
+  }
+
   function isInteractableBlock(type) {
     return isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type);
   }
@@ -191,6 +236,8 @@
 
   /* --- ブロックごとの適正ツール / 硬さ / 必要ツールレベル --- */
   function blockPreferredTool(type) {
+    if (isStairsBlock(type)) return (type < OAK_STAIRS + 4) ? 'axe' : 'pickaxe';       // 木=斧 / 石系=ツルハシ
+    if (isSlabBlock(type)) return (type < OAK_SLAB + 2) ? 'axe' : 'pickaxe';
     if ([STONE, DEEPSLATE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK].includes(type)) return 'pickaxe';
     if (isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type) || type === OAK_FENCE) return 'axe';
     if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN, OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_TRAPDOOR_CLOSED, OAK_TRAPDOOR_OPEN, OAK_FENCE, OAK_FENCE_GATE_Z_CLOSED, OAK_FENCE_GATE_Z_OPEN, OAK_FENCE_GATE_X_CLOSED, OAK_FENCE_GATE_X_OPEN].includes(type)) return 'axe';
@@ -214,6 +261,17 @@
     [OAK_FENCE, 1.0], [OAK_FENCE_GATE_Z_CLOSED, 1.0], [OAK_FENCE_GATE_Z_OPEN, 1.0], [OAK_FENCE_GATE_X_CLOSED, 1.0], [OAK_FENCE_GATE_X_OPEN, 1.0],
     [COBBLESTONE_WALL, 2.6],
   ]);
+  // 階段/ハーフブロックの硬さは元素材と同じ
+  for (let i = 0; i < 4; i++) {
+    BLOCK_HARDNESS.set(OAK_STAIRS + i, 1.8);
+    BLOCK_HARDNESS.set(OAK_STAIRS + 4 + i, 2.6);
+    BLOCK_HARDNESS.set(OAK_STAIRS + 8 + i, 2.6);
+  }
+  for (let i = 0; i < 2; i++) {
+    BLOCK_HARDNESS.set(OAK_SLAB + i, 1.8);
+    BLOCK_HARDNESS.set(OAK_SLAB + 2 + i, 2.6);
+    BLOCK_HARDNESS.set(OAK_SLAB + 4 + i, 2.6);
+  }
   // 掘ってもドロップしない（必要ツールレベル未満）判定。tier: 1木 2石 3鉄 4ダイヤ
   function requiredToolTier(type) {
     if ([IRON_ORE, IRON_BLOCK].includes(type)) return 2;            // 鉄鉱石/鉄ブロック: 石ツルハシ以上
@@ -492,6 +550,8 @@
     if (def && def.food) { eatSelectedFood(); return; }
     if (tg && def && def.id === 'oak_door') { placeDoorFromTarget(tg); return; }
     if (tg && def && def.id === 'oak_fence_gate') { placeFenceGateFromTarget(tg); return; }
+    if (tg && def && def.stairs) { placeStairsFromTarget(tg, def); return; }
+    if (tg && def && def.slab) { placeSlabFromTarget(tg, def); return; }
     // ブロック設置
     if (!tg || !def || def.block == null) { if (def && def.block == null) thock(90); return; }
     const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];

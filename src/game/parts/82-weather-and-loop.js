@@ -272,6 +272,15 @@
     },
     // 採掘時間の確認（岩盤=Infinity 期待）。t はブロックID
     miningTimeOf: (t) => ({ type: TYPES[t] && TYPES[t].name, time: miningTime(t) }),
+    // 階段の設置方位テスト: 現在の視線の水平方位（0=-z 1=+x 2=+z 3=-x）
+    stairFacing: () => horizontalFacingIndex(),
+    // ブロックのドロップと形状の確認: id → { name, drops:[[item,n]], model, collision }
+    blockInfo: (t) => ({
+      name: TYPES[t] && TYPES[t].name,
+      drops: (typeof blockDrops === 'function') ? blockDrops(t) : null,
+      modelParts: TYPES[t] && TYPES[t].model ? TYPES[t].model.length : 0,
+      collisionBoxes: TYPES[t] && TYPES[t].collisionBoxes ? TYPES[t].collisionBoxes.length : (TYPES[t] && TYPES[t].solid === false ? 0 : 1),
+    }),
     // 任意座標で爆発（岩盤の爆発耐性テスト用）
     explodeAtXYZ: (x, y, z, power = 3) => { explodeAt(x, y, z, power); return { x, y, z, power }; },
     // ライトエンジン確認: 任意ブロックを近くに設置（松明の光テスト等。t はブロックID）

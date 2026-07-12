@@ -17,6 +17,13 @@
     brick:          { name: 'レンガ', cat: 'block', block: BRICK },
     snow:           { name: '雪', cat: 'block', block: SNOW },
     stone_brick:    { name: '石レンガ', cat: 'block', block: STONE_BRICK },
+    // 階段/ハーフブロック（block は基準バリアント。設置時に向き/上下を確定する）
+    oak_stairs:         { name: '木の階段', cat: 'block', block: OAK_STAIRS, stairs: true, fuel: 1.5 },
+    cobblestone_stairs: { name: '丸石の階段', cat: 'block', block: OAK_STAIRS + 4, stairs: true },
+    stone_brick_stairs: { name: '石レンガの階段', cat: 'block', block: OAK_STAIRS + 8, stairs: true },
+    oak_slab:           { name: '木のハーフブロック', cat: 'block', block: OAK_SLAB, slab: true, fuel: 0.75 },
+    cobblestone_slab:   { name: '丸石のハーフブロック', cat: 'block', block: OAK_SLAB + 2, slab: true },
+    stone_brick_slab:   { name: '石レンガのハーフブロック', cat: 'block', block: OAK_SLAB + 4, slab: true },
     torch:          { name: '松明', cat: 'block', block: TORCH },
     crafting_table: { name: '作業台', cat: 'block', block: CRAFTING_TABLE, fuel: 1.5 },
     furnace:        { name: 'かまど', cat: 'block', block: FURNACE },
@@ -92,6 +99,17 @@
   // 名前付きIDにない設置可能ブロック（和風建材など）も、採掘したら持てるよう自動登録する
   const ITEM_FOR_BLOCK = [];
   for (const [id, def] of Object.entries(ITEM_DEFS)) if (def.block != null) ITEM_FOR_BLOCK[def.block] = id;
+  // 階段/ハーフの全バリアント → 親アイテム（どの向きを壊しても同じアイテムをドロップ）
+  for (let i = 0; i < 4; i++) {
+    ITEM_FOR_BLOCK[OAK_STAIRS + i] = 'oak_stairs';
+    ITEM_FOR_BLOCK[OAK_STAIRS + 4 + i] = 'cobblestone_stairs';
+    ITEM_FOR_BLOCK[OAK_STAIRS + 8 + i] = 'stone_brick_stairs';
+  }
+  for (let i = 0; i < 2; i++) {
+    ITEM_FOR_BLOCK[OAK_SLAB + i] = 'oak_slab';
+    ITEM_FOR_BLOCK[OAK_SLAB + 2 + i] = 'cobblestone_slab';
+    ITEM_FOR_BLOCK[OAK_SLAB + 4 + i] = 'stone_brick_slab';
+  }
   for (let b = 0; b < TYPES.length; b++) {
     if (ITEM_FOR_BLOCK[b] || !TYPES[b] || TYPES[b].solid === false || TYPES[b].noAutoItem) continue;
     const id = `block_${b}`;
