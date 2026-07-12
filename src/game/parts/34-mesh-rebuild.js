@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 11; // 9-11: ライトエンジン（頂点属性 sky/block 2チャンネル焼き込み）
+  const MESH_WORKER_VERSION = 12; // 9-12: ライトエンジン（sky/block 2ch焼き込み + スムースライティング/AO）
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {

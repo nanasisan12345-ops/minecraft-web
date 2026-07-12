@@ -700,6 +700,63 @@ function sampleFaceLight(x, y, z) {
   return [BRIGHT[getLight(0, x, y, z)], BRIGHT[getLight(1, x, y, z)]];
 }
 
+/* ==== スムースライティング + AO（本家式。キューブ面のみ。モデルパーツは自セルのフラット） ====
+   面の4頂点それぞれについて、空気側セル層の「頂点を共有する4セル」（自セル+側面2+角1）の光を平均し、
+   側面/角の遮蔽数から AO 段階(0-3)を出して係数を掛ける。side1&&side2 のとき角は見えないので除外し AO=3。 */
+const AO_MUL = [1.0, 0.8, 0.65, 0.5];
+let SAMPLE_CACHE = null; // ビルド内のセルサンプルメモ（同じセルを最大12頂点が参照する）
+// 戻り値はパック整数: sky(0-15) | blk<<4 | opaque<<8（Mapへのオブジェクト格納を避けて高速化）
+function cellSample(x, y, z) {
+  const w = LGT.w;
+  const ix = x - LGT.x0, iz = z - LGT.z0;
+  if (ix < 0 || ix >= w || iz < 0 || iz >= w || y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) {
+    return y > heightAt(x, z) ? 15 : 0; // 域外は高さだけで近似（チャンク端の頂点のみ到達）
+  }
+  const key = (ix * w + iz) * 400 + (y - CHUNK_Y_MIN);
+  let pk = SAMPLE_CACHE.get(key);
+  if (pk !== undefined) return pk;
+  const c = LGT.cols[ix * w + iz];
+  let s, b;
+  if (y > c.top) { s = 15; b = 0; }
+  else if (y < c.y0) { s = 0; b = 0; }
+  else { const i = y - c.y0; s = c.sky[i]; b = c.blk[i]; }
+  pk = s | (b << 4) | (lightOpaqueVal(lightColValAt(c, x, y, z)) ? 256 : 0);
+  SAMPLE_CACHE.set(key, pk);
+  return pk;
+}
+function vertexLightAO(ax, ay, az, dx1, dy1, dz1, dx2, dy2, dz2, out, oi) {
+  const p0 = cellSample(ax, ay, az);
+  const p1 = cellSample(ax + dx1, ay + dy1, az + dz1);
+  const p2 = cellSample(ax + dx2, ay + dy2, az + dz2);
+  const o1 = p1 & 256, o2 = p2 & 256;
+  let s = BRIGHT[p0 & 15], b = BRIGHT[(p0 >> 4) & 15], n = 1, ao;
+  if (o1 && o2) {
+    ao = 3; // 両側面が塞がっていると角は見えない
+  } else {
+    const p3 = cellSample(ax + dx1 + dx2, ay + dy1 + dy2, az + dz1 + dz2);
+    const o3 = p3 & 256;
+    ao = (o1 ? 1 : 0) + (o2 ? 1 : 0) + (o3 ? 1 : 0);
+    if (!o3) { s += BRIGHT[p3 & 15]; b += BRIGHT[(p3 >> 4) & 15]; n++; }
+  }
+  if (!o1) { s += BRIGHT[p1 & 15]; b += BRIGHT[(p1 >> 4) & 15]; n++; }
+  if (!o2) { s += BRIGHT[p2 & 15]; b += BRIGHT[(p2 >> 4) & 15]; n++; }
+  const m = AO_MUL[ao] / n;
+  out[oi] = s * m;
+  out[oi + 1] = b * m;
+}
+// 面ごと・頂点ごとの接線方向オフセット [dx1,dy1,dz1,dx2,dy2,dz2] を事前計算（頂点単位の配列生成を避ける）
+const FACE_CORNERS = FACE_DEFS.map(fd => {
+  const nAxis = fd.n[0] !== 0 ? 0 : fd.n[1] !== 0 ? 1 : 2;
+  const t = [0, 1, 2].filter(a => a !== nAxis);
+  return fd.v.map(p => {
+    const d1 = [0, 0, 0], d2 = [0, 0, 0];
+    d1[t[0]] = p[t[0]] === 1 ? 1 : -1;
+    d2[t[1]] = p[t[1]] === 1 ? 1 : -1;
+    return [d1[0], d1[1], d1[2], d2[0], d2[1], d2[2]];
+  });
+});
+const SB8 = new Float64Array(8); // addBlockFaceToState 用の頂点光スクラッチ
+
 function occludes(x, y, z, self) {
   const nt = blockAtStack(x, y, z);
   if (nt === undefined) return false;
@@ -726,24 +783,37 @@ function makeMeshBuildState() {
 }
 
 const FULL_LIGHT = [1, 0];
-function addQuadToState(state, verts, normal, uvCoords, mat = 0, sb = FULL_LIGHT) {
+// sb: 長さ2=[s,b]（4頂点共通のフラット、モデルパーツ用） / 長さ8=頂点ごと（スムースライティング）。
+// flip=true で四角形の対角分割を反転（AO異方性のチェッカーボード対策）
+function addQuadToState(state, verts, normal, uvCoords, mat = 0, sb = FULL_LIGHT, flip = false) {
   const group = state.positions.length === 1 ? 0 : Math.max(0, Math.min(state.positions.length - 1, mat | 0));
   const pos = state.positions[group], norm = state.normals[group], uv = state.uvs[group], idx = state.indices[group];
   const lig = state.lights[group];
   const base = pos.length / 3;
-  for (const p of verts) {
+  const perVertex = sb.length === 8;
+  for (let i = 0; i < verts.length; i++) {
+    const p = verts[i];
     pos.push(p[0], p[1], p[2]);
     norm.push(normal[0], normal[1], normal[2]);
-    lig.push(sb[0], sb[1]);
+    if (perVertex) lig.push(sb[i * 2], sb[i * 2 + 1]);
+    else lig.push(sb[0], sb[1]);
   }
   uv.push(...uvCoords);
-  idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  if (flip) idx.push(base + 1, base + 2, base + 3, base + 1, base + 3, base);
+  else idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
 function addBlockFaceToState(state, x, y, z, f) {
-  const fd = FACE_DEFS[f];
-  const rgb = sampleFaceLight(x + fd.n[0], y + fd.n[1], z + fd.n[2]);
-  addQuadToState(state, fd.v.map(p => [x + p[0], y + p[1], z + p[2]]), fd.n, fd.uv, fd.m, rgb);
+  const fd = FACE_DEFS[f], corners = FACE_CORNERS[f];
+  const ax = x + fd.n[0], ay = y + fd.n[1], az = z + fd.n[2];
+  for (let i = 0; i < 4; i++) {
+    const c = corners[i];
+    vertexLightAO(ax, ay, az, c[0], c[1], c[2], c[3], c[4], c[5], SB8, i * 2);
+  }
+  // 明暗差が小さい対角で三角形を分割する
+  const t0 = SB8[0] + SB8[1], t1 = SB8[2] + SB8[3], t2 = SB8[4] + SB8[5], t3 = SB8[6] + SB8[7];
+  const flip = Math.abs(t0 - t2) > Math.abs(t1 - t3);
+  addQuadToState(state, fd.v.map(p => [x + p[0], y + p[1], z + p[2]]), fd.n, fd.uv, fd.m, SB8, flip);
 }
 
 function addBoxPartToState(state, x, y, z, part, rgb) {
@@ -813,6 +883,7 @@ function buildChunkState(cx, cz) {
   COL_CACHE = new Map();
   STACK_CACHE = new Map();
   computeLighting(cx, cz);
+  SAMPLE_CACHE = new Map();
   const build = makeMeshBuildState();
   const x0 = cx * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
   const x1 = x0 + CHUNK_SIZE - 1, z1 = z0 + CHUNK_SIZE - 1;
