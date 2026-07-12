@@ -694,11 +694,10 @@ function computeLighting(cx, cz) {
   propagateLight(1, bq);
 }
 
-// 面が接する空気側セルの光 → 頂点カラー（ブロックライトは松明色の暖色に寄せる）
+// 面が接する空気側セルの光 → 頂点属性 [空チャンネル輝度, ブロック光チャンネル輝度]。
+// 暖色化と max 合成はシェーダー側（24-instanced-meshes.js の applyChunkLightShader）で行う
 function sampleFaceLight(x, y, z) {
-  const s = BRIGHT[getLight(0, x, y, z)];
-  const b = BRIGHT[getLight(1, x, y, z)];
-  return [Math.max(s, b), Math.max(s, b * 0.85), Math.max(s, b * 0.62)];
+  return [BRIGHT[getLight(0, x, y, z)], BRIGHT[getLight(1, x, y, z)]];
 }
 
 function occludes(x, y, z, self) {
@@ -719,23 +718,23 @@ function makeMeshBuildState() {
       positions: Array.from({ length: groupCount }, () => []),
       normals: Array.from({ length: groupCount }, () => []),
       uvs: Array.from({ length: groupCount }, () => []),
-      colors: Array.from({ length: groupCount }, () => []),
+      lights: Array.from({ length: groupCount }, () => []),
       indices: Array.from({ length: groupCount }, () => []),
       blocks: 0,
     };
   });
 }
 
-const WHITE_LIGHT = [1, 1, 1];
-function addQuadToState(state, verts, normal, uvCoords, mat = 0, rgb = WHITE_LIGHT) {
+const FULL_LIGHT = [1, 0];
+function addQuadToState(state, verts, normal, uvCoords, mat = 0, sb = FULL_LIGHT) {
   const group = state.positions.length === 1 ? 0 : Math.max(0, Math.min(state.positions.length - 1, mat | 0));
   const pos = state.positions[group], norm = state.normals[group], uv = state.uvs[group], idx = state.indices[group];
-  const col = state.colors[group];
+  const lig = state.lights[group];
   const base = pos.length / 3;
   for (const p of verts) {
     pos.push(p[0], p[1], p[2]);
     norm.push(normal[0], normal[1], normal[2]);
-    col.push(rgb[0], rgb[1], rgb[2]);
+    lig.push(sb[0], sb[1]);
   }
   uv.push(...uvCoords);
   idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
@@ -830,35 +829,35 @@ function buildChunkState(cx, cz) {
 }
 
 function packTypeState(state) {
-  let positionCount = 0, normalCount = 0, uvCount = 0, colorCount = 0, indexCount = 0;
+  let positionCount = 0, normalCount = 0, uvCount = 0, lightCount = 0, indexCount = 0;
   for (let g = 0; g < state.positions.length; g++) {
     positionCount += state.positions[g].length;
     normalCount += state.normals[g].length;
     uvCount += state.uvs[g].length;
-    colorCount += state.colors[g].length;
+    lightCount += state.lights[g].length;
     indexCount += state.indices[g].length;
   }
   const positions = new Float32Array(positionCount);
   const normals = new Float32Array(normalCount);
   const uvs = new Float32Array(uvCount);
-  const colors = new Float32Array(colorCount);
+  const lights = new Float32Array(lightCount);
   const indices = new Uint32Array(indexCount);
   const groups = [];
-  let po = 0, no = 0, uo = 0, co = 0, io = 0, vertexOffset = 0;
+  let po = 0, no = 0, uo = 0, lo = 0, io = 0, vertexOffset = 0;
   for (let g = 0; g < state.positions.length; g++) {
     const gp = state.positions[g];
     if (!gp.length) continue;
-    const gn = state.normals[g], gu = state.uvs[g], gc = state.colors[g], gi = state.indices[g];
+    const gn = state.normals[g], gu = state.uvs[g], gl = state.lights[g], gi = state.indices[g];
     positions.set(gp, po);
     normals.set(gn, no);
     uvs.set(gu, uo);
-    colors.set(gc, co);
+    lights.set(gl, lo);
     for (let i = 0; i < gi.length; i++) indices[io + i] = gi[i] + vertexOffset;
     groups.push({ start: io, count: gi.length, material: g });
     po += gp.length;
     no += gn.length;
     uo += gu.length;
-    co += gc.length;
+    lo += gl.length;
     io += gi.length;
     vertexOffset += gp.length / 3;
   }
@@ -866,7 +865,7 @@ function packTypeState(state) {
     positions: positions.buffer,
     normals: normals.buffer,
     uvs: uvs.buffer,
-    colors: colors.buffer,
+    lights: lights.buffer,
     indices: indices.buffer,
     groups,
     blocks: state.blocks,
@@ -949,7 +948,7 @@ self.onmessage = (ev) => {
       }
     }
     const transfers = [];
-    for (const part of packed.parts) transfers.push(part.positions, part.normals, part.uvs, part.colors, part.indices);
+    for (const part of packed.parts) transfers.push(part.positions, part.normals, part.uvs, part.lights, part.indices);
     self.postMessage({ id: msg.id, packed, ms, probeLight }, transfers);
   } catch (err) {
     self.postMessage({ id: msg.id, error: err && err.message ? err.message : String(err) });

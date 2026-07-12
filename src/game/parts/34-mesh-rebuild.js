@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 10; // 9-10: ライトエンジン（頂点カラー焼き込み）を追加・高速化
+  const MESH_WORKER_VERSION = 11; // 9-11: ライトエンジン（頂点属性 sky/block 2チャンネル焼き込み）
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {
@@ -55,7 +55,7 @@
         positions: Array.from({ length: groupCount }, () => []),
         normals: Array.from({ length: groupCount }, () => []),
         uvs: Array.from({ length: groupCount }, () => []),
-        colors: Array.from({ length: groupCount }, () => []),
+        lights: Array.from({ length: groupCount }, () => []),
         indices: Array.from({ length: groupCount }, () => []),
         blocks: 0,
       };
@@ -81,20 +81,19 @@
     return open;
   }
   function mainFaceLight(x, y, z) {
-    const v = mainSkyOpen(x, y, z) ? 1 : 0.08;
-    return [v, v, v];
+    return [mainSkyOpen(x, y, z) ? 1 : 0.08, 0];
   }
 
-  const WHITE_LIGHT = [1, 1, 1];
-  function addQuadToState(state, verts, normal, uvCoords, mat = 0, rgb = WHITE_LIGHT) {
+  const FULL_LIGHT = [1, 0];
+  function addQuadToState(state, verts, normal, uvCoords, mat = 0, sb = FULL_LIGHT) {
     const group = state.positions.length === 1 ? 0 : Math.max(0, Math.min(state.positions.length - 1, mat | 0));
     const pos = state.positions[group], norm = state.normals[group], uv = state.uvs[group], idx = state.indices[group];
-    const col = state.colors[group];
+    const lig = state.lights[group];
     const base = pos.length / 3;
     for (const p of verts) {
       pos.push(p[0], p[1], p[2]);
       norm.push(normal[0], normal[1], normal[2]);
-      col.push(rgb[0], rgb[1], rgb[2]);
+      lig.push(sb[0], sb[1]);
     }
     uv.push(...uvCoords);
     idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
@@ -170,24 +169,24 @@
 
   function buildGeometry(state) {
     const geo = new THREE.BufferGeometry();
-    const pos = [], norm = [], uv = [], col = [], idx = [];
+    const pos = [], norm = [], uv = [], lig = [], idx = [];
     for (let g = 0; g < state.positions.length; g++) {
       const gp = state.positions[g];
       if (!gp.length) continue;
       const vertexOffset = pos.length / 3;
       const indexStart = idx.length;
       for (let i = 0; i < gp.length; i++) pos.push(gp[i]);
-      const gn = state.normals[g], guv = state.uvs[g], gc = state.colors[g], gi = state.indices[g];
+      const gn = state.normals[g], guv = state.uvs[g], gl = state.lights[g], gi = state.indices[g];
       for (let i = 0; i < gn.length; i++) norm.push(gn[i]);
       for (let i = 0; i < guv.length; i++) uv.push(guv[i]);
-      for (let i = 0; i < gc.length; i++) col.push(gc[i]);
+      for (let i = 0; i < gl.length; i++) lig.push(gl[i]);
       for (let i = 0; i < gi.length; i++) idx.push(gi[i] + vertexOffset);
       geo.addGroup(indexStart, gi.length, g);
     }
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setAttribute('mcLight', new THREE.Float32BufferAttribute(lig, 2));
     geo.setIndex(idx);
     geo.computeBoundingSphere();
     return geo;
@@ -204,10 +203,15 @@
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    // 頂点カラー（ライトエンジンの焼き込み）。旧バージョンのキャッシュには無いので白で埋める
-    const colSrc = part.colors ? asF32(part.colors) : null;
-    const col = colSrc && colSrc.length === pos.length ? colSrc : new Float32Array(pos.length).fill(1);
-    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    // ライトエンジンの焼き込み [sky, block]×頂点。欠けていたら「空100%」で埋める
+    const ligSrc = part.lights ? asF32(part.lights) : null;
+    const vtx = pos.length / 3;
+    let lig = ligSrc && ligSrc.length === vtx * 2 ? ligSrc : null;
+    if (!lig) {
+      lig = new Float32Array(vtx * 2);
+      for (let i = 0; i < vtx; i++) lig[i * 2] = 1;
+    }
+    geo.setAttribute('mcLight', new THREE.BufferAttribute(lig, 2));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     for (const g of part.groups || []) geo.addGroup(g.start, g.count, g.material);
     geo.computeBoundingSphere();
