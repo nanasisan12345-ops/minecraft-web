@@ -96,19 +96,10 @@
   function diePlayer() {
     SURVIVAL.dead = true;
     SURVIVAL.health = 0;
-    // Minecraft同様、持ち物は死んだ場所に散らばる（5分残る）。チェスト保管が大事になる
-    const dx = Math.floor(player.pos.x), dy = Math.max(CHUNK_Y_MIN + 2, Math.floor(player.pos.y)), dz = Math.floor(player.pos.z);
-    let dropped = 0;
-    for (let i = 0; i < INV_SIZE; i++) {
-      const s = INV[i];
-      if (!s) continue;
-      spawnItemDrop(dx, dy, dz, s.id, s.n, s.dur, 300);
-      INV[i] = null;
-      dropped++;
-    }
-    if (dropped > 0) invChanged();
+    // キープインベントリ方式（ユーザー要望による本家からの意図的な変更）:
+    // 死んでも持ち物・防具はドロップせず、リスポーン後もそのまま持っている
     deathScreen.querySelector('.death-detail').textContent =
-      `${lastDamageCause ? `死因: ${lastDamageCause}　` : ''}${dropped > 0 ? `持ち物は死んだ場所（XYZ ${dx} / ${dy} / ${dz}）に落ちている（約5分で消える）` : ''}`;
+      `${lastDamageCause ? `死因: ${lastDamageCause}　` : ''}持ち物はそのまま残っている`;
     deathScreen.classList.add('show');
     releasePointerForUi();
     if (typeof closeContainer === 'function') closeContainer();
