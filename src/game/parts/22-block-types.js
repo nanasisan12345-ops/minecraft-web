@@ -88,6 +88,8 @@
     { name: '木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 71
     { name: '開いた木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 72
     { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 73
+    { name: '岩盤', color: 0x333639, icon: T.bedrock, mats: faceMats(T.bedrock), noAutoItem: true, unbreakable: true }, // 74
+    { name: '深層岩', color: 0x4c4f55, icon: T.deepslate, mats: faceMats(T.deepslate) }, // 75
   ];
   const GRASS = 0, DIRT = 1, STONE = 2, LOG = 3, LEAVES = 4, SAND = 5, PLANKS = 6, BRICK = 7, GLASS = 8, WATER = 9, SNOW = 10;
   const COAL_ORE = 11, IRON_ORE = 12, GOLD_ORE = 13, DIAMOND_ORE = 14, TORCH = 15;
@@ -108,6 +110,7 @@
   const COBBLESTONE_WALL = 65;
   const OAK_DOOR_S_CLOSED = 66, OAK_DOOR_S_CLOSED_TOP = 67, OAK_DOOR_S_OPEN = 68, OAK_DOOR_S_OPEN_TOP = 69;
   const OAK_DOOR_W_CLOSED = 70, OAK_DOOR_W_CLOSED_TOP = 71, OAK_DOOR_W_OPEN = 72, OAK_DOOR_W_OPEN_TOP = 73;
+  const BEDROCK = 74, DEEPSLATE = 75; // ワールド最下層の岩盤（破壊不可）と深層の石。worker側の同名定数と一致させること
 
   // 発光ブロックの光レベル（本家準拠）。ライトエンジンが BFS 伝播して頂点カラーへ焼き込む
   TYPES[TORCH].lightLevel = 14;

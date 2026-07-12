@@ -191,7 +191,7 @@
 
   /* --- ブロックごとの適正ツール / 硬さ / 必要ツールレベル --- */
   function blockPreferredTool(type) {
-    if ([STONE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK].includes(type)) return 'pickaxe';
+    if ([STONE, DEEPSLATE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK].includes(type)) return 'pickaxe';
     if (isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type) || type === OAK_FENCE) return 'axe';
     if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN, OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_TRAPDOOR_CLOSED, OAK_TRAPDOOR_OPEN, OAK_FENCE, OAK_FENCE_GATE_Z_CLOSED, OAK_FENCE_GATE_Z_OPEN, OAK_FENCE_GATE_X_CLOSED, OAK_FENCE_GATE_X_OPEN].includes(type)) return 'axe';
     if ([DIRT, GRASS, SAND, SNOW, FARMLAND].includes(type)) return 'shovel';
@@ -200,7 +200,7 @@
   const BLOCK_HARDNESS = new Map([
     [LEAVES, 0.25], [TORCH, 0.1], [SNOW, 0.22], [DIRT, 0.6], [GRASS, 0.7], [SAND, 0.55],
     [LOG, 2.2], [PLANKS, 1.8], [CRAFTING_TABLE, 1.8], [BED, 0.9], [FARMLAND, 0.6],
-    [STONE, 2.4], [COBBLESTONE, 2.6], [BRICK, 2.8], [FURNACE, 3.0], [FURNACE_LIT, 3.0],
+    [STONE, 2.4], [DEEPSLATE, 4.8], [COBBLESTONE, 2.6], [BRICK, 2.8], [FURNACE, 3.0], [FURNACE_LIT, 3.0],
     [COAL_ORE, 3.0], [IRON_ORE, 3.4], [GOLD_ORE, 3.4], [DIAMOND_ORE, 4.0],
     [GLASS, 0.4], [GLOW_CRYSTAL, 1.2], [DRIPSTONE, 1.0],
     [STONE_BRICK, 2.6], [MOSSY_BRICK, 2.4], [CHEST, 1.8], [OPEN_CHEST, 1.4], [LANTERN, 0.4], [CACTUS, 0.5], [VILLAGE_SIGN, 0.7],
@@ -227,8 +227,9 @@
     if (!d || !d.tool || d.tool === 'sword') return null;
     return { id: s.id, tool: d.tool, tier: d.tier };
   }
-  // 破壊にかかる秒数。適正ツールを持っていると速い。
+  // 破壊にかかる秒数。適正ツールを持っていると速い。岩盤(unbreakable)は無限＝ゲージが進まない。
   function miningTime(type) {
+    if (TYPES[type] && TYPES[type].unbreakable) return Infinity;
     const base = isDoorBlock(type) ? 1.0 : (BLOCK_HARDNESS.get(type) || 1.2);
     const tool = blockPreferredTool(type);
     if (!tool) return Math.min(base, 1.2);
@@ -308,6 +309,7 @@
   }
   function finishBreak(tg) {
     const [x, y, z] = tg.block; const t = blockAt(x, y, z); if (t === undefined) return;
+    if (TYPES[t].unbreakable) return; // 岩盤はどの経路でも壊せない
     burst(x, y, z, TYPES[t].color);
     const tool = blockPreferredTool(t);
     const held = heldToolInfo();

@@ -9,6 +9,7 @@ const FACE_DEFS = [
 
 const GRASS = 0, DIRT = 1, STONE = 2, SAND = 5, WATER = 9, SNOW = 10;
 const COAL_ORE = 11, IRON_ORE = 12, GOLD_ORE = 13, DIAMOND_ORE = 14, LAVA = 24;
+const BEDROCK = 74, DEEPSLATE = 75; // 22-block-types.js の同名定数と一致させること
 const SEA = 8, SNOW_LINE = 30, ROCK_LINE = 23;
 const SPAWN_GROUND_Y = 12, SPAWN_FLAT_R = 28, SPAWN_CLEAR_R = 38;
 
@@ -386,10 +387,24 @@ function caveMouthAt(x, z, h) {
   return seam < 0.026 && hash2(Math.floor(x / 6), Math.floor(z / 6)) > 0.58;
 }
 
+// 岩盤: Y=-64 は全マス、-63〜-60 は上に行くほど薄くなるハッシュ混在（本家1.18風）。破壊不可
+function bedrockAt(x, y, z) {
+  if (y <= CHUNK_Y_MIN) return true;
+  const d = y - CHUNK_Y_MIN; // 1..4
+  if (d > 4) return false;
+  return hash2(x * 3.7 + y * 11.3, z * 5.1 - y * 7.7) < 1 - d * 0.2; // 80/60/40/20%
+}
+// 深層の基本石: y<0 は深層岩、y=0..8 は石との遷移帯（本家の深層岩帯）
+function baseStoneAt(x, y, z) {
+  if (y >= 8) return STONE;
+  if (y < 0) return DEEPSLATE;
+  return hash2(x * 2.3 - y * 3.1, z * 2.9 + y * 1.7) < (8 - y) / 9 ? DEEPSLATE : STONE;
+}
 function oreTypeAt(x, y, z, h) {
-  if (y >= h - 4 || y <= CHUNK_Y_MIN + 1) return STONE;
+  if (bedrockAt(x, y, z)) return BEDROCK;
+  if (y >= h - 4 || y <= CHUNK_Y_MIN + 1) return baseStoneAt(x, y, z);
   const speck = hash2(x * 3.17 + y * 0.91, z * 2.73 - y * 0.47);
-  if (speck < 0.73) return STONE;
+  if (speck < 0.73) return baseStoneAt(x, y, z);
   const vein = fbm3(x * 0.075 + 40, y * 0.115 - 17, z * 0.075 + 90, 3, 0.56);
   const broad = fbm3(x * 0.030 - 220, y * 0.045 + 180, z * 0.030 + 60, 2, 0.55);
   const oreBand = vein + broad * 0.45;
@@ -398,7 +413,7 @@ function oreTypeAt(x, y, z, h) {
   if (y <= 24 && oreBand > 0.40 - deep && speck > 0.915 - deep) return GOLD_ORE;
   if (y <= 44 && oreBand > 0.30 && speck > 0.84) return IRON_ORE;
   if (y <= h - 5 && oreBand > 0.20 && speck > 0.75) return COAL_ORE;
-  return STONE;
+  return baseStoneAt(x, y, z);
 }
 
 // 列（x,z）ごとに一度だけ計算する高価な情報。terrainBlockAt が Y ごとに
@@ -463,7 +478,10 @@ function blockAt(x, y, z) {
 function columnYRange(x, z) {
   const d = columnDesc(x, z);
   const h = d.h, wf = d.waterFeature;
-  const naturalMin = Math.max(CHUNK_Y_MIN, Math.min(h, SEA) - 24);
+  // 洞窟がありうる列（caveRegion > -0.20。境界の滑らかさぶん -0.26 まで余裕を持つ）は
+  // 最下層まで走査して深部の洞窟壁を欠けなく描画する。洞窟が生成されない列は
+  // 従来どおり浅く打ち切って走査コストを抑える（32-world-window.js 側と同じ規則）
+  const naturalMin = d.caveRegion > -0.26 ? CHUNK_Y_MIN : Math.max(CHUNK_Y_MIN, Math.min(h, SEA) - 24);
   const naturalMax = Math.min(CHUNK_Y_MAX, Math.max(h, SEA, wf && wf.fallTop != null ? wf.fallTop : h));
   const b = columnYBounds.get(xzKey(x, z));
   if (!b) return { min: naturalMin, max: naturalMax };
@@ -472,6 +490,10 @@ function columnYRange(x, z) {
 
 // 列ごとにブロック種を1回だけ計算して密な配列に詰める（0=空気, それ以外=種+1）。
 // メッシュ本体の走査も隣接面のオクルージョン判定も、この配列から読むだけになる。
+// 深層（従来の走査下限より下）のソリッドは UNRESOLVED を置き、種類の確定（鉱石ノイズ等）を
+// 「面が見えるセル」だけに遅延する。UNRESOLVED は透過表・モデル表の範囲外なので、
+// オクルージョン/ライト計算では自然に不透明ソリッドとして扱われる。
+const UNRESOLVED = 0x7fff;
 let STACK_CACHE = new Map();
 function columnStack(x, z) {
   const id = xzKey(x, z);
@@ -483,9 +505,17 @@ function columnStack(x, z) {
   const d = columnDesc(x, z);
   const n = Math.max(0, y1 - y0 + 1);
   const arr = new Int32Array(n);
+  const b = columnYBounds.get(id);
+  const deepCut = Math.min(d.h, SEA) - 24; // ここより下が「深層」
   for (let y = y0; y <= y1; y++) {
-    const idk = xyzKey(x, y, z);
     let t;
+    if (y < deepCut && (!b || y < b.min || y > b.max)) {
+      // 深層かつ明示ブロックの範囲外: 洞窟（空気）かどうかだけ確定する
+      const cave = !d.fuji && d.caveRegion > -0.20 && isCaveAt(x, y, z, d.h, d.caveRegion);
+      arr[y - y0] = cave ? 0 : UNRESOLVED;
+      continue;
+    }
+    const idk = xyzKey(x, y, z);
     const edit = explicitEdits.get(idk);
     if (edit < 0) t = undefined;
     else if (edit != null && edit >= 0) t = edit;
@@ -872,6 +902,7 @@ function addBlockToState(build, x, y, z, t) {
   }
   let added = false;
   for (let f = 0; f < FACE_DEFS.length; f++) {
+    if (f === 3 && y === CHUNK_Y_MIN) continue; // ワールド最下面（岩盤の底）は描かない
     if (!faceVisible(x, y, z, t, f)) continue;
     addBlockFaceToState(state, x, y, z, f);
     added = true;
@@ -891,9 +922,21 @@ function buildChunkState(cx, cz) {
     const s = columnStack(x, z);
     const y0 = s.y0, arr = s.arr;
     for (let i = 0; i < arr.length; i++) {
-      const v = arr[i];
+      let v = arr[i];
       if (v === 0) continue;
-      addBlockToState(build, x, y0 + i, z, v - 1);
+      const y = y0 + i;
+      if (v === UNRESOLVED) {
+        // 深層の遅延ソリッド: どこかの面が見える場合だけ種類（鉱石/深層岩/岩盤）を確定する
+        let vis = false;
+        for (let f = 0; f < FACE_DEFS.length && !vis; f++) {
+          if (f === 3 && y === CHUNK_Y_MIN) continue;
+          vis = faceVisible(x, y, z, -1, f);
+        }
+        if (!vis) continue;
+        v = oreTypeAt(x, y, z, columnDesc(x, z).h) + 1;
+        arr[i] = v; // 確定値を書き戻す（以後の参照はこの値）
+      }
+      addBlockToState(build, x, y, z, v - 1);
     }
   }
   return build;

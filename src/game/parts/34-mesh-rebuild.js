@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 12; // 9-12: ライトエンジン（sky/block 2ch焼き込み + スムースライティング/AO）
+  const MESH_WORKER_VERSION = 13; // 9-13: ライトエンジン + 岩盤/深層岩 + 深部洞窟の描画範囲拡張
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {
@@ -160,6 +160,7 @@
     }
     let added = false;
     for (let f = 0; f < FACE_DEFS.length; f++) {
+      if (f === 3 && y === CHUNK_Y_MIN) continue; // ワールド最下面（岩盤の底）は描かない
       if (!faceVisible(x, y, z, t, f)) continue;
       addBlockFaceToState(state, x, y, z, f);
       added = true;

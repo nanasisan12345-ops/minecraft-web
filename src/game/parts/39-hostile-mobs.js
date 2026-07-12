@@ -38,7 +38,7 @@
       const x = cx + dx, y = cy + dy, z = cz + dz;
       if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) continue;
       const t = blockAt(x, y, z);
-      if (t === undefined || t === WATER || t === LAVA) continue;
+      if (t === undefined || t === WATER || t === LAVA || TYPES[t].unbreakable) continue; // 岩盤は爆発でも壊れない
       if (t === TNT) { igniteTNT(x, y, z, rnd(0.1, 0.4)); continue; }   // 連鎖爆発
       if (dd > power - 0.8 && Math.random() < 0.45) continue;   // 外縁はまばらに残す
       if (Math.random() < 0.3) for (const [id, n] of blockDrops(t)) spawnItemDrop(x, y, z, id, n); // 3割だけ回収できる

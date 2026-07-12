@@ -49,9 +49,12 @@
     }
   }
   function columnYRange(x, z) {
-    const h = heightAt(x, z);
-    const wf = waterFeatureAt(x, z, h);
-    const naturalMin = Math.max(CHUNK_Y_MIN, Math.min(h, SEA) - 24);
+    const d = columnDescMain(x, z);
+    const h = d.h;
+    const wf = d.waterFeature;
+    // 洞窟がありうる列（caveRegion > -0.20。境界の滑らかさぶん -0.26 まで余裕を持つ）は
+    // 最下層まで走査して深部の洞窟壁を欠けなく描画する（world-mesh-worker.js 側と同じ規則）
+    const naturalMin = d.caveRegion > -0.26 ? CHUNK_Y_MIN : Math.max(CHUNK_Y_MIN, Math.min(h, SEA) - 24);
     const naturalMax = Math.min(CHUNK_Y_MAX, Math.max(h, SEA, wf && wf.fallTop != null ? wf.fallTop : h));
     const b = columnYBounds.get(columnKey(x, z));
     if (!b) return { min: naturalMin, max: naturalMax };
@@ -520,10 +523,25 @@
     }
   }
 
+  // 岩盤: Y=-64 は全マス、-63〜-60 は上に行くほど薄くなるハッシュ混在（本家1.18風）。破壊不可。
+  // world-mesh-worker.js の同名関数と必ず同一式に保つこと
+  function bedrockAt(x, y, z) {
+    if (y <= CHUNK_Y_MIN) return true;
+    const d = y - CHUNK_Y_MIN; // 1..4
+    if (d > 4) return false;
+    return hash2(x * 3.7 + y * 11.3, z * 5.1 - y * 7.7) < 1 - d * 0.2; // 80/60/40/20%
+  }
+  // 深層の基本石: y<0 は深層岩、y=0..8 は石との遷移帯（本家の深層岩帯）
+  function baseStoneAt(x, y, z) {
+    if (y >= 8) return STONE;
+    if (y < 0) return DEEPSLATE;
+    return hash2(x * 2.3 - y * 3.1, z * 2.9 + y * 1.7) < (8 - y) / 9 ? DEEPSLATE : STONE;
+  }
   function oreTypeAt(x, y, z, h) {
-    if (y >= h - 4 || y <= CHUNK_Y_MIN + 1) return STONE;
+    if (bedrockAt(x, y, z)) return BEDROCK;
+    if (y >= h - 4 || y <= CHUNK_Y_MIN + 1) return baseStoneAt(x, y, z);
     const speck = hash2(x * 3.17 + y * 0.91, z * 2.73 - y * 0.47);
-    if (speck < 0.73) return STONE;
+    if (speck < 0.73) return baseStoneAt(x, y, z);
     const vein = fbm3(x * 0.075 + 40, y * 0.115 - 17, z * 0.075 + 90, 3, 0.56);
     const broad = fbm3(x * 0.030 - 220, y * 0.045 + 180, z * 0.030 + 60, 2, 0.55);
     const oreBand = vein + broad * 0.45;
@@ -532,7 +550,7 @@
     if (y <= 24 && oreBand > 0.40 - deep && speck > 0.915 - deep) return GOLD_ORE;
     if (y <= 44 && oreBand > 0.30 && speck > 0.84) return IRON_ORE;
     if (y <= h - 5 && oreBand > 0.20 && speck > 0.75) return COAL_ORE;
-    return STONE;
+    return baseStoneAt(x, y, z);
   }
 
   const STRUCT_CELL = 38;

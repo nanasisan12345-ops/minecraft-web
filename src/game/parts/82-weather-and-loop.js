@@ -260,6 +260,20 @@
     equipArmor: (id = 'iron_armor') => { SAVE.armor = id ? mkItem(id) : null; markSaveDirty(); if (!CAMERA_VIEW.thirdPerson) toggleThirdPerson(); return { armor: SAVE.armor, thirdPerson: CAMERA_VIEW.thirdPerson }; },
     // バケツテスト: 足元近くに水源を1つ置き、そこから汲めるか確認
     bucketPlace: () => { const x = Math.floor(player.pos.x) + 2, z = Math.floor(player.pos.z); let y = Math.floor(player.pos.y); while (y > CHUNK_Y_MIN && !isSolid(x, y, z)) y--; const wy = y + 1; setEdit(key(x, wy, z), WATER); setBlock(x, wy, z, WATER); requestEditedBlockRebuild(x, wy, z); return { x, y: wy, z, placed: blockAt(x, wy, z) === WATER }; },
+    // 岩盤/深層岩の確認: 現在地の列の Y=-58〜-64 のブロック名を返す
+    bedrockScan: (dx = 0, dz = 0) => {
+      const x = Math.floor(player.pos.x) + dx, z = Math.floor(player.pos.z) + dz;
+      const out = {};
+      for (let y = -58; y >= CHUNK_Y_MIN; y--) {
+        const t = blockAt(x, y, z);
+        out[y] = t == null ? 'air' : TYPES[t].name;
+      }
+      return out;
+    },
+    // 採掘時間の確認（岩盤=Infinity 期待）。t はブロックID
+    miningTimeOf: (t) => ({ type: TYPES[t] && TYPES[t].name, time: miningTime(t) }),
+    // 任意座標で爆発（岩盤の爆発耐性テスト用）
+    explodeAtXYZ: (x, y, z, power = 3) => { explodeAt(x, y, z, power); return { x, y, z, power }; },
     // ライトエンジン確認: 任意ブロックを近くに設置（松明の光テスト等。t はブロックID）
     placeAt: (t = TORCH, dx = 2, dy = 0, dz = 0) => {
       const x = Math.floor(player.pos.x) + dx, z = Math.floor(player.pos.z) + dz;

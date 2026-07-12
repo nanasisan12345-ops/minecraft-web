@@ -7,6 +7,7 @@
     grass_block:    { name: '草ブロック', cat: 'block', block: GRASS },
     dirt:           { name: '土', cat: 'block', block: DIRT },
     stone:          { name: '石', cat: 'block', block: STONE },
+    deepslate:      { name: '深層岩', cat: 'block', block: DEEPSLATE },
     cobblestone:    { name: '丸石', cat: 'block', block: COBBLESTONE },
     sand:           { name: '砂', cat: 'block', block: SAND },
     log:            { name: '丸太', cat: 'block', block: LOG, fuel: 1.5 },
