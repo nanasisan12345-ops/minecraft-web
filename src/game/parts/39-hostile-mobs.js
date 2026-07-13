@@ -43,7 +43,6 @@
       if (dd > power - 0.8 && Math.random() < 0.45) continue;   // 外縁はまばらに残す
       if (Math.random() < 0.3) for (const [id, n] of blockDrops(t)) spawnItemDrop(x, y, z, id, n); // 3割だけ回収できる
       if (typeof clearCropAt === 'function') clearCropAt(x, y, z);
-      if (typeof unregisterPlacedLight === 'function') unregisterPlacedLight(x, y, z);
       setEdit(key(x, y, z), -1); setBlock(x, y, z, null);
       touched.push([x, y, z]);
     }
@@ -139,14 +138,6 @@
     }
     return null;
   }
-  // 頭上がブロックで塞がっているか（=空が見えない暗い場所か）。
-  // heightAt は峡谷や洞窟のくり抜きを反映しないため、実ブロックを上へ走査して判定する。
-  function isCoveredFromSky(x, y, z) {
-    const top = Math.min(CHUNK_Y_MAX, y + 48);
-    for (let yy = y + 1; yy <= top; yy++) if (isSolid(x, yy, z)) return true;
-    return false;
-  }
-
   /* --- スポーン --- */
   let mobSpawnClock = 4;
   function mobCounts() {
@@ -176,7 +167,16 @@
     const h = heightAt(x, z), top = topTypeAt(x, z, h);
     if (top === WATER || typeof waterFeatureAt === 'function' && waterFeatureAt(x, z, h)) return false;
     if (hasBlock(x, h + 1, z) || hasBlock(x, h + 2, z)) return false;
-    if (nearPlacedLight(x, h + 1, z, 8)) return false;
+    return true;
+  }
+  // 本家準拠の湧き光量ゲート: 湧きセルの blocklight=0 が必須。空(sky)が差す明るい場所は
+  // 夜のみ許可（暗い屋内・洞窟は昼夜問わず可）。ワーカーが焼いた実ライトを使い、
+  // データ未取得（未メッシュ）のチャンクは保守的に湧かせない。
+  function spawnLightAllows(x, y, z) {
+    const L = (typeof bakedLightAt === 'function') ? bakedLightAt(x, y, z) : null;
+    if (!L) return false;
+    if (L.blk > 0) return false;
+    if (L.sky > 7 && DAY.label !== '夜') return false;
     return true;
   }
   function trySpawnMobs() {
@@ -185,32 +185,28 @@
     const px = Math.floor(player.pos.x), py = Math.floor(player.pos.y), pz = Math.floor(player.pos.z);
     const surfaceH = heightAt(px, pz);
     const underground = py < surfaceH - 6;
-    const isNight = DAY.label === '夜';
-    // 地上が満員 or（地上でも地下でも湧く条件が無い）なら早期に抜ける
-    if (!isNight && !underground) return;                 // 昼の地上では湧かない
     let spawned = 0;                                       // このサイクルで湧かせた数（上限あり）
     for (let tries = 0; tries < 12 && spawned < MOB_SPAWN_PER_CYCLE; tries++) {
       const a = Math.random() * Math.PI * 2, r = rnd(MOB_SPAWN_MIN_R + 2, MOB_SPAWN_MAX_R);
       const x = Math.floor(player.pos.x + Math.cos(a) * r), z = Math.floor(player.pos.z + Math.sin(a) * r);
       if (Math.hypot(x - player.pos.x, z - player.pos.z) < MOB_SPAWN_MIN_R) continue;
       if (underground && counts.cave < MOB_CAVE_MAX && Math.random() < 0.7) {
-        // 洞窟スポーン: プレイヤーの高さ付近の空洞を探す。
-        // 「地形高さより深い」だけでなく「頭上が塞がって空が見えない」ことも必須。
-        // これで峡谷の底や谷底のような、昼間は明るい窪地には湧かない。
+        // 洞窟スポーン: プレイヤーの高さ付近の空洞の床を探す。
+        // 湧きセル（床の1つ上）のブロック光=0 が必須。松明を並べれば blocklight で止まる。
         const gy = mobGroundY(x, z, py + rnd(-6, 6));
         if (gy == null || gy >= heightAt(x, z) - 6) continue;
-        if (!isCoveredFromSky(x, gy + 2, z)) continue;
-        if (nearPlacedLight(x, gy + 1, z, 8)) continue;
+        if (!spawnLightAllows(x, gy + 1, z)) continue;
         const roll = Math.random();
         const kind = roll < 0.4 ? 'slime' : roll < 0.65 ? 'skeleton' : roll < 0.85 ? 'zombie' : 'creeper';
         spawnMobAt(kind, x, gy, z, true);
         counts.cave++; spawned++;
         continue;
       }
-      // 地上スポーン: 夜のみ
-      if (!isNight || counts.surface >= MOB_SURFACE_MAX) continue;
+      // 地上スポーン: 明るさで判定（空が差す露天は夜のみ／暗ければ日陰・屋内でも湧く）。
+      if (counts.surface >= MOB_SURFACE_MAX) continue;
       if (!canSpawnSurfaceMobAt(x, z)) continue;
       const h = heightAt(x, z);
+      if (!spawnLightAllows(x, h + 1, z)) continue;
       const swamp = typeof biomeAt === 'function' && biomeAt(x, z).id === 'swamp';
       const roll = Math.random();
       const kind = swamp && roll < 0.4 ? 'slime' : roll < 0.4 ? 'zombie' : roll < 0.62 ? 'skeleton' : roll < 0.82 ? 'creeper' : 'slime';
@@ -338,7 +334,10 @@
     // 日光による焼失（本家と同じ）。朝〜昼に、空が見える場所にいるゾンビ/スケルトンは
     // 炎に包まれて数秒で燃え尽きる。屋根や洞窟など日陰にいれば生き延びる。
     if ((u.kind === 'zombie' || u.kind === 'skeleton') && !u.cave && (DAY.label === '朝' || DAY.label === '昼')) {
-      const exposed = !isCoveredFromSky(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
+      // 本家準拠: 昼に「空が直に当たる（skylight>=14）」場所のゾンビ/スケルトンだけ燃える。
+      // 屋根の下・日陰・洞窟（sky<14）は燃えない。光データ未取得なら燃やさない（保守的）。
+      const L = (typeof bakedLightAt === 'function') ? bakedLightAt(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z)) : null;
+      const exposed = !!L && L.sky >= 14;
       if (exposed) {
         u.burn += dt;
         // 燃えている間は継続的に炎の粒子を上げる

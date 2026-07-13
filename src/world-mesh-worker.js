@@ -1040,12 +1040,37 @@ function loadPayload(payload) {
   for (let i = 0; i < blocked.length; i += 2) blockedColumns.add(xzKey(blocked[i], blocked[i + 1]));
 }
 
+// 直近の computeLighting(=LGT) から、対象チャンク(16x16列)の焼き込み済み光値を取り出し、
+// メインスレッドがモブ湧き判定に使えるコンパクトなグリッドにする。
+// 各セル1バイト = (sky<<4 | blk)。y0..y1 は当チャンク列の光域の和集合。
+function extractChunkLight(cx, cz) {
+  const x0 = cx * CHUNK_SIZE, z0 = cz * CHUNK_SIZE;
+  let y0 = Infinity, y1 = -Infinity;
+  for (let x = x0; x < x0 + CHUNK_SIZE; x++) for (let z = z0; z < z0 + CHUNK_SIZE; z++) {
+    const c = LGT.cols[(x - LGT.x0) * LGT.w + (z - LGT.z0)];
+    if (c.y0 < y0) y0 = c.y0;
+    if (c.top > y1) y1 = c.top;
+  }
+  if (!isFinite(y0) || y1 < y0) { y0 = 0; y1 = 0; }
+  const h = y1 - y0 + 1;
+  const data = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * h);
+  for (let y = y0; y <= y1; y++) {
+    const yo = (y - y0) * (CHUNK_SIZE * CHUNK_SIZE);
+    for (let x = x0; x < x0 + CHUNK_SIZE; x++) for (let z = z0; z < z0 + CHUNK_SIZE; z++) {
+      const sky = getLight(0, x, y, z), blk = getLight(1, x, y, z);
+      data[yo + (x - x0) * CHUNK_SIZE + (z - z0)] = ((sky > 15 ? 15 : sky) << 4) | (blk > 15 ? 15 : blk);
+    }
+  }
+  return { x0, z0, y0, y1, data: data.buffer };
+}
+
 self.onmessage = (ev) => {
   const msg = ev.data || {};
   try {
     const t0 = performance.now();
     loadPayload(msg.payload || {});
     const packed = packBuildState(buildChunkState(msg.payload.cx, msg.payload.cz));
+    packed.light = extractChunkLight(msg.payload.cx, msg.payload.cz);
     const ms = performance.now() - t0;
     let probeLight = null;
     const pr = msg.payload.probe;
@@ -1063,6 +1088,7 @@ self.onmessage = (ev) => {
     }
     const transfers = [];
     for (const part of packed.parts) transfers.push(part.positions, part.normals, part.uvs, part.lights, part.indices);
+    if (packed.light && packed.light.data) transfers.push(packed.light.data);
     self.postMessage({ id: msg.id, packed, ms, probeLight }, transfers);
   } catch (err) {
     self.postMessage({ id: msg.id, error: err && err.message ? err.message : String(err) });

@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 13; // 9-13: ライトエンジン + 岩盤/深層岩 + 深部洞窟の描画範囲拡張
+  const MESH_WORKER_VERSION = 15; // 9-13: ライト+岩盤/深層岩/深部洞窟。14: packed.light。15: はしご/板ガラス/看板モデル追加
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {
@@ -30,6 +30,20 @@
   // 並列ワーカーやキャッシュヒットが同一フレームに大量のジオメトリ生成を持ち込むと
   // メインスレッドがカクつくため、完成メッシュはキューに積んでフレームあたり時間予算で貼る。
   const meshApplyQueue = [];
+  // ワーカーが焼いた光値(sky/blk)を chunkKey ごとに保持（fresh/cache 両経路で更新）。
+  // モブの湧き判定・日光燃焼が bakedLightAt() 経由で参照する。
+  const CHUNK_LIGHT = new Map(); // chunkKey -> { x0, z0, y0, y1, data:Uint8Array((sky<<4|blk)/cell) }
+  // 焼き込み済みブロック光を返す。データ未取得なら null（呼び出し側は保守的に扱う）。
+  function bakedLightAt(x, y, z) {
+    x = Math.floor(x); y = Math.floor(y); z = Math.floor(z);
+    const g = CHUNK_LIGHT.get(chunkKey(chunkCoord(x), chunkCoord(z)));
+    if (!g) return null;
+    if (y < g.y0 || y > g.y1) return null;
+    const lx = x - g.x0, lz = z - g.z0;
+    if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE) return null;
+    const b = g.data[(y - g.y0) * (CHUNK_SIZE * CHUNK_SIZE) + lx * CHUNK_SIZE + lz];
+    return { sky: b >> 4, blk: b & 15 };
+  }
   const chunkBuildVersions = new Map();
   let chunkMeshDbPromise = null;
   const meshWorkerStats = { workerBuilds: 0, cacheHits: 0, cacheWrites: 0, fallbacks: 0, errors: 0 };
@@ -279,6 +293,13 @@
       mesh.visible = blocks > 0;
       if (old && old !== EMPTY_GEO) old.dispose();
     }
+    const lg = packed.light;
+    if (lg && lg.data) {
+      CHUNK_LIGHT.set(id, {
+        x0: lg.x0, z0: lg.z0, y0: lg.y0, y1: lg.y1,
+        data: lg.data instanceof Uint8Array ? lg.data : new Uint8Array(lg.data),
+      });
+    }
   }
 
   function meshDb() {
@@ -489,6 +510,7 @@
       if (chunk.cx >= cx0 && chunk.cx <= cx1 && chunk.cz >= cz0 && chunk.cz <= cz1) continue;
       disposeTerrainChunk(chunk);
       terrainChunks.delete(id);
+      CHUNK_LIGHT.delete(id);
     }
   }
 
@@ -497,6 +519,7 @@
     pendingChunkKeys.clear();
     for (const chunk of terrainChunks.values()) disposeTerrainChunk(chunk);
     terrainChunks.clear();
+    CHUNK_LIGHT.clear();
     const cx0 = chunkCoord(winCX - WIN_R), cx1 = chunkCoord(winCX + WIN_R);
     const cz0 = chunkCoord(winCZ - WIN_R), cz1 = chunkCoord(winCZ + WIN_R);
     for (let cx = cx0; cx <= cx1; cx++) for (let cz = cz0; cz <= cz1; cz++) rebuildChunk(cx, cz);
