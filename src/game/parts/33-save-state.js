@@ -18,6 +18,7 @@
     chestSeen: {},       // 生成チェストのロット抽選済みフラグ "x,y,z" -> 1
     crops: {},           // 成長中の作物 "x,y,z" -> 経過秒
     saplings: {},        // 成長中の苗木 "x,y,z" -> 経過秒
+    signs: {},           // 看板テキスト "x,y,z" -> [1〜4行の文字列]
     trades: {},          // 取引ID -> 回数
     progress: [],        // 達成済み進捗ID
     stats: { kills: 0, nights: 0 },
@@ -31,7 +32,7 @@
       for (const k of Object.keys(SAVE)) if (data[k] !== undefined) SAVE[k] = data[k];
       if (!SAVE.stats || typeof SAVE.stats !== 'object') SAVE.stats = { kills: 0, nights: 0 };
       if (!Array.isArray(SAVE.progress)) SAVE.progress = [];
-      for (const k of ['furnaces', 'chests', 'chestSeen', 'trades', 'crops', 'saplings']) if (!SAVE[k] || typeof SAVE[k] !== 'object') SAVE[k] = {};
+      for (const k of ['furnaces', 'chests', 'chestSeen', 'trades', 'crops', 'saplings', 'signs']) if (!SAVE[k] || typeof SAVE[k] !== 'object') SAVE[k] = {};
     } catch (e) {}
   }
   function writeSaveNow() {

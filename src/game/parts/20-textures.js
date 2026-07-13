@@ -352,6 +352,18 @@
       g.fillRect(8, 9, 16, 1); g.fillRect(7, 15, 18, 1); g.fillRect(10, 21, 12, 1);
       dots(g, S, 0x6d4c1b, 0.04, 0.76);
     }),
+    ladder: makeTex((g, S) => {
+      // 背景は透明のまま。左右の縦レール＋横桟だけを木の色で描く（隙間から向こうが透ける）
+      const rail = (rx) => {
+        for (let y = 0; y < S; y++) { g.fillStyle = tint(0x7a5624, rnd(0.85, 1.12)); g.fillRect(rx, y, 4, 1); }
+        g.fillStyle = 'rgba(58,36,18,0.85)'; g.fillRect(rx, 0, 1, S); g.fillRect(rx + 3, 0, 1, S);
+      };
+      rail(4); rail(24);
+      for (let ry = 5; ry < S; ry += 8) {
+        for (let x = 4; x < 28; x++) { g.fillStyle = tint(0x8a6a2f, rnd(0.9, 1.1)); g.fillRect(x, ry, 1, 3); }
+        g.fillStyle = 'rgba(58,36,18,0.8)'; g.fillRect(4, ry + 2, 24, 1);
+      }
+    }),
     cobble: makeTex((g, S) => {                              // 丸石。ゴロゴロした玉石の敷き詰め。
       noise(g, S, 0x74797d, 0.8, 1.05);
       const stones = [[2, 2, 9, 8], [13, 1, 9, 9], [24, 3, 7, 8], [1, 12, 8, 9], [11, 12, 10, 8], [23, 13, 8, 8], [3, 22, 9, 8], [14, 22, 8, 8], [24, 23, 7, 7]];

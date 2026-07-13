@@ -116,6 +116,8 @@
     requestAnimationFrame(animate);
     const now = performance.now(), dt = Math.min((now - prev) / 1000, 0.05); prev = now;
 
+    if (started && !animate.signsInited) { animate.signsInited = true; if (typeof refreshAllSigns === 'function') refreshAllSigns(); }
+
     if (started && !SURVIVAL.dead) {
       const f = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
       const s = (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0);
@@ -137,10 +139,14 @@
         if (keys['Space'] && player.onGround) {
           player.vel.y = JUMP; player.onGround = false;
         }
+        // はしご: 重なっている間は重力を打ち消し、W/Space で上昇・入力なしでゆっくり滑降。
+        // 触れている間は落下速度をリセット＝着地で落下ダメージなし。
+        const onLadder = playerOnLadder();
+        if (onLadder) player.vel.y = (keys['KeyW'] || keys['Space']) ? 2.35 : -1.5;
         moveAxis('x', player.vel.x * dt); moveAxis('z', player.vel.z * dt);
         player.onGround = false;
         const fallVel = player.vel.y;
-        if (moveAxis('y', player.vel.y * dt)) { if (player.vel.y < 0) { player.onGround = true; applyFallDamage(fallVel); } player.vel.y = 0; }
+        if (moveAxis('y', player.vel.y * dt)) { if (player.vel.y < 0) { player.onGround = true; if (!onLadder) applyFallDamage(fallVel); } player.vel.y = 0; }
         if (player.pos.y < CHUNK_Y_MIN - 40) damagePlayer(999);
         updateSurvival(dt, len > 0.05 || Math.abs(player.vel.y) > 0.1);
       }
@@ -312,6 +318,33 @@
         if (t !== undefined && TYPES[t].lightLevel > 0) { emitter = { type: TYPES[t].name, level: TYPES[t].lightLevel, dist: +Math.hypot(x - px, y - py, z - pz).toFixed(1) }; break; }
       }
       const st = window.__mcMeshWorkerStats || {};
-      return { pos: [px, py, pz], coveredFromSky: covered, nearestEmitter: emitter, lastBuildMs: st.lastBuildMs, avgBuildMs: st.avgBuildMs, maxBuildMs: st.maxBuildMs };
+      // baked = ワーカーが焼いた実ライト {sky,blk}（モブ湧き/日光燃焼の判定に使う値）。null は未メッシュ。
+      const baked = (typeof bakedLightAt === 'function') ? bakedLightAt(px, py, pz) : null;
+      return { pos: [px, py, pz], baked, coveredFromSky: covered, nearestEmitter: emitter, lastBuildMs: st.lastBuildMs, avgBuildMs: st.avgBuildMs, maxBuildMs: st.maxBuildMs };
     },
+    // モブ湧きの光量ゲート判定を任意セルで確認する（true=このセルに敵が湧ける明るさ）。
+    spawnLightAt: (dx = 0, dy = 0, dz = 0) => {
+      const px = Math.floor(player.pos.x) + dx, py = Math.floor(player.pos.y) + dy, pz = Math.floor(player.pos.z) + dz;
+      const baked = (typeof bakedLightAt === 'function') ? bakedLightAt(px, py, pz) : null;
+      const allowed = (typeof spawnLightAllows === 'function') ? spawnLightAllows(px, py, pz) : null;
+      return { pos: [px, py, pz], baked, dayLabel: DAY.label, canSpawnHere: allowed };
+    },
+    // C2 テスト: 看板を任意座標に設置しテキストを直接セット（編集ダイアログを介さず検証）
+    signSet: (dx = 1, dy = 0, dz = 0, dir = 0, lines = ['あいう', 'テスト看板', '日本語OK', '1234']) => {
+      const x = Math.floor(player.pos.x) + dx, y = Math.floor(player.pos.y) + dy, z = Math.floor(player.pos.z) + dz;
+      const t = SIGN + (dir & 3);
+      setEdit(key(x, y, z), t); saveEditsSoon(); setBlock(x, y, z, t); requestEditedBlockRebuild(x, y, z, t);
+      SAVE.signs[`${x},${y},${z}`] = lines; if (typeof refreshSignMesh === 'function') refreshSignMesh(x, y, z);
+      markSaveDirty();
+      return { x, y, z, dir, lines };
+    },
+    signInfo: () => JSON.parse(JSON.stringify(SAVE.signs || {})),
+    // C2 テスト: はしごを任意座標へ（dir=向き）。onLadder は現在プレイヤーがはしごに触れているか
+    ladderPut: (dx = 1, dy = 0, dz = 0, dir = 0) => {
+      const x = Math.floor(player.pos.x) + dx, y = Math.floor(player.pos.y) + dy, z = Math.floor(player.pos.z) + dz;
+      const t = LADDER + (dir & 3);
+      setEdit(key(x, y, z), t); saveEditsSoon(); setBlock(x, y, z, t); requestEditedBlockRebuild(x, y, z, t);
+      return { x, y, z, dir };
+    },
+    onLadder: () => (typeof playerOnLadder === 'function') ? playerOnLadder() : null,
   };

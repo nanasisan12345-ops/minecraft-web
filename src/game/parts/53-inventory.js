@@ -35,6 +35,9 @@
     oak_fence:      { name: '木のフェンス', cat: 'block', block: OAK_FENCE, fuel: 1.5 },
     oak_fence_gate: { name: '木のフェンスゲート', cat: 'block', block: OAK_FENCE_GATE_Z_CLOSED, fuel: 1.5 },
     cobblestone_wall: { name: '丸石の壁', cat: 'block', block: COBBLESTONE_WALL },
+    ladder:         { name: 'はしご', cat: 'block', block: LADDER, ladder: true, fuel: 1.5 },
+    glass_pane:     { name: '板ガラス', cat: 'block', block: GLASS_PANE },
+    sign:           { name: '看板', cat: 'block', block: SIGN, sign: true, fuel: 1.5 },
     glow_crystal:   { name: '発光結晶', cat: 'block', block: GLOW_CRYSTAL },
     gold_block:     { name: '金ブロック', cat: 'block', block: GOLD_BLOCK },
     iron_block:     { name: '鉄ブロック', cat: 'block', block: IRON_BLOCK },
@@ -109,6 +112,11 @@
     ITEM_FOR_BLOCK[OAK_SLAB + i] = 'oak_slab';
     ITEM_FOR_BLOCK[OAK_SLAB + 2 + i] = 'cobblestone_slab';
     ITEM_FOR_BLOCK[OAK_SLAB + 4 + i] = 'stone_brick_slab';
+  }
+  // はしご/看板の全向き → 親アイテム（どの向きを壊しても同じアイテムをドロップ）
+  for (let i = 0; i < 4; i++) {
+    ITEM_FOR_BLOCK[LADDER + i] = 'ladder';
+    ITEM_FOR_BLOCK[SIGN + i] = 'sign';
   }
   for (let b = 0; b < TYPES.length; b++) {
     if (ITEM_FOR_BLOCK[b] || !TYPES[b] || TYPES[b].solid === false || TYPES[b].noAutoItem) continue;

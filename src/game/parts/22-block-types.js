@@ -149,6 +149,40 @@
     t.collisionBoxes = [box];
   }
 
+  // はしご(94-97): 4向きの薄板。index=はしごが向く側(=設置面normal) 0=-z 1=+x 2=+z 3=-x。
+  // solid:false かつ collisionBoxes 無し（プレイヤーがブロック内に入って登る）。climbable フラグで物理側が判定。
+  const LADDER = TYPES.length; // 94
+  for (let dir = 0; dir < 4; dir++) {
+    TYPES.push({ name: 'はしご', color: 0x7a5624, icon: T.ladder, mats: faceMats(T.ladder, { transparent: true, depthWrite: false }), transparent: true, solid: false, noAutoItem: true, climbable: true });
+  }
+  const LADDER_BOX = [
+    [0.0, 0, 0.875, 1.0, 1, 1.0],   // 0: -z 向き（+z側の壁に貼る）
+    [0.0, 0, 0.000, 0.125, 1, 1.0], // 1: +x 向き（-x側の壁に貼る）
+    [0.0, 0, 0.000, 1.0, 1, 0.125], // 2: +z 向き（-z側の壁に貼る）
+    [0.875, 0, 0.000, 1.0, 1, 1.0], // 3: -x 向き（+x側の壁に貼る）
+  ];
+  for (let i = 0; i < 4; i++) TYPES[LADDER + i].model = [{ box: LADDER_BOX[i] }];
+
+  // 板ガラス(98): フェンス風の十字薄板（厚さ0.125・全高）。collisionBoxes 同形。
+  const GLASS_PANE = TYPES.length; // 98
+  TYPES.push({ name: '板ガラス', color: 0xbfe9ff, icon: T.glass, mats: faceMats(T.glass, { transparent: true, depthWrite: false }), transparent: true });
+  const PANE_BOXES = [[0.4375, 0, 0.0, 0.5625, 1, 1.0], [0.0, 0, 0.4375, 1.0, 1, 0.5625]];
+  TYPES[GLASS_PANE].model = PANE_BOXES.map(box => ({ box }));
+  TYPES[GLASS_PANE].collisionBoxes = PANE_BOXES;
+
+  // 看板(99-102): 立て看板。4向き。index=板が向く側(=horizontalFacingIndex) 0=-z 1=+x 2=+z 3=-x。
+  // テキストは別レイヤ(45-signs.js)のオーバーレイmeshで描く。solid:false（通り抜け可）。
+  const SIGN = TYPES.length; // 99
+  for (let dir = 0; dir < 4; dir++) {
+    TYPES.push({ name: '看板', color: 0xb5824a, icon: T.villageSign, mats: faceMats(T.villageSign, { shininess: 5, specular: 0x221400 }), transparent: true, solid: false, noAutoItem: true });
+  }
+  const SIGN_POST = { box: [0.45, 0.00, 0.45, 0.55, 0.48, 0.55] };
+  const SIGN_BOARD_Z = { box: [0.08, 0.48, 0.36, 0.92, 0.86, 0.64] };
+  const SIGN_BOARD_X = { box: [0.36, 0.48, 0.08, 0.64, 0.86, 0.92] };
+  for (let dir = 0; dir < 4; dir++) {
+    TYPES[SIGN + dir].model = [SIGN_POST, (dir % 2 === 0) ? SIGN_BOARD_Z : SIGN_BOARD_X];
+  }
+
   // 発光ブロックの光レベル（本家準拠）。ライトエンジンが BFS 伝播して頂点カラーへ焼き込む
   TYPES[TORCH].lightLevel = 14;
   TYPES[LANTERN].lightLevel = 15;

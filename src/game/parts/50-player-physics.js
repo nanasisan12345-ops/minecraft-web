@@ -59,6 +59,19 @@
     }
     return false;
   }
+  // プレイヤーのAABBがはしごブロックと重なっているか（重なっている間は登れる）
+  function playerOnLadder() {
+    if (typeof LADDER === 'undefined') return false;
+    const p = player.pos;
+    const x0 = Math.floor(p.x - HALF), x1 = Math.floor(p.x + HALF);
+    const y0 = Math.floor(p.y - EYE), y1 = Math.floor(p.y + TOP_H);
+    const z0 = Math.floor(p.z - HALF), z1 = Math.floor(p.z + HALF);
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
+      const t = blockAt(x, y, z);
+      if (t !== undefined && t >= LADDER && t < LADDER + 4) return true;
+    }
+    return false;
+  }
   function overlapsPlayer(x, y, z, type = null) {
     const p = player.pos;
     const boxes = type == null ? [[0, 0, 0, 1, 1, 1]] : blockCollisionBoxes(type);

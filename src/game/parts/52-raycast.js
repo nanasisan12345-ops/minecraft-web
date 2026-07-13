@@ -184,6 +184,8 @@
   /* --- 階段/ハーフブロックの設置（IDバリアント方式。ドアと同じ流儀） --- */
   const isStairsBlock = (type) => type >= OAK_STAIRS && type < OAK_STAIRS + 12;
   const isSlabBlock = (type) => type >= OAK_SLAB && type < OAK_SLAB + 6;
+  const isLadderBlock = (type) => type >= LADDER && type < LADDER + 4;
+  const isSignBlock = (type) => type >= SIGN && type < SIGN + 4;
   // プレイヤーの視線の水平方位（0=-z 1=+x 2=+z 3=-x）。階段は「向いている方向の奥が高くなる」
   function horizontalFacingIndex() {
     const d = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -226,6 +228,38 @@
     return consumeSelectedAndPlace(x, y, z, type);
   }
 
+  // はしごは「背面が不透明フルブロックの側面」にのみ設置できる。向きは設置面normalで決まる。
+  function isOpaqueFullBlock(x, y, z) {
+    const t = blockAt(x, y, z);
+    return t !== undefined && TYPES[t].solid !== false && !TYPES[t].transparent && !TYPES[t].model;
+  }
+  function ladderFacingFromNormal(n) {
+    if (n[2] === -1) return 0; // -z
+    if (n[0] === 1) return 1;  // +x
+    if (n[2] === 1) return 2;  // +z
+    return 3;                  // -x
+  }
+  function placeLadderFromTarget(tg) {
+    if (tg.normal[1] !== 0) return false;                        // 側面クリックのみ
+    if (!isOpaqueFullBlock(tg.block[0], tg.block[1], tg.block[2])) return false; // 背面が不透明フルブロック必須
+    const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
+    if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) return false;
+    const type = LADDER + ladderFacingFromNormal(tg.normal);
+    if (isPlacementBlocked(x, y, z) || overlapsPlayer(x, y, z, type)) return false;
+    return consumeSelectedAndPlace(x, y, z, type);
+  }
+  // 立て看板: ブロックの上面クリックのみ。向きは視線方位。設置直後に編集ダイアログを開く。
+  function placeSignFromTarget(tg) {
+    if (tg.normal[1] !== 1) return false;
+    const x = tg.block[0], y = tg.block[1] + 1, z = tg.block[2];
+    if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) return false;
+    const type = SIGN + horizontalFacingIndex();
+    if (isPlacementBlocked(x, y, z) || overlapsPlayer(x, y, z, type)) return false;
+    if (!consumeSelectedAndPlace(x, y, z, type)) return false;
+    if (typeof openSignEditor === 'function') openSignEditor(x, y, z);
+    return true;
+  }
+
   function isInteractableBlock(type) {
     return isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type);
   }
@@ -240,6 +274,7 @@
     if (isSlabBlock(type)) return (type < OAK_SLAB + 2) ? 'axe' : 'pickaxe';
     if ([STONE, DEEPSLATE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK].includes(type)) return 'pickaxe';
     if (isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type) || type === OAK_FENCE) return 'axe';
+    if (isLadderBlock(type) || isSignBlock(type)) return 'axe';
     if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN, OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_TRAPDOOR_CLOSED, OAK_TRAPDOOR_OPEN, OAK_FENCE, OAK_FENCE_GATE_Z_CLOSED, OAK_FENCE_GATE_Z_OPEN, OAK_FENCE_GATE_X_CLOSED, OAK_FENCE_GATE_X_OPEN].includes(type)) return 'axe';
     if ([DIRT, GRASS, SAND, SNOW, FARMLAND].includes(type)) return 'shovel';
     return null;
@@ -272,6 +307,8 @@
     BLOCK_HARDNESS.set(OAK_SLAB + 2 + i, 2.6);
     BLOCK_HARDNESS.set(OAK_SLAB + 4 + i, 2.6);
   }
+  for (let i = 0; i < 4; i++) { BLOCK_HARDNESS.set(LADDER + i, 0.4); BLOCK_HARDNESS.set(SIGN + i, 1.0); }
+  BLOCK_HARDNESS.set(GLASS_PANE, 0.3);
   // 掘ってもドロップしない（必要ツールレベル未満）判定。tier: 1木 2石 3鉄 4ダイヤ
   function requiredToolTier(type) {
     if ([IRON_ORE, IRON_BLOCK].includes(type)) return 2;            // 鉄鉱石/鉄ブロック: 石ツルハシ以上
@@ -310,6 +347,7 @@
     if (type === DIAMOND_ORE) return [['diamond', 1]];
     if (type === GLOW_CRYSTAL) return [['glow_shard', 1]];
     if (type === OPEN_CHEST || type === VILLAGE_SIGN) return [['planks', 1]];
+    if (type === GLASS_PANE) return []; // 本家同様ガラス板はドロップなし
     if (type === FARMLAND || type === FURNACE_LIT) return [[type === FARMLAND ? 'dirt' : 'furnace', 1]];
     if (type === GRASS) {
       const out = [['dirt', 1]];
@@ -328,30 +366,6 @@
     }
     const id = ITEM_FOR_BLOCK[type];
     return id ? [[id, 1]] : [];
-  }
-
-  /* --- 置いた明かりの記録（敵スポーン抑制に使う） --- */
-  const PLACED_LIGHTS = new Map(); // "x,y,z" -> {x,y,z}
-  const LIGHT_BLOCK_TYPES = [TORCH, LANTERN, PAPER_LANTERN, GLOW_CRYSTAL];
-  function registerPlacedLight(x, y, z, type) {
-    if (!LIGHT_BLOCK_TYPES.includes(type)) return;
-    PLACED_LIGHTS.set(key(x, y, z), { x, y, z });
-  }
-  function unregisterPlacedLight(x, y, z) {
-    PLACED_LIGHTS.delete(key(x, y, z));
-  }
-  function nearPlacedLight(x, y, z, r = 8) {
-    for (const l of PLACED_LIGHTS.values()) {
-      if (Math.abs(l.x - x) <= r && Math.abs(l.z - z) <= r && Math.abs(l.y - y) <= r + 2) return true;
-    }
-    return false;
-  }
-  // 既存セーブの編集からプレイヤーが置いた明かりを復元
-  for (const [id, type] of edits) {
-    if (type >= 0 && LIGHT_BLOCK_TYPES.includes(type)) {
-      const c = id.split(',');
-      PLACED_LIGHTS.set(id, { x: +c[0], y: +c[1], z: +c[2] });
-    }
   }
 
   /* --- 採掘 --- */
@@ -402,13 +416,27 @@
     }
     // 道具の耐久値を消費
     if (held && held.tool === tool) damageSelectedTool(1);
-    unregisterPlacedLight(x, y, z);
+    if (isSignBlock(t) && typeof deleteSignText === 'function') deleteSignText(x, y, z); // 看板テキストを削除
     if (isDoorBlock(t)) {
       removeDoorPairAt(x, y, z, t);
       thock(150);
       return;
     }
     setEdit(id, -1); saveEditsSoon(); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z, t); thock(150);
+    breakDetachedLadders(x, y, z); // 背面(壁)を失ったはしごを剥がしてアイテム化
+  }
+  // (bx,by,bz) を壁にしていたはしごを、隣接4方向から探して剥がす（本家: 背面が壊れると落ちる）
+  const LADDER_WALL_OFFSET = [[0, 0, 1], [-1, 0, 0], [0, 0, -1], [1, 0, 0]]; // facing 0..3 → 壁の相対位置
+  function breakDetachedLadders(bx, by, bz) {
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const lx = bx + dx, lz = bz + dz, lt = blockAt(lx, by, lz);
+      if (lt === undefined || !isLadderBlock(lt)) continue;
+      const off = LADDER_WALL_OFFSET[lt - LADDER];
+      if (lx + off[0] === bx && lz + off[2] === bz) {
+        spawnItemDrop(lx, by, lz, 'ladder', 1);
+        setEdit(key(lx, by, lz), -1); setBlock(lx, by, lz, null); requestEditedBlockRebuild(lx, by, lz, lt);
+      }
+    }
   }
   function updateMining(dt, tg) {
     if (!mouseHeld.left || !started || SURVIVAL.dead || !tg || isContainerOpen()) { resetMining(); return; }
@@ -525,6 +553,7 @@
       if (isDoorBlock(hitType)) { toggleDoorAt(bx, by, bz, hitType); return; }
       if (isTrapdoorBlock(hitType)) { toggleTrapdoorAt(bx, by, bz, hitType); return; }
       if (isFenceGateBlock(hitType)) { toggleFenceGateAt(bx, by, bz, hitType); return; }
+      if (isSignBlock(hitType) && typeof openSignEditor === 'function') { openSignEditor(bx, by, bz); return; } // 看板を右クリックで再編集
     }
     // バケツ（水/溶岩/牛乳）
     if (tryUseBucket()) return;
@@ -552,6 +581,8 @@
     if (tg && def && def.id === 'oak_fence_gate') { placeFenceGateFromTarget(tg); return; }
     if (tg && def && def.stairs) { placeStairsFromTarget(tg, def); return; }
     if (tg && def && def.slab) { placeSlabFromTarget(tg, def); return; }
+    if (tg && def && def.ladder) { placeLadderFromTarget(tg); return; }
+    if (tg && def && def.sign) { placeSignFromTarget(tg); return; }
     // ブロック設置
     if (!tg || !def || def.block == null) { if (def && def.block == null) thock(90); return; }
     const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
@@ -562,7 +593,6 @@
     s.n -= 1;
     if (s.n <= 0) INV[selected] = null;
     invChanged();
-    registerPlacedLight(x, y, z, type);
     setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z, type); thock(260);
     if (typeof progressEvent === 'function') progressEvent('place', ITEM_FOR_BLOCK[type]);
   }
