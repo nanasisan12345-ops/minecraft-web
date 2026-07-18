@@ -195,6 +195,7 @@
     const s = selectedItem(); if (!s) return false;
     s.n -= 1; if (s.n <= 0) INV[selected] = null; invChanged();
     setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z, type);
+    if (typeof displaceLiquidAt === 'function') displaceLiquidAt(x, y, z); // 液体を塞いだら下流を枯らす
     thock(260);
     if (typeof progressEvent === 'function') progressEvent('place', ITEM_FOR_BLOCK[type]);
     return true;
@@ -272,7 +273,7 @@
   function blockPreferredTool(type) {
     if (isStairsBlock(type)) return (type < OAK_STAIRS + 4) ? 'axe' : 'pickaxe';       // 木=斧 / 石系=ツルハシ
     if (isSlabBlock(type)) return (type < OAK_SLAB + 2) ? 'axe' : 'pickaxe';
-    if ([STONE, DEEPSLATE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK].includes(type)) return 'pickaxe';
+    if ([STONE, DEEPSLATE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK, OBSIDIAN].includes(type)) return 'pickaxe';
     if (isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type) || type === OAK_FENCE) return 'axe';
     if (isLadderBlock(type) || isSignBlock(type)) return 'axe';
     if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN, OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_TRAPDOOR_CLOSED, OAK_TRAPDOOR_OPEN, OAK_FENCE, OAK_FENCE_GATE_Z_CLOSED, OAK_FENCE_GATE_Z_OPEN, OAK_FENCE_GATE_X_CLOSED, OAK_FENCE_GATE_X_OPEN].includes(type)) return 'axe';
@@ -309,6 +310,7 @@
   }
   for (let i = 0; i < 4; i++) { BLOCK_HARDNESS.set(LADDER + i, 0.4); BLOCK_HARDNESS.set(SIGN + i, 1.0); }
   BLOCK_HARDNESS.set(GLASS_PANE, 0.3);
+  BLOCK_HARDNESS.set(OBSIDIAN, 45); // 非常に硬い（ダイヤツルハシ推奨）
   // 掘ってもドロップしない（必要ツールレベル未満）判定。tier: 1木 2石 3鉄 4ダイヤ
   function requiredToolTier(type) {
     if ([IRON_ORE, IRON_BLOCK].includes(type)) return 2;            // 鉄鉱石/鉄ブロック: 石ツルハシ以上
@@ -484,13 +486,20 @@
       if (at && at.userData.kind === 'cow' && !at.userData.baby) {
         INV[selected] = mkItem('milk_bucket'); invChanged(); thock(300); return true;
       }
-      // 水/溶岩を汲む
+      // 水/溶岩を汲む（汲めるのは源のみ。流れは汲めない。自然の水源は無限のまま残す）
       const lq = pickLiquidTarget();
       if (lq) {
+        const [bx, by, bz] = lq.block;
+        const sim = (typeof getLiquid === 'function') ? getLiquid(bx, by, bz) : null;
+        if (sim && sim.lv > 0) return false; // 流れ（level>0）は汲めない
         INV[selected] = mkItem(lq.type === LAVA ? 'lava_bucket' : 'water_bucket'); invChanged();
-        // プレイヤーが置いた液体(edit)なら汲んだら消す（自然の水源は無限のまま）
-        const lid = key(lq.block[0], lq.block[1], lq.block[2]);
-        if (edits.get(lid) === lq.type) { setEdit(lid, -1); saveEditsSoon(); setBlock(lq.block[0], lq.block[1], lq.block[2], null); requestEditedBlockRebuild(lq.block[0], lq.block[1], lq.block[2]); }
+        if (sim && sim.lv === 0 && typeof pickupLiquidSource === 'function') {
+          pickupLiquidSource(bx, by, bz);              // シムの源を消す（下流が枯れる）
+        } else if (!sim && edits.get(key(bx, by, bz)) === lq.type) {
+          // 旧セーブ由来の edit 水源（sim管理外）は従来どおり消す
+          setEdit(key(bx, by, bz), -1); saveEditsSoon(); setBlock(bx, by, bz, null); requestEditedBlockRebuild(bx, by, bz);
+        }
+        // 自然の水源(sim無し・edit無し)は残す（無限）
         thock(300); return true;
       }
       return false;
@@ -500,7 +509,9 @@
       const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
       const type = s.id === 'lava_bucket' ? LAVA : WATER;
       if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX || isPlacementBlocked(x, y, z) || overlapsPlayer(x, y, z, type)) return false;
-      setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z, type);
+      // 液体の源として設置 → セルオートマトンが流れを作る（47-liquids.js）
+      if (typeof placeLiquidSource === 'function') placeLiquidSource(x, y, z, type);
+      else { setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z, type); }
       INV[selected] = mkItem('bucket'); invChanged(); thock(240); return true;
     }
     if (s.id === 'milk_bucket') {
@@ -594,5 +605,6 @@
     if (s.n <= 0) INV[selected] = null;
     invChanged();
     setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z, type); thock(260);
+    if (typeof displaceLiquidAt === 'function') displaceLiquidAt(x, y, z); // 液体を塞いだら下流を枯らす
     if (typeof progressEvent === 'function') progressEvent('place', ITEM_FOR_BLOCK[type]);
   }

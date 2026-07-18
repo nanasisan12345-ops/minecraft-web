@@ -36,6 +36,23 @@
     const g = actx.createGain(); g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
     src.connect(hp).connect(g).connect(actx.destination); src.start(t); src.stop(t + 0.3);
   }
+  // 溶岩×水の石化「ジュッ」音（高域ノイズの短いシュー、距離減衰つき）
+  function playSizzle(x, y, z) {
+    if (!actx) return;
+    let gain = 0.14;
+    if (Number.isFinite(x) && typeof player !== 'undefined') {
+      const d = Math.hypot(x - player.pos.x, y - player.pos.y, z - player.pos.z);
+      if (d > 26) return;
+      gain = Math.max(0.02, 0.14 * (1 - d / 26));
+    }
+    const t = actx.currentTime, len = Math.floor(actx.sampleRate * 0.35), buf = actx.createBuffer(1, len, actx.sampleRate), dd = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) dd[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = actx.createBufferSource(); src.buffer = buf;
+    const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.setValueAtTime(2400, t); hp.frequency.exponentialRampToValueAtTime(900, t + 0.3);
+    const g = actx.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.33);
+    src.connect(hp).connect(g).connect(actx.destination); src.start(t); src.stop(t + 0.35);
+  }
+
   // 被弾音（低いうめき風の下降トーン）
   function playHurtSound() {
     if (!actx) return;

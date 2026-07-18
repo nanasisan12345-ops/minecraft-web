@@ -60,6 +60,7 @@
     SURVIVAL.hunger = 18;
     SURVIVAL.hurtFlash = 0;
     SURVIVAL.invuln = 2.0;
+    SURVIVAL.burn = 0;
     SURVIVAL.dead = false;
     deathScreen.classList.remove('show');
     regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z));
@@ -145,13 +146,23 @@
     } else {
       SURVIVAL.starveClock = 0;
     }
-    // 溶岩・サボテン
+    // 溶岩・炎上・サボテン
     if (!(typeof DEBUG !== 'undefined' && DEBUG.fly)) {
       const fx = Math.floor(player.pos.x), fz = Math.floor(player.pos.z);
       const feet = Math.floor(player.pos.y - 0.9);
       if (blockAt(fx, feet, fz) === LAVA || blockAt(fx, feet + 1, fz) === LAVA) {
         damagePlayer(3, '溶岩');
         SURVIVAL.hurtFlash = 0.8;
+        SURVIVAL.burn = 2.0; // 溶岩から出ても2秒燃え続ける
+      }
+      // 水に入ると消火。炎上中は約0.8秒ごとに追加ダメージ
+      if (blockAt(fx, feet, fz) === WATER || blockAt(fx, feet + 1, fz) === WATER) SURVIVAL.burn = 0;
+      if ((SURVIVAL.burn || 0) > 0) {
+        SURVIVAL.burn -= dt;
+        SURVIVAL.burnClock = (SURVIVAL.burnClock || 0) + dt;
+        if (SURVIVAL.burnClock >= 0.8) { SURVIVAL.burnClock = 0; damagePlayer(1, '炎上'); SURVIVAL.hurtFlash = 0.5; }
+      } else {
+        SURVIVAL.burnClock = 0;
       }
       for (const [nx, nz] of [[fx + 1, fz], [fx - 1, fz], [fx, fz + 1], [fx, fz - 1]]) {
         if (blockAt(nx, feet, nz) === CACTUS || blockAt(nx, feet + 1, nz) === CACTUS) {
@@ -169,6 +180,7 @@
     const hearts = '♥'.repeat(Math.ceil(hp / 2)).padEnd(10, '♡');
     const meat = '◆'.repeat(Math.ceil(food / 2)).padEnd(10, '◇');
     survivalHud.classList.toggle('hurt', SURVIVAL.hurtFlash > 0);
-    survivalHud.innerHTML = `<div class="health">${hearts}</div><div class="hunger">${meat}</div>`;
+    const fire = (SURVIVAL.burn || 0) > 0 ? '🔥 ' : '';
+    survivalHud.innerHTML = `<div class="health">${fire}${hearts}</div><div class="hunger">${meat}</div>`;
   }
   updateSurvivalHud();

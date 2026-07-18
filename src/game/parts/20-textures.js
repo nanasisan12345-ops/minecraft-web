@@ -352,6 +352,12 @@
       g.fillRect(8, 9, 16, 1); g.fillRect(7, 15, 18, 1); g.fillRect(10, 21, 12, 1);
       dots(g, S, 0x6d4c1b, 0.04, 0.76);
     }),
+    obsidian: makeTex((g, S) => {
+      noise(g, S, 0x161020, 0.85, 1.12);
+      dots(g, S, 0x0c0812, 0.10, 0.8);
+      dots(g, S, 0x3a2a55, 0.05, 1.15);
+      for (let i = 0; i < 5; i++) { g.fillStyle = tint(0x5a3f7e, rnd(0.9, 1.2)); g.fillRect(Math.random() * S | 0, Math.random() * S | 0, 2, 1); }
+    }),
     ladder: makeTex((g, S) => {
       // 背景は透明のまま。左右の縦レール＋横桟だけを木の色で描く（隙間から向こうが透ける）
       const rail = (rx) => {

@@ -183,6 +183,10 @@
     TYPES[SIGN + dir].model = [SIGN_POST, (dir % 2 === 0) ? SIGN_BOARD_Z : SIGN_BOARD_X];
   }
 
+  // 黒曜石(103): 溶岩源×水で生成する不透明フルブロック（採掘は非常に硬い）
+  const OBSIDIAN = TYPES.length; // 103
+  TYPES.push({ name: '黒曜石', color: 0x1a1228, icon: T.obsidian, mats: faceMats(T.obsidian, { shininess: 60, specular: 0x2a1a44 }) });
+
   // 発光ブロックの光レベル（本家準拠）。ライトエンジンが BFS 伝播して頂点カラーへ焼き込む
   TYPES[TORCH].lightLevel = 14;
   TYPES[LANTERN].lightLevel = 15;

@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 15; // 9-13: ライト+岩盤/深層岩/深部洞窟。14: packed.light。15: はしご/板ガラス/看板モデル追加
+  const MESH_WORKER_VERSION = 16; // 9-13: ライト+岩盤/深層岩/深部洞窟。14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {
@@ -113,10 +113,10 @@
     idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 
-  function addBlockFaceToState(state, x, y, z, f) {
+  function addBlockFaceToState(state, x, y, z, f, topY = 1) {
     const fd = FACE_DEFS[f];
     const rgb = mainFaceLight(x + fd.n[0], y + fd.n[1], z + fd.n[2]);
-    addQuadToState(state, fd.v.map(p => [x + p[0], y + p[1], z + p[2]]), fd.n, fd.uv, fd.m, rgb);
+    addQuadToState(state, fd.v.map(p => [x + p[0], y + (p[1] === 1 ? topY : p[1]), z + p[2]]), fd.n, fd.uv, fd.m, rgb);
   }
 
   function addBoxPartToState(state, x, y, z, part, rgbIn) {
@@ -170,6 +170,22 @@
     const model = TYPES[t] && TYPES[t].model;
     if (model) {
       addModelToState(state, x, y, z, model);
+      return;
+    }
+    // シム液体セル: レベルに応じて上面を下げる（ワーカー経路の addLiquidBlockToState と同形）
+    const lq = (typeof getLiquid === 'function') ? getLiquid(x, y, z) : null;
+    if (lq) {
+      const above = blockAt(x, y + 1, z);
+      const topH = (above === t) ? 1 : Math.max(1 / 9, (8 - lq.lv) / 9);
+      let addedL = false;
+      for (let f = 0; f < FACE_DEFS.length; f++) {
+        if (f === 3 && y === CHUNK_Y_MIN) continue;
+        if (f === 2) { if (above === t) continue; } // 上面: 高さが下がるので同液体が乗る時以外は常に描く
+        else if (!faceVisible(x, y, z, t, f)) continue;
+        addBlockFaceToState(state, x, y, z, f, topH);
+        addedL = true;
+      }
+      if (addedL) state.blocks++;
       return;
     }
     let added = false;
@@ -434,6 +450,11 @@
       blockedColumns.push(x, z);
       hash = fnvAdd(fnvAdd(hash, x ^ 0x2d2d), z ^ 0x4b4b);
     }
+    // シム液体セル（レベル別の水面高）。レベルが変わるとハッシュも変わり正しく再ビルドされる
+    const liquidCells = (typeof collectLiquidMeshCells === 'function') ? collectLiquidMeshCells(x0, x1, z0, z1) : [];
+    for (let i = 0; i < liquidCells.length; i += 4) {
+      hash = fnvAdd(fnvAdd(fnvAdd(fnvAdd(hash, liquidCells[i] ^ 0x7171), liquidCells[i + 1] ^ 0x3939), liquidCells[i + 2] ^ 0x5b5b), liquidCells[i + 3] ^ 0x1d1d);
+    }
     hash = fnvAdd(fnvAdd(hash, WORLD_SEED), MESH_WORKER_VERSION);
     return {
       cx, cz,
@@ -451,6 +472,7 @@
       airs,
       edits: editEntries,
       blockedColumns,
+      liquidCells,
       cacheKey: `${WORLD_SEED}:mesh:${MESH_WORKER_VERSION}:${cx},${cz}:${hash.toString(36)}`,
     };
   }

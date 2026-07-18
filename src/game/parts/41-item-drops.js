@@ -95,8 +95,16 @@
       d.pickupDelay = Math.max(0, d.pickupDelay - dt);
       if (d.life <= 0) { scene.remove(d.mesh); ITEM_DROPS.splice(i, 1); continue; }
       const p = d.mesh.position;
+      // 液体の流れに押される＋水には浮く（C8）
+      const lbx = Math.floor(p.x), lby = Math.floor(p.y), lbz = Math.floor(p.z);
+      if (typeof liquidFlowVector === 'function') {
+        const fv = liquidFlowVector(lbx, lby, lbz);
+        if (fv) { p.x += fv.x * 1.4 * dt; p.z += fv.z * 1.4 * dt; }
+      }
+      const inWater = blockAt(lbx, lby, lbz) === WATER;
       if (!d.grounded) {
-        d.vy -= 16 * dt;
+        if (inWater) d.vy = Math.min(d.vy + 40 * dt, 0.9); // 浮力: 水面までゆっくり浮上
+        else d.vy -= 16 * dt;
         p.x += d.vx * dt; p.z += d.vz * dt;
         const ny = p.y + d.vy * dt;
         const g = dropGroundY(p.x, p.y + 0.2, p.z);

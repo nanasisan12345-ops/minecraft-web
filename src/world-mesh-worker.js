@@ -20,6 +20,7 @@ let transparent = [];
 let groupCounts = [];
 let blockModels = [];
 let lightLevels = [];
+let liquidLevels = null; // "x,y,z" -> lv(0-7)。シム液体の可変水面高（C8）
 let explicitBlocks = new Map();
 let explicitAir = new Set();
 let explicitEdits = new Map();
@@ -833,7 +834,7 @@ function addQuadToState(state, verts, normal, uvCoords, mat = 0, sb = FULL_LIGHT
   else idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
-function addBlockFaceToState(state, x, y, z, f) {
+function addBlockFaceToState(state, x, y, z, f, topY = 1) {
   const fd = FACE_DEFS[f], corners = FACE_CORNERS[f];
   const ax = x + fd.n[0], ay = y + fd.n[1], az = z + fd.n[2];
   for (let i = 0; i < 4; i++) {
@@ -843,7 +844,7 @@ function addBlockFaceToState(state, x, y, z, f) {
   // 明暗差が小さい対角で三角形を分割する
   const t0 = SB8[0] + SB8[1], t1 = SB8[2] + SB8[3], t2 = SB8[4] + SB8[5], t3 = SB8[6] + SB8[7];
   const flip = Math.abs(t0 - t2) > Math.abs(t1 - t3);
-  addQuadToState(state, fd.v.map(p => [x + p[0], y + p[1], z + p[2]]), fd.n, fd.uv, fd.m, SB8, flip);
+  addQuadToState(state, fd.v.map(p => [x + p[0], y + (p[1] === 1 ? topY : p[1]), z + p[2]]), fd.n, fd.uv, fd.m, SB8, flip);
 }
 
 function addBoxPartToState(state, x, y, z, part, rgb) {
@@ -892,12 +893,32 @@ function addModelToState(state, x, y, z, model) {
   if (added) state.blocks++;
 }
 
+// シム管理下の液体セル: レベルに応じて上面を (8-lv)/9 に下げて描く（上に同液体が乗る滝の柱は満杯）
+function addLiquidBlockToState(state, x, y, z, t, lv) {
+  const above = blockAtStack(x, y + 1, z);
+  const topH = (above === t) ? 1 : Math.max(1 / 9, (8 - lv) / 9);
+  let added = false;
+  for (let f = 0; f < FACE_DEFS.length; f++) {
+    if (f === 3 && y === CHUNK_Y_MIN) continue;
+    if (f === 2) { if (above === t) continue; } // 上面: 高さが下がるので同液体が乗る時以外は常に描く
+    else if (!faceVisible(x, y, z, t, f)) continue;
+    addBlockFaceToState(state, x, y, z, f, topH);
+    added = true;
+  }
+  if (added) state.blocks++;
+}
+
 function addBlockToState(build, x, y, z, t) {
   const state = build[t];
   if (!state) return;
   const model = blockModels[t];
   if (model) {
     addModelToState(state, x, y, z, model);
+    return;
+  }
+  const liqLv = liquidLevels ? liquidLevels.get(x + ',' + y + ',' + z) : undefined;
+  if (liqLv !== undefined) {
+    addLiquidBlockToState(state, x, y, z, t, liqLv);
     return;
   }
   let added = false;
@@ -1011,6 +1032,9 @@ function loadPayload(payload) {
   groupCounts = payload.groupCounts || [];
   blockModels = payload.blockModels || [];
   lightLevels = payload.lightLevels || [];
+  liquidLevels = new Map();
+  const lc = payload.liquidCells || [];
+  for (let i = 0; i < lc.length; i += 4) liquidLevels.set(lc[i] + ',' + lc[i + 1] + ',' + lc[i + 2], lc[i + 3]);
   explicitBlocks = new Map();
   explicitAir = new Set();
   explicitEdits = new Map();

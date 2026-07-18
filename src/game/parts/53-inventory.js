@@ -38,6 +38,7 @@
     ladder:         { name: 'はしご', cat: 'block', block: LADDER, ladder: true, fuel: 1.5 },
     glass_pane:     { name: '板ガラス', cat: 'block', block: GLASS_PANE },
     sign:           { name: '看板', cat: 'block', block: SIGN, sign: true, fuel: 1.5 },
+    obsidian:       { name: '黒曜石', cat: 'block', block: OBSIDIAN },
     glow_crystal:   { name: '発光結晶', cat: 'block', block: GLOW_CRYSTAL },
     gold_block:     { name: '金ブロック', cat: 'block', block: GOLD_BLOCK },
     iron_block:     { name: '鉄ブロック', cat: 'block', block: IRON_BLOCK },

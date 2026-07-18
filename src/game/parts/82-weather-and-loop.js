@@ -116,7 +116,7 @@
     requestAnimationFrame(animate);
     const now = performance.now(), dt = Math.min((now - prev) / 1000, 0.05); prev = now;
 
-    if (started && !animate.signsInited) { animate.signsInited = true; if (typeof refreshAllSigns === 'function') refreshAllSigns(); }
+    if (started && !animate.signsInited) { animate.signsInited = true; if (typeof refreshAllSigns === 'function') refreshAllSigns(); if (typeof restoreLiquids === 'function') restoreLiquids(); }
 
     if (started && !SURVIVAL.dead) {
       const f = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
@@ -144,6 +144,12 @@
         const onLadder = playerOnLadder();
         if (onLadder) player.vel.y = (keys['KeyW'] || keys['Space']) ? 2.35 : -1.5;
         moveAxis('x', player.vel.x * dt); moveAxis('z', player.vel.z * dt);
+        // 液体の流れに押される（C8: レベル勾配から流向を計算、約1.4/s）
+        if (typeof liquidFlowVector === 'function') {
+          const lfx = Math.floor(player.pos.x), lfy = Math.floor(player.pos.y - 0.9), lfz = Math.floor(player.pos.z);
+          const fv = liquidFlowVector(lfx, lfy, lfz) || liquidFlowVector(lfx, lfy + 1, lfz);
+          if (fv) { moveAxis('x', fv.x * 1.4 * dt); moveAxis('z', fv.z * 1.4 * dt); }
+        }
         player.onGround = false;
         const fallVel = player.vel.y;
         if (moveAxis('y', player.vel.y * dt)) { if (player.vel.y < 0) { player.onGround = true; if (!onLadder) applyFallDamage(fallVel); } player.vel.y = 0; }
@@ -182,6 +188,7 @@
     updateItemDrops(dt);
     updateFurnaces(dt);
     updateFurnaceBars();
+    updateLiquids(dt);
     updateCrops(dt);
     updateSaplings(dt);
     updateProgress(dt);
@@ -347,4 +354,41 @@
       return { x, y, z, dir };
     },
     onLadder: () => (typeof playerOnLadder === 'function') ? playerOnLadder() : null,
+    // C8 テスト: 液体の源を設置（kind='water'|'lava'）／セル情報／シム統計
+    placeLiquid: (kind = 'water', dx = 1, dy = 0, dz = 0) => {
+      const x = Math.floor(player.pos.x) + dx, y = Math.floor(player.pos.y) + dy, z = Math.floor(player.pos.z) + dz;
+      if (typeof placeLiquidSource === 'function') placeLiquidSource(x, y, z, kind === 'lava' ? LAVA : WATER);
+      return { x, y, z, kind };
+    },
+    liquidInfo: (dx = 1, dy = 0, dz = 0) => (typeof liquidInfoAt === 'function') ? liquidInfoAt(Math.floor(player.pos.x) + dx, Math.floor(player.pos.y) + dy, Math.floor(player.pos.z) + dz) : null,
+    simStats: () => (typeof liquidSimStats === 'function') ? liquidSimStats() : null,
+    // C8 テスト用: rAF が止まっていても液体シムを手動で n 水tick 進める（1回=0.3s相当）
+    stepLiquids: (n = 30) => { if (typeof updateLiquids === 'function') for (let i = 0; i < n; i++) updateLiquids(0.3); return (typeof liquidSimStats === 'function') ? liquidSimStats() : null; },
+    // C8 テスト: 液体の源を汲み取る（下流が枯れる）。dx,dy,dz は源セルへのオフセット
+    removeLiquid: (dx = 1, dy = 0, dz = 0) => {
+      const x = Math.floor(player.pos.x) + dx, y = Math.floor(player.pos.y) + dy, z = Math.floor(player.pos.z) + dz;
+      const t = (typeof pickupLiquidSource === 'function') ? pickupLiquidSource(x, y, z) : null;
+      return { x, y, z, removed: t != null };
+    },
+    // C8 テスト: SAVE.liquids から源を復元（通常は起動1フレーム目に自動実行。rAF停止時の手動用）
+    refloodFromSave: () => { if (typeof restoreLiquids === 'function') restoreLiquids(); return (typeof liquidSimStats === 'function') ? liquidSimStats() : null; },
+    // C8 テスト: 任意セルの流向ベクトル（プレイヤー相対座標）
+    flowAt: (dx = 1, dy = 0, dz = 0) => {
+      const x = Math.floor(player.pos.x) + dx, y = Math.floor(player.pos.y) + dy, z = Math.floor(player.pos.z) + dz;
+      return { pos: [x, y, z], flow: (typeof liquidFlowVector === 'function') ? liquidFlowVector(x, y, z) : null };
+    },
+    // C8 テスト: 炎上状態（残り秒数）と体力
+    burnInfo: () => ({ burn: SURVIVAL.burn || 0, health: SURVIVAL.health, invuln: SURVIVAL.invuln }),
+    // C8 テスト: rAF停止時に生存処理（溶岩/炎上/消火）を手動で dt 秒ぶん進める
+    stepSurvival: (dt = 0.1, moving = false) => { updateSurvival(dt, moving); return { burn: SURVIVAL.burn || 0, health: SURVIVAL.health, invuln: SURVIVAL.invuln }; },
+    // テスト用: rAF停止時にワールド生成/メッシュ適用ジョブを手動で回す（プリロード完了→__startGame() 用）
+    pump: (n = 300) => {
+      for (let i = 0; i < n; i++) { processWorldJob(); processRebuildJob(); processPlantJob(); }
+      return { preloadReady: (typeof worldPreloadReady === 'function') ? worldPreloadReady() : null, stats: window.__mcMeshWorkerStats };
+    },
+    // C8 テスト: rAF停止時にアイテムドロップ物理（流れ押し/浮力）を手動で進める
+    stepDrops: (dt = 0.1, n = 1) => {
+      for (let i = 0; i < n; i++) updateItemDrops(dt);
+      return ITEM_DROPS.map(dd => ({ id: dd.id, x: +dd.mesh.position.x.toFixed(2), y: +dd.mesh.position.y.toFixed(2), z: +dd.mesh.position.z.toFixed(2), grounded: dd.grounded }));
+    },
   };
