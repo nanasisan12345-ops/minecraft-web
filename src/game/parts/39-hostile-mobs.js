@@ -44,6 +44,7 @@
       if (Math.random() < 0.3) for (const [id, n] of blockDrops(t)) spawnItemDrop(x, y, z, id, n); // 3割だけ回収できる
       if (typeof clearCropAt === 'function') clearCropAt(x, y, z);
       setEdit(key(x, y, z), -1); setBlock(x, y, z, null);
+      if (typeof rsOnBlockChanged === 'function') rsOnBlockChanged(x, y, z, -1); // RS部品の登録解除/回路の再評価
       touched.push([x, y, z]);
     }
     if (touched.length) { saveEditsSoon(); for (const [x, y, z] of touched) requestEditedBlockRebuild(x, y, z); }

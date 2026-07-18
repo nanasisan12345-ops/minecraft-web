@@ -38,6 +38,14 @@
     { out: 'diamond', n: 9, pattern: ['B'], keys: { B: 'diamond_block' } },
     { out: 'coal_block', n: 1, pattern: ['MMM', 'MMM', 'MMM'], keys: { M: 'coal' } },
     { out: 'coal', n: 9, pattern: ['B'], keys: { B: 'coal_block' } },
+    // レッドストーン部品（本家準拠: トーチ=棒+ダスト / レバー=棒+丸石 / ボタン=石1 / 感圧板=同素材2 /
+    // ランプ=ダスト4+発光結晶の欠片1（C16でグロウストーンに移行するまでの代用））
+    { out: 'redstone_torch', n: 1, pattern: ['R', 'S'], keys: { R: 'redstone_dust', S: 'stick' } },
+    { out: 'lever', n: 1, pattern: ['S', 'C'], keys: { S: 'stick', C: 'cobblestone' } },
+    { out: 'stone_button', n: 1, pattern: ['T'], keys: { T: 'stone' } },
+    { out: 'stone_pressure_plate', n: 1, pattern: ['TT'], keys: { T: 'stone' } },
+    { out: 'wooden_pressure_plate', n: 1, pattern: ['PP'], keys: { P: 'planks' } },
+    { out: 'redstone_lamp', n: 1, pattern: [' R ', 'RGR', ' R '], keys: { R: 'redstone_dust', G: 'glow_shard' } },
     // バケツ（鉄インゴット3個をV字に）
     { out: 'bucket', n: 1, pattern: ['M M', ' M '], keys: { M: 'iron_ingot' } },
     // ツルハシ

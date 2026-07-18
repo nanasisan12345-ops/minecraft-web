@@ -39,6 +39,14 @@
     glass_pane:     { name: '板ガラス', cat: 'block', block: GLASS_PANE },
     sign:           { name: '看板', cat: 'block', block: SIGN, sign: true, fuel: 1.5 },
     obsidian:       { name: '黒曜石', cat: 'block', block: OBSIDIAN },
+    // レッドストーン部品（rsGround: 不透明ブロックの上面にのみ設置）
+    redstone_dust:  { name: 'レッドストーンダスト', cat: 'material', block: REDSTONE_WIRE, rsGround: true },
+    redstone_torch: { name: 'レッドストーントーチ', cat: 'block', block: REDSTONE_TORCH, rsGround: true, fuel: 0.5 },
+    lever:          { name: 'レバー', cat: 'block', block: LEVER_OFF, rsGround: true },
+    stone_button:   { name: '石のボタン', cat: 'block', block: STONE_BUTTON_OFF, rsGround: true },
+    stone_pressure_plate:  { name: '石の感圧板', cat: 'block', block: STONE_PLATE_OFF, rsGround: true },
+    wooden_pressure_plate: { name: '木の感圧板', cat: 'block', block: WOOD_PLATE_OFF, rsGround: true, fuel: 1.5 },
+    redstone_lamp:  { name: 'レッドストーンランプ', cat: 'block', block: REDSTONE_LAMP_OFF },
     glow_crystal:   { name: '発光結晶', cat: 'block', block: GLOW_CRYSTAL },
     gold_block:     { name: '金ブロック', cat: 'block', block: GOLD_BLOCK },
     iron_block:     { name: '鉄ブロック', cat: 'block', block: IRON_BLOCK },
@@ -132,6 +140,13 @@
   ITEM_FOR_BLOCK[OAK_TRAPDOOR_OPEN] = 'oak_trapdoor';
   ITEM_FOR_BLOCK[OAK_FENCE_GATE_Z_CLOSED] = 'oak_fence_gate';
   ITEM_FOR_BLOCK[OAK_FENCE_GATE_Z_OPEN] = 'oak_fence_gate';
+  // レッドストーンの on/off バリアント → 親アイテム
+  ITEM_FOR_BLOCK[REDSTONE_TORCH_OFF] = 'redstone_torch';
+  ITEM_FOR_BLOCK[LEVER_ON] = 'lever';
+  ITEM_FOR_BLOCK[STONE_BUTTON_ON] = 'stone_button';
+  ITEM_FOR_BLOCK[STONE_PLATE_ON] = 'stone_pressure_plate';
+  ITEM_FOR_BLOCK[WOOD_PLATE_ON] = 'wooden_pressure_plate';
+  ITEM_FOR_BLOCK[REDSTONE_LAMP_ON] = 'redstone_lamp';
   ITEM_FOR_BLOCK[OAK_FENCE_GATE_X_CLOSED] = 'oak_fence_gate';
   ITEM_FOR_BLOCK[OAK_FENCE_GATE_X_OPEN] = 'oak_fence_gate';
   function itemDef(id) { return ITEM_DEFS[id] || null; }

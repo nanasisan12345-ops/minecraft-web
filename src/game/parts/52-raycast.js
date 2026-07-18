@@ -273,7 +273,7 @@
   function blockPreferredTool(type) {
     if (isStairsBlock(type)) return (type < OAK_STAIRS + 4) ? 'axe' : 'pickaxe';       // 木=斧 / 石系=ツルハシ
     if (isSlabBlock(type)) return (type < OAK_SLAB + 2) ? 'axe' : 'pickaxe';
-    if ([STONE, DEEPSLATE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK, OBSIDIAN].includes(type)) return 'pickaxe';
+    if ([STONE, DEEPSLATE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, REDSTONE_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK, OBSIDIAN, STONE_BUTTON_OFF, STONE_BUTTON_ON, STONE_PLATE_OFF, STONE_PLATE_ON].includes(type)) return 'pickaxe';
     if (isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type) || type === OAK_FENCE) return 'axe';
     if (isLadderBlock(type) || isSignBlock(type)) return 'axe';
     if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN, OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_TRAPDOOR_CLOSED, OAK_TRAPDOOR_OPEN, OAK_FENCE, OAK_FENCE_GATE_Z_CLOSED, OAK_FENCE_GATE_Z_OPEN, OAK_FENCE_GATE_X_CLOSED, OAK_FENCE_GATE_X_OPEN].includes(type)) return 'axe';
@@ -311,10 +311,19 @@
   for (let i = 0; i < 4; i++) { BLOCK_HARDNESS.set(LADDER + i, 0.4); BLOCK_HARDNESS.set(SIGN + i, 1.0); }
   BLOCK_HARDNESS.set(GLASS_PANE, 0.3);
   BLOCK_HARDNESS.set(OBSIDIAN, 45); // 非常に硬い（ダイヤツルハシ推奨）
+  // レッドストーン
+  BLOCK_HARDNESS.set(REDSTONE_ORE, 3.4);
+  BLOCK_HARDNESS.set(REDSTONE_WIRE, 0.05);
+  BLOCK_HARDNESS.set(REDSTONE_TORCH, 0.1); BLOCK_HARDNESS.set(REDSTONE_TORCH_OFF, 0.1);
+  BLOCK_HARDNESS.set(LEVER_OFF, 0.5); BLOCK_HARDNESS.set(LEVER_ON, 0.5);
+  BLOCK_HARDNESS.set(STONE_BUTTON_OFF, 0.5); BLOCK_HARDNESS.set(STONE_BUTTON_ON, 0.5);
+  BLOCK_HARDNESS.set(STONE_PLATE_OFF, 0.5); BLOCK_HARDNESS.set(STONE_PLATE_ON, 0.5);
+  BLOCK_HARDNESS.set(WOOD_PLATE_OFF, 0.5); BLOCK_HARDNESS.set(WOOD_PLATE_ON, 0.5);
+  BLOCK_HARDNESS.set(REDSTONE_LAMP_OFF, 0.8); BLOCK_HARDNESS.set(REDSTONE_LAMP_ON, 0.8);
   // 掘ってもドロップしない（必要ツールレベル未満）判定。tier: 1木 2石 3鉄 4ダイヤ
   function requiredToolTier(type) {
     if ([IRON_ORE, IRON_BLOCK].includes(type)) return 2;            // 鉄鉱石/鉄ブロック: 石ツルハシ以上
-    if ([GOLD_ORE, DIAMOND_ORE, GOLD_BLOCK, DIAMOND_BLOCK].includes(type)) return 3; // 金/ダイヤ鉱石・ブロック: 鉄ツルハシ以上
+    if ([GOLD_ORE, DIAMOND_ORE, GOLD_BLOCK, DIAMOND_BLOCK, REDSTONE_ORE].includes(type)) return 3; // 金/ダイヤ/RS鉱石・ブロック: 鉄ツルハシ以上
     if (blockPreferredTool(type) === 'pickaxe') return 1;           // 石系: 何かしらのツルハシが必要
     return 0;
   }
@@ -347,6 +356,8 @@
     if (type === IRON_ORE) return [['raw_iron', 1]];
     if (type === GOLD_ORE) return [['raw_gold', 1]];
     if (type === DIAMOND_ORE) return [['diamond', 1]];
+    if (type === REDSTONE_ORE) return [['redstone_dust', 4 + (Math.random() < 0.5 ? 1 : 0)]]; // 本家準拠: ダスト4-5
+    if (type === REDSTONE_WIRE) return [['redstone_dust', 1]];
     if (type === GLOW_CRYSTAL) return [['glow_shard', 1]];
     if (type === OPEN_CHEST || type === VILLAGE_SIGN) return [['planks', 1]];
     if (type === GLASS_PANE) return []; // 本家同様ガラス板はドロップなし
@@ -426,6 +437,37 @@
     }
     setEdit(id, -1); saveEditsSoon(); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z, t); thock(150);
     breakDetachedLadders(x, y, z); // 背面(壁)を失ったはしごを剥がしてアイテム化
+    if (typeof rsOnBlockChanged === 'function') { rsOnBlockChanged(x, y, z, -1); breakUnsupportedRsBlocks(x, y, z); }
+  }
+  // (bx,by,bz) を足場にしていたRS部品（ワイヤ/トーチ/レバー/ボタン/感圧板）を剥がしてアイテム化
+  function breakUnsupportedRsBlocks(bx, by, bz) {
+    const at = blockAt(bx, by + 1, bz);
+    if (at === undefined || typeof rsOnBlockChanged !== 'function') return;
+    const groundMounted = [REDSTONE_WIRE, REDSTONE_TORCH, REDSTONE_TORCH_OFF, LEVER_OFF, LEVER_ON,
+      STONE_BUTTON_OFF, STONE_BUTTON_ON, STONE_PLATE_OFF, STONE_PLATE_ON, WOOD_PLATE_OFF, WOOD_PLATE_ON];
+    if (!groundMounted.includes(at)) return;
+    for (const [itemId, n] of blockDrops(at)) spawnItemDrop(bx, by + 1, bz, itemId, n);
+    setEdit(key(bx, by + 1, bz), -1); setBlock(bx, by + 1, bz, null); requestEditedBlockRebuild(bx, by + 1, bz, at);
+    rsOnBlockChanged(bx, by + 1, bz, -1);
+  }
+  // RS部品の設置: 不透明フルブロックの上面クリックのみ
+  function placeRsGroundFromTarget(tg, def) {
+    if (tg.normal[1] !== 1) return false;
+    const x = tg.block[0], y = tg.block[1] + 1, z = tg.block[2];
+    if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX) return false;
+    const below = blockAt(x, y - 1, z);
+    if (below === undefined || TYPES[below].solid === false || TYPES[below].model) { thock(90); return false; }
+    if (isPlacementBlocked(x, y, z) || overlapsPlayer(x, y, z, def.block)) return false;
+    const s = selectedItem();
+    if (!s) return false;
+    s.n -= 1;
+    if (s.n <= 0) INV[selected] = null;
+    invChanged();
+    setEdit(key(x, y, z), def.block); saveEditsSoon(); setBlock(x, y, z, def.block); requestEditedBlockRebuild(x, y, z, def.block);
+    if (typeof rsOnBlockChanged === 'function') rsOnBlockChanged(x, y, z, def.block);
+    thock(280);
+    if (typeof progressEvent === 'function') progressEvent('place', ITEM_FOR_BLOCK[def.block]);
+    return true;
   }
   // (bx,by,bz) を壁にしていたはしごを、隣接4方向から探して剥がす（本家: 背面が壊れると落ちる）
   const LADDER_WALL_OFFSET = [[0, 0, 1], [-1, 0, 0], [0, 0, -1], [1, 0, 0]]; // facing 0..3 → 壁の相対位置
@@ -561,6 +603,9 @@
       if (hitType === OPEN_CHEST) { openContainer('chest', { key: key(bx, by, bz) }); return; }
       if (hitType === BED) { trySleepInBed(bx, by, bz); return; }
       if (hitType === TNT) { igniteTNT(bx, by, bz); return; }   // TNTを右クリックで着火
+      if (hitType === LEVER_OFF || hitType === LEVER_ON) { rsToggleLeverAt(bx, by, bz, hitType); return; }
+      if (hitType === STONE_BUTTON_OFF) { rsPressButtonAt(bx, by, bz); return; }
+      if (hitType === STONE_BUTTON_ON) return; // 押下中のボタンは待つ
       if (isDoorBlock(hitType)) { toggleDoorAt(bx, by, bz, hitType); return; }
       if (isTrapdoorBlock(hitType)) { toggleTrapdoorAt(bx, by, bz, hitType); return; }
       if (isFenceGateBlock(hitType)) { toggleFenceGateAt(bx, by, bz, hitType); return; }
@@ -594,6 +639,7 @@
     if (tg && def && def.slab) { placeSlabFromTarget(tg, def); return; }
     if (tg && def && def.ladder) { placeLadderFromTarget(tg); return; }
     if (tg && def && def.sign) { placeSignFromTarget(tg); return; }
+    if (tg && def && def.rsGround) { placeRsGroundFromTarget(tg, def); return; }
     // ブロック設置
     if (!tg || !def || def.block == null) { if (def && def.block == null) thock(90); return; }
     const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
@@ -606,5 +652,6 @@
     invChanged();
     setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z, type); thock(260);
     if (typeof displaceLiquidAt === 'function') displaceLiquidAt(x, y, z); // 液体を塞いだら下流を枯らす
+    if (typeof rsOnBlockChanged === 'function') rsOnBlockChanged(x, y, z, type); // RS部品の登録/回路の再評価
     if (typeof progressEvent === 'function') progressEvent('place', ITEM_FOR_BLOCK[type]);
   }

@@ -9,7 +9,7 @@ const FACE_DEFS = [
 
 const GRASS = 0, DIRT = 1, STONE = 2, SAND = 5, WATER = 9, SNOW = 10;
 const COAL_ORE = 11, IRON_ORE = 12, GOLD_ORE = 13, DIAMOND_ORE = 14, LAVA = 24;
-const BEDROCK = 74, DEEPSLATE = 75; // 22-block-types.js の同名定数と一致させること
+const BEDROCK = 74, DEEPSLATE = 75, REDSTONE_ORE = 104; // 22-block-types.js の同名定数と一致させること
 const SEA = 8, SNOW_LINE = 30, ROCK_LINE = 23;
 const SPAWN_GROUND_Y = 12, SPAWN_FLAT_R = 28, SPAWN_CLEAR_R = 38;
 
@@ -21,6 +21,7 @@ let groupCounts = [];
 let blockModels = [];
 let lightLevels = [];
 let liquidLevels = null; // "x,y,z" -> lv(0-7)。シム液体の可変水面高（C8）
+let wireLevels = null;   // "x,y,z" -> 0-15。RSワイヤの信号強度（明度に反映、C15）
 let explicitBlocks = new Map();
 let explicitAir = new Set();
 let explicitEdits = new Map();
@@ -412,6 +413,7 @@ function oreTypeAt(x, y, z, h) {
   const deep = y <= -32 ? 0.080 : y <= -8 ? 0.060 : y <= 11 ? 0.035 : 0;
   if (y <= 13 && oreBand > 0.48 - deep && speck > 0.955 - deep) return DIAMOND_ORE;
   if (y <= 24 && oreBand > 0.40 - deep && speck > 0.915 - deep) return GOLD_ORE;
+  if (y <= 15 && oreBand > 0.34 && speck > 0.875) return REDSTONE_ORE; // 本家準拠: y<16。32-world-window.js と完全同一に保つこと
   if (y <= 44 && oreBand > 0.30 && speck > 0.84) return IRON_ORE;
   if (y <= h - 5 && oreBand > 0.20 && speck > 0.75) return COAL_ORE;
   return baseStoneAt(x, y, z);
@@ -884,7 +886,10 @@ function addCrossPartToState(state, x, y, z, part, rgb) {
 
 function addModelToState(state, x, y, z, model) {
   // モデルパーツ（松明/ドア/フェンス等）は自セルの光でフラットに照らす
-  const rgb = sampleFaceLight(x, y, z);
+  let rgb = sampleFaceLight(x, y, z);
+  // RSワイヤは信号強度で赤の明度を変える（blockライトチャンネルを持ち上げると暖色に光って見える）
+  const wl = wireLevels ? wireLevels.get(x + ',' + y + ',' + z) : undefined;
+  if (wl !== undefined) rgb = [rgb[0] * 0.5, Math.max(rgb[1], 0.10 + 0.90 * (wl / 15))];
   let added = false;
   for (const part of model) {
     if (part.kind === 'cross') added = addCrossPartToState(state, x, y, z, part, rgb) || added;
@@ -1035,6 +1040,9 @@ function loadPayload(payload) {
   liquidLevels = new Map();
   const lc = payload.liquidCells || [];
   for (let i = 0; i < lc.length; i += 4) liquidLevels.set(lc[i] + ',' + lc[i + 1] + ',' + lc[i + 2], lc[i + 3]);
+  wireLevels = new Map();
+  const wc = payload.wireCells || [];
+  for (let i = 0; i < wc.length; i += 4) wireLevels.set(wc[i] + ',' + wc[i + 1] + ',' + wc[i + 2], wc[i + 3]);
   explicitBlocks = new Map();
   explicitAir = new Set();
   explicitEdits = new Map();

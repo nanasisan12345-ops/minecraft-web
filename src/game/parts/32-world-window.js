@@ -548,6 +548,7 @@
     const deep = y <= -32 ? 0.080 : y <= -8 ? 0.060 : y <= 11 ? 0.035 : 0; // 深層ほど良い鉱石が出やすい
     if (y <= 13 && oreBand > 0.48 - deep && speck > 0.955 - deep) return DIAMOND_ORE;
     if (y <= 24 && oreBand > 0.40 - deep && speck > 0.915 - deep) return GOLD_ORE;
+    if (y <= 15 && oreBand > 0.34 && speck > 0.875) return REDSTONE_ORE; // 本家準拠: y<16
     if (y <= 44 && oreBand > 0.30 && speck > 0.84) return IRON_ORE;
     if (y <= h - 5 && oreBand > 0.20 && speck > 0.75) return COAL_ORE;
     return baseStoneAt(x, y, z);

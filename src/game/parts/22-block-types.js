@@ -187,6 +187,61 @@
   const OBSIDIAN = TYPES.length; // 103
   TYPES.push({ name: '黒曜石', color: 0x1a1228, icon: T.obsidian, mats: faceMats(T.obsidian, { shininess: 60, specular: 0x2a1a44 }) });
 
+  // レッドストーン(104-117): 鉱石/ワイヤ/トーチon-off/レバーoff-on/石ボタンoff-on/感圧板(石・木)off-on/ランプoff-on
+  // on/off はIDバリアント方式（ドアと同流儀）。信号ロジックは 47-redstone.js。
+  const REDSTONE_ORE = TYPES.length;       // 104
+  TYPES.push({ name: 'レッドストーン鉱石', color: 0x8a3a34, icon: T.redstoneOre, mats: faceMats(T.redstoneOre) });
+  const REDSTONE_WIRE = TYPES.length;      // 105
+  TYPES.push({ name: 'レッドストーンダスト', color: 0xc02218, icon: T.redstoneWire, mats: faceMats(T.redstoneWire, { transparent: true, alphaTest: 0.15 }), transparent: true, solid: false, noAutoItem: true });
+  const REDSTONE_TORCH = TYPES.length;     // 106 (点灯)
+  TYPES.push({ name: 'レッドストーントーチ', color: 0xff4a3a, icon: T.redstoneTorchOn, mats: faceMats(T.redstoneTorchOn, { transparent: true, alphaTest: 0.2 }), transparent: true, solid: false, noAutoItem: true });
+  const REDSTONE_TORCH_OFF = TYPES.length; // 107 (消灯)
+  TYPES.push({ name: 'レッドストーントーチ(消灯)', color: 0x5a1410, icon: T.redstoneTorchOff, mats: faceMats(T.redstoneTorchOff, { transparent: true, alphaTest: 0.2 }), transparent: true, solid: false, noAutoItem: true });
+  const LEVER_OFF = TYPES.length;          // 108
+  TYPES.push({ name: 'レバー', color: 0x84898d, icon: T.lever, mats: faceMats(T.lever, { transparent: true, alphaTest: 0.2 }), transparent: true, solid: false, noAutoItem: true });
+  const LEVER_ON = TYPES.length;           // 109
+  TYPES.push({ name: 'レバー(ON)', color: 0x84898d, icon: T.lever, mats: faceMats(T.lever, { transparent: true, alphaTest: 0.2 }), transparent: true, solid: false, noAutoItem: true });
+  const STONE_BUTTON_OFF = TYPES.length;   // 110
+  TYPES.push({ name: '石のボタン', color: 0x84898d, icon: T.stone, mats: faceMats(T.stone), transparent: true, solid: false, noAutoItem: true });
+  const STONE_BUTTON_ON = TYPES.length;    // 111
+  TYPES.push({ name: '石のボタン(押)', color: 0x84898d, icon: T.stone, mats: faceMats(T.stone), transparent: true, solid: false, noAutoItem: true });
+  const STONE_PLATE_OFF = TYPES.length;    // 112
+  TYPES.push({ name: '石の感圧板', color: 0x84898d, icon: T.stone, mats: faceMats(T.stone), transparent: true, solid: false, noAutoItem: true });
+  const STONE_PLATE_ON = TYPES.length;     // 113
+  TYPES.push({ name: '石の感圧板(押)', color: 0x84898d, icon: T.stone, mats: faceMats(T.stone), transparent: true, solid: false, noAutoItem: true });
+  const WOOD_PLATE_OFF = TYPES.length;     // 114
+  TYPES.push({ name: '木の感圧板', color: 0xb5824a, icon: T.planks, mats: faceMats(T.planks), transparent: true, solid: false, noAutoItem: true });
+  const WOOD_PLATE_ON = TYPES.length;      // 115
+  TYPES.push({ name: '木の感圧板(押)', color: 0xb5824a, icon: T.planks, mats: faceMats(T.planks), transparent: true, solid: false, noAutoItem: true });
+  const REDSTONE_LAMP_OFF = TYPES.length;  // 116
+  TYPES.push({ name: 'レッドストーンランプ', color: 0x5a4020, icon: T.redstoneLamp, mats: faceMats(T.redstoneLamp) });
+  const REDSTONE_LAMP_ON = TYPES.length;   // 117 (点灯)
+  TYPES.push({ name: 'レッドストーンランプ(点灯)', color: 0xe8a83a, icon: T.redstoneLampOn, mats: faceMats(T.redstoneLampOn), noAutoItem: true });
+
+  // 形状: ワイヤ=床の薄い十字 / トーチ=松明形 / レバー=台座+棒 / ボタン=小箱 / 感圧板=薄板
+  const WIRE_BOXES = [[0.0, 0, 0.38, 1.0, 0.03, 0.62], [0.38, 0, 0.0, 0.62, 0.03, 1.0]];
+  TYPES[REDSTONE_WIRE].model = WIRE_BOXES.map(box => ({ box }));
+  const RS_TORCH_MODEL = [
+    { box: [0.43, 0.00, 0.43, 0.57, 0.66, 0.57] },
+    { box: [0.34, 0.56, 0.34, 0.66, 0.92, 0.66] },
+  ];
+  TYPES[REDSTONE_TORCH].model = RS_TORCH_MODEL;
+  TYPES[REDSTONE_TORCH_OFF].model = RS_TORCH_MODEL;
+  TYPES[LEVER_OFF].model = [
+    { box: [0.30, 0.00, 0.30, 0.70, 0.12, 0.70] },
+    { box: [0.44, 0.12, 0.44, 0.56, 0.55, 0.56] },
+  ];
+  TYPES[LEVER_ON].model = [
+    { box: [0.30, 0.00, 0.30, 0.70, 0.12, 0.70] },
+    { box: [0.44, 0.12, 0.20, 0.56, 0.30, 0.50] }, // 倒れたハンドル
+  ];
+  TYPES[STONE_BUTTON_OFF].model = [{ box: [0.34, 0, 0.34, 0.66, 0.12, 0.66] }];
+  TYPES[STONE_BUTTON_ON].model = [{ box: [0.34, 0, 0.34, 0.66, 0.05, 0.66] }];
+  TYPES[STONE_PLATE_OFF].model = [{ box: [0.07, 0, 0.07, 0.93, 0.06, 0.93] }];
+  TYPES[STONE_PLATE_ON].model = [{ box: [0.07, 0, 0.07, 0.93, 0.025, 0.93] }];
+  TYPES[WOOD_PLATE_OFF].model = [{ box: [0.07, 0, 0.07, 0.93, 0.06, 0.93] }];
+  TYPES[WOOD_PLATE_ON].model = [{ box: [0.07, 0, 0.07, 0.93, 0.025, 0.93] }];
+
   // 発光ブロックの光レベル（本家準拠）。ライトエンジンが BFS 伝播して頂点カラーへ焼き込む
   TYPES[TORCH].lightLevel = 14;
   TYPES[LANTERN].lightLevel = 15;
@@ -194,6 +249,8 @@
   TYPES[GLOW_CRYSTAL].lightLevel = 13;
   TYPES[LAVA].lightLevel = 15;
   TYPES[FURNACE_LIT].lightLevel = 13;
+  TYPES[REDSTONE_TORCH].lightLevel = 7;      // 本家準拠: RSトーチは光レベル7
+  TYPES[REDSTONE_LAMP_ON].lightLevel = 15;   // 受電で光レベル15（ライトエンジン連動）
 
   TYPES[TORCH].model = [
     { box: [0.43, 0.00, 0.43, 0.57, 0.72, 0.57] },

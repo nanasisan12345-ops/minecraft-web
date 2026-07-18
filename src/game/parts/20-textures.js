@@ -459,9 +459,62 @@
       g.strokeStyle = 'rgba(40,42,46,0.75)'; g.lineWidth = 1;
       for (let x = 3; x < S; x += 6) { g.beginPath(); g.moveTo(x + rnd(-1, 1), 0); g.lineTo(x + rnd(-2, 2), S); g.stroke(); }
     }),
+    redstoneOre: makeTex((g, S) => {                         // レッドストーン鉱石。石に赤い結晶粒。
+      noise(g, S, 0x757a7d, 0.86, 1.06);
+      const spots = [[4, 5], [14, 3], [23, 7], [6, 15], [17, 13], [25, 17], [4, 24], [13, 23], [22, 25]];
+      for (const [x, y] of spots) {
+        g.fillStyle = tint(0xd8281e, rnd(0.85, 1.1)); g.fillRect(x, y, 4, 4);
+        g.fillStyle = tint(0xff5a4a, rnd(0.95, 1.15)); g.fillRect(x + 1, y + 1, 2, 2);
+      }
+      dots(g, S, 0x4f545a, 0.05, 0.8);
+    }),
+    redstoneWire: makeTex((g, S) => {                        // ダスト。赤い粉の筋（背景透明）。
+      g.clearRect(0, 0, S, S);
+      g.fillStyle = tint(0xc02218, 1.0); g.fillRect(0, S / 2 - 3, S, 6); g.fillRect(S / 2 - 3, 0, 6, S);
+      g.fillStyle = tint(0xe83a28, 1.05); g.fillRect(0, S / 2 - 1, S, 2); g.fillRect(S / 2 - 1, 0, 2, S);
+      for (let i = 0; i < 20; i++) { g.fillStyle = tint(0x8a1810, rnd(0.8, 1.2)); g.fillRect(Math.random() * S | 0, Math.random() * S | 0, 1, 1); }
+    }),
+    redstoneTorchOn: makeTex((g, S) => {                     // RSトーチ(点灯)。赤く光る先端。
+      noise(g, S, 0x5a361a, 0.85, 1.08);
+      g.fillStyle = '#3a2412'; g.fillRect(10, 12, 12, 20);
+      g.fillStyle = '#8a5525'; g.fillRect(13, 12, 6, 20);
+      g.fillStyle = '#ff4a3a'; g.fillRect(8, 4, 16, 10);
+      g.fillStyle = '#ff8a7a'; g.fillRect(11, 6, 10, 6);
+      g.fillStyle = '#ffd2c8'; g.fillRect(13, 4, 6, 5);
+    }),
+    redstoneTorchOff: makeTex((g, S) => {                    // RSトーチ(消灯)。暗い赤の先端。
+      noise(g, S, 0x5a361a, 0.85, 1.08);
+      g.fillStyle = '#3a2412'; g.fillRect(10, 12, 12, 20);
+      g.fillStyle = '#8a5525'; g.fillRect(13, 12, 6, 20);
+      g.fillStyle = '#5a1410'; g.fillRect(8, 4, 16, 10);
+      g.fillStyle = '#7a241a'; g.fillRect(11, 6, 10, 6);
+    }),
+    lever: makeTex((g, S) => {                               // レバー。丸石台座＋木の棒。
+      noise(g, S, 0x74797d, 0.8, 1.02);
+      g.fillStyle = tint(0x4f545a, 0.9); g.fillRect(6, 20, 20, 8);
+      g.fillStyle = tint(0x84898d, 1.0); g.fillRect(8, 22, 16, 4);
+      g.fillStyle = '#8a5525'; g.fillRect(14, 4, 4, 18);
+      g.fillStyle = '#5a361a'; g.fillRect(14, 4, 1, 18);
+      g.fillStyle = '#d8281e'; g.fillRect(13, 2, 6, 4);
+    }),
+    redstoneLamp: makeTex((g, S) => {                        // ランプ(消灯)。暗い琥珀色＋格子。
+      noise(g, S, 0x5a4020, 0.8, 1.05);
+      g.fillStyle = tint(0x3a2a12, 0.9);
+      g.fillRect(0, 0, S, 3); g.fillRect(0, S - 3, S, 3); g.fillRect(0, 0, 3, S); g.fillRect(S - 3, 0, 3, S);
+      g.fillRect(0, S / 2 - 1, S, 2); g.fillRect(S / 2 - 1, 0, 2, S);
+      dots(g, S, 0x7a5a2a, 0.06, 1.1);
+    }),
+    redstoneLampOn: makeTex((g, S) => {                      // ランプ(点灯)。明るい金色の光。
+      noise(g, S, 0xe8a83a, 0.95, 1.08);
+      g.fillStyle = tint(0x8a5a1a, 0.9);
+      g.fillRect(0, 0, S, 3); g.fillRect(0, S - 3, S, 3); g.fillRect(0, 0, 3, S); g.fillRect(S - 3, 0, 3, S);
+      g.fillRect(0, S / 2 - 1, S, 2); g.fillRect(S / 2 - 1, 0, 2, S);
+      g.fillStyle = 'rgba(255,242,180,0.85)'; g.fillRect(5, 5, 10, 10); g.fillRect(19, 19, 8, 8);
+      dots(g, S, 0xfff2a3, 0.08, 1.15);
+    }),
   };
   TX.lava.wrapS = TX.lava.wrapT = THREE.RepeatWrapping;
   TX.cactus.userData.normalMap = normalFromCanvas(TX.cactus.image, 2.2);
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
-  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'doorLower', 'doorUpper', 'trapdoor', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'furnaceSide', 'furnaceTop', 'furnaceFront', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'farmland', 'furnaceLit', 'tntSide', 'tntTop', 'ironBlock', 'diamondBlock', 'coalBlock', 'bedrock', 'deepslate'])
+  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'doorLower', 'doorUpper', 'trapdoor', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'furnaceSide', 'furnaceTop', 'furnaceFront', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'farmland', 'furnaceLit', 'tntSide', 'tntTop', 'ironBlock', 'diamondBlock', 'coalBlock', 'bedrock', 'deepslate', 'redstoneOre', 'redstoneLamp', 'redstoneLampOn'])
     TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);

@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 16; // 9-13: ライト+岩盤/深層岩/深部洞窟。14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高
+  const MESH_WORKER_VERSION = 17; // 14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高。17: RS鉱石+RS部品モデル
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {
@@ -155,7 +155,13 @@
   }
 
   function addModelToState(state, x, y, z, model) {
-    const rgb = mainFaceLight(x, y, z);
+    let rgb = mainFaceLight(x, y, z);
+    // RSワイヤの信号強度→明度（ワーカー経路と同形）
+    if (typeof rsSignalInfoAt === 'function' && blockAt(x, y, z) === REDSTONE_WIRE) {
+      const info = rsSignalInfoAt(x, y, z);
+      const wl = info.wireLevel || 0;
+      rgb = [rgb[0] * 0.5, Math.max(rgb[1], 0.10 + 0.90 * (wl / 15))];
+    }
     let added = false;
     for (const part of model) {
       if (part.kind === 'cross') added = addCrossPartToState(state, x, y, z, part, rgb) || added;
@@ -455,6 +461,11 @@
     for (let i = 0; i < liquidCells.length; i += 4) {
       hash = fnvAdd(fnvAdd(fnvAdd(fnvAdd(hash, liquidCells[i] ^ 0x7171), liquidCells[i + 1] ^ 0x3939), liquidCells[i + 2] ^ 0x5b5b), liquidCells[i + 3] ^ 0x1d1d);
     }
+    // RSワイヤ（信号強度で赤の明度が変わる）。同じくハッシュに含める
+    const wireCells = (typeof collectRsWireCells === 'function') ? collectRsWireCells(x0, x1, z0, z1) : [];
+    for (let i = 0; i < wireCells.length; i += 4) {
+      hash = fnvAdd(fnvAdd(fnvAdd(fnvAdd(hash, wireCells[i] ^ 0x2f2f), wireCells[i + 1] ^ 0x6363), wireCells[i + 2] ^ 0x0f0f), wireCells[i + 3] ^ 0x4545);
+    }
     hash = fnvAdd(fnvAdd(hash, WORLD_SEED), MESH_WORKER_VERSION);
     return {
       cx, cz,
@@ -473,6 +484,7 @@
       edits: editEntries,
       blockedColumns,
       liquidCells,
+      wireCells,
       cacheKey: `${WORLD_SEED}:mesh:${MESH_WORKER_VERSION}:${cx},${cz}:${hash.toString(36)}`,
     };
   }

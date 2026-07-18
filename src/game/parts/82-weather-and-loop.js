@@ -116,7 +116,7 @@
     requestAnimationFrame(animate);
     const now = performance.now(), dt = Math.min((now - prev) / 1000, 0.05); prev = now;
 
-    if (started && !animate.signsInited) { animate.signsInited = true; if (typeof refreshAllSigns === 'function') refreshAllSigns(); if (typeof restoreLiquids === 'function') restoreLiquids(); }
+    if (started && !animate.signsInited) { animate.signsInited = true; if (typeof refreshAllSigns === 'function') refreshAllSigns(); if (typeof restoreLiquids === 'function') restoreLiquids(); if (typeof restoreRedstone === 'function') restoreRedstone(); }
 
     if (started && !SURVIVAL.dead) {
       const f = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
@@ -189,6 +189,7 @@
     updateFurnaces(dt);
     updateFurnaceBars();
     updateLiquids(dt);
+    updateRedstone(dt);
     updateCrops(dt);
     updateSaplings(dt);
     updateProgress(dt);
@@ -308,6 +309,7 @@
       const y = Math.floor(player.pos.y) + dy;
       const t = blockAt(x, y, z);
       setEdit(key(x, y, z), -1); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z, t);
+      if (typeof rsOnBlockChanged === 'function') rsOnBlockChanged(x, y, z, -1);
       return { x, y, z, was: t != null ? TYPES[t] && TYPES[t].name : null };
     },
     // ライトエンジン確認: 現在地の空の見え方＋近くの発光ブロック＋直近チャンクビルド時間。
@@ -391,4 +393,29 @@
       for (let i = 0; i < n; i++) updateItemDrops(dt);
       return ITEM_DROPS.map(dd => ({ id: dd.id, x: +dd.mesh.position.x.toFixed(2), y: +dd.mesh.position.y.toFixed(2), z: +dd.mesh.position.z.toFixed(2), grounded: dd.grounded }));
     },
+    // C15 テスト: 任意セルの信号情報（プレイヤー相対座標）
+    signalAt: (dx = 1, dy = 0, dz = 0) => rsSignalInfoAt(Math.floor(player.pos.x) + dx, Math.floor(player.pos.y) + dy, Math.floor(player.pos.z) + dz),
+    rsStats: () => rsStats(),
+    // C15 テスト: RS部品/ブロックを直接設置（kind: wire|torch|lever|button|plateS|plateW|lamp|型ID数値）
+    rsPut: (kind, dx = 1, dy = 0, dz = 0) => {
+      const map = { wire: REDSTONE_WIRE, torch: REDSTONE_TORCH, lever: LEVER_OFF, button: STONE_BUTTON_OFF, plateS: STONE_PLATE_OFF, plateW: WOOD_PLATE_OFF, lamp: REDSTONE_LAMP_OFF };
+      const t = typeof kind === 'number' ? kind : map[kind];
+      if (t == null) return null;
+      const x = Math.floor(player.pos.x) + dx, y = Math.floor(player.pos.y) + dy, z = Math.floor(player.pos.z) + dz;
+      setEdit(key(x, y, z), t); saveEditsSoon(); setBlock(x, y, z, t); requestEditedBlockRebuild(x, y, z, t);
+      if (typeof rsOnBlockChanged === 'function') rsOnBlockChanged(x, y, z, t);
+      return { pos: [x, y, z], type: t };
+    },
+    // C15 テスト: レバー切替/ボタン押下（プレイヤー相対座標）
+    rsUse: (dx = 1, dy = 0, dz = 0) => {
+      const x = Math.floor(player.pos.x) + dx, y = Math.floor(player.pos.y) + dy, z = Math.floor(player.pos.z) + dz;
+      const t = blockAt(x, y, z);
+      if (t === LEVER_OFF || t === LEVER_ON) return { toggled: rsToggleLeverAt(x, y, z, t) };
+      if (t === STONE_BUTTON_OFF) return { pressed: rsPressButtonAt(x, y, z) };
+      return { none: true, block: t };
+    },
+    // C15 テスト: rAF停止時にRSティックを手動で進める（1回=0.1s）
+    stepRedstone: (n = 5) => { for (let i = 0; i < n; i++) updateRedstone(RS_TICK_SEC); return rsStats(); },
+    // C15 テスト: edits からRS部品レジストリを復元（通常は起動1フレーム目に自動実行。rAF停止時の手動用）
+    rsRestore: () => { if (typeof restoreRedstone === 'function') restoreRedstone(); return rsStats(); },
   };
