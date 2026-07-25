@@ -855,7 +855,9 @@ function addBoxPartToState(state, x, y, z, part, rgb) {
   const x0 = x + b[0], y0 = y + b[1], z0 = z + b[2];
   const x1 = x + b[3], y1 = y + b[4], z1 = z + b[5];
   if (x1 <= x0 || y1 <= y0 || z1 <= z0) return false;
-  const uvCoords = part.uv || FACE_DEFS[0].uv;
+  // UVは面ごと（FACE_DEFS[f].uv）を使う（34-mesh-rebuild.js と同じ規則）。
+  // 1種類のUVを全面に使い回すと面1(-x)と面4(+z)でu,vが入れ替わり絵柄が90度回る
+  const uvCoords = part.uv || null;
   const faces = [
     [[x1,y0,z0], [x1,y1,z0], [x1,y1,z1], [x1,y0,z1]],
     [[x0,y0,z0], [x0,y0,z1], [x0,y1,z1], [x0,y1,z0]],
@@ -866,7 +868,7 @@ function addBoxPartToState(state, x, y, z, part, rgb) {
   ];
   for (let f = 0; f < FACE_DEFS.length; f++) {
     const fd = FACE_DEFS[f];
-    addQuadToState(state, faces[f], fd.n, uvCoords, part.mat ?? fd.m, rgb);
+    addQuadToState(state, faces[f], fd.n, uvCoords || fd.uv, part.mat ?? fd.m, rgb);
   }
   return true;
 }

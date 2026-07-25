@@ -29,18 +29,18 @@
     { name: '鉄鉱石',   color: 0xc78a55, icon: T.ironOre,    mats: faceMats(T.ironOre) }, // 12
     { name: '金鉱石',   color: 0xe2b93c, icon: T.goldOre,    mats: faceMats(T.goldOre, { shininess: 8, specular: 0x332800 }) }, // 13
     { name: 'ダイヤ鉱石', color: 0x55d9e8, icon: T.diamondOre, mats: faceMats(T.diamondOre, { shininess: 12, specular: 0x225566 }) }, // 14
-    { name: 'たいまつ', color: 0xffb23a, icon: T.torch, mats: faceMats(T.torch, { emissive: 0xffa324, emissiveIntensity: 0.75, shininess: 16, specular: 0x442200 }), transparent: true }, // 15
-    { name: '作業台', color: 0xb5824a, icon: T.crafting, mats: faceMats(T.crafting) }, // 16
+    { name: 'たいまつ', color: 0xffb23a, icon: T.torch, mats: faceMats([T.torch, T.torch, T.torchFlame, T.torch, T.torch, T.torch], { emissive: 0xffa324, emissiveIntensity: 0.75, shininess: 16, specular: 0x442200 }), transparent: true }, // 15
+    { name: '作業台', color: 0xb5824a, icon: T.crafting, mats: faceMats([T.crafting, T.crafting, T.craftingTop, T.planks, T.crafting, T.crafting]) }, // 16
     { name: 'かまど', color: 0x757a7d, icon: T.furnaceFront, mats: faceMats([T.furnaceSide, T.furnaceSide, T.furnaceTop, T.furnaceTop, T.furnaceFront, T.furnaceSide], { emissive: 0x221008, emissiveIntensity: 0.12 }) }, // 17
     { name: '発光結晶', color: 0x6df7ff, icon: T.glowCrystal, mats: faceMats(T.glowCrystal, { emissive: 0x52dfff, emissiveIntensity: 0.92, shininess: 30, specular: 0x66ffff }) }, // 18
     { name: '鍾乳石', color: 0x8b8172, icon: T.dripstone, mats: faceMats(T.dripstone) }, // 19
     { name: '石レンガ', color: 0x868b8f, icon: T.stoneBrick, mats: faceMats(T.stoneBrick) }, // 20
     { name: '苔石レンガ', color: 0x6f8a5a, icon: T.mossyBrick, mats: faceMats(T.mossyBrick) }, // 21
-    { name: '宝箱', color: 0xc79a52, icon: T.chest, mats: faceMats(T.chest, { shininess: 8, specular: 0x332100 }), transparent: true }, // 22
+    { name: '宝箱', color: 0xc79a52, icon: T.chest, mats: faceMats([T.chest, T.chest, T.chestTop, T.chestTop, T.chest, T.chest], { shininess: 8, specular: 0x332100 }), transparent: true }, // 22
     { name: 'ランタン', color: 0xffc25a, icon: T.lantern, mats: faceMats(T.lantern, { emissive: 0xffb43a, emissiveIntensity: 0.85, shininess: 18, specular: 0x442200 }), transparent: true }, // 23
     { name: '溶岩', color: 0xff6a1a, icon: T.lava, mats: faceMats(T.lava, { transparent: true, depthWrite: false, opacity: 0.94, emissive: 0xff5a18, emissiveIntensity: 0.9, shininess: 40, specular: 0x552200 }), transparent: true, solid: false }, // 24
     { name: 'サボテン', color: 0x4f8f3a, icon: T.cactus, mats: faceMats(T.cactus), transparent: true }, // 25
-    { name: '開いた宝箱', color: 0x9a7038, icon: T.chestOpen, mats: faceMats(T.chestOpen, { shininess: 8, specular: 0x332100 }), transparent: true }, // 26
+    { name: '開いた宝箱', color: 0x9a7038, icon: T.chestOpen, mats: faceMats([T.chestOpen, T.chestOpen, T.chestTop, T.chestTop, T.chestOpen, T.chestOpen], { shininess: 8, specular: 0x332100 }), transparent: true }, // 26
     { name: '村の看板', color: 0xb5824a, icon: T.villageSign, mats: faceMats(T.villageSign, { shininess: 5, specular: 0x221400 }), transparent: true }, // 27
     { name: '朱の木', color: 0xcf3b1e, icon: T.vermilion, mats: faceMats(T.vermilion, { shininess: 5, specular: 0x331008 }) }, // 28
     { name: '白漆喰', color: 0xeae3d2, icon: T.plaster, mats: faceMats(T.plaster) }, // 29
@@ -64,14 +64,14 @@
     { name: '鉄ブロック', color: 0xd0d5da, icon: T.ironBlock, mats: faceMats(T.ironBlock, { shininess: 26, specular: 0x6a7076 }) }, // 47
     { name: 'ダイヤブロック', color: 0x66d8e6, icon: T.diamondBlock, mats: faceMats(T.diamondBlock, { shininess: 30, specular: 0x226677 }) }, // 48
     { name: '石炭ブロック', color: 0x26282c, icon: T.coalBlock, mats: faceMats(T.coalBlock) }, // 49
-    { name: '木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true }, // 50
-    { name: '木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 51
-    { name: '開いた木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 52
-    { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 53
-    { name: '木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 54
-    { name: '木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 55
-    { name: '開いた木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 56
-    { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 57
+    { name: '木のドア', color: 0xa8743d, icon: T.doorBottom, transparent: true }, // 50
+    { name: '木のドア(上)', color: 0xa8743d, icon: T.doorTop, transparent: true, noAutoItem: true }, // 51
+    { name: '開いた木のドア', color: 0xa8743d, icon: T.doorBottom, transparent: true, noAutoItem: true }, // 52
+    { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorTop, transparent: true, noAutoItem: true }, // 53
+    { name: '木のドア', color: 0xa8743d, icon: T.doorBottom, transparent: true, noAutoItem: true }, // 54
+    { name: '木のドア(上)', color: 0xa8743d, icon: T.doorTop, transparent: true, noAutoItem: true }, // 55
+    { name: '開いた木のドア', color: 0xa8743d, icon: T.doorBottom, transparent: true, noAutoItem: true }, // 56
+    { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorTop, transparent: true, noAutoItem: true }, // 57
     { name: '木のトラップドア', color: 0xa8743d, icon: T.trapdoor, mats: faceMats(T.trapdoor, { transparent: true, alphaTest: 0.18 }), transparent: true }, // 58
     { name: '開いた木のトラップドア', color: 0xa8743d, icon: T.trapdoor, mats: faceMats(T.trapdoor, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 59
     { name: '木のフェンス', color: 0xa8743d, icon: T.planks, mats: faceMats(T.planks), transparent: true, collisionHeight: 1.5 }, // 60
@@ -80,14 +80,14 @@
     { name: '木のフェンスゲート', color: 0xa8743d, icon: T.planks, mats: faceMats(T.planks), transparent: true, collisionHeight: 1.5, noAutoItem: true }, // 63
     { name: '開いた木のフェンスゲート', color: 0xa8743d, icon: T.planks, mats: faceMats(T.planks), transparent: true, solid: false, noAutoItem: true }, // 64
     { name: '丸石の壁', color: 0x7d8286, icon: T.cobble, mats: faceMats(T.cobble), transparent: true, collisionHeight: 1.5 }, // 65
-    { name: '木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 66
-    { name: '木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 67
-    { name: '開いた木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 68
-    { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 69
-    { name: '木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 70
-    { name: '木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 71
-    { name: '開いた木のドア', color: 0xa8743d, icon: T.doorLower, mats: faceMats(T.doorLower, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 72
-    { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorUpper, mats: faceMats(T.doorUpper, { transparent: true, alphaTest: 0.18 }), transparent: true, noAutoItem: true }, // 73
+    { name: '木のドア', color: 0xa8743d, icon: T.doorBottom, transparent: true, noAutoItem: true }, // 66
+    { name: '木のドア(上)', color: 0xa8743d, icon: T.doorTop, transparent: true, noAutoItem: true }, // 67
+    { name: '開いた木のドア', color: 0xa8743d, icon: T.doorBottom, transparent: true, noAutoItem: true }, // 68
+    { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorTop, transparent: true, noAutoItem: true }, // 69
+    { name: '木のドア', color: 0xa8743d, icon: T.doorBottom, transparent: true, noAutoItem: true }, // 70
+    { name: '木のドア(上)', color: 0xa8743d, icon: T.doorTop, transparent: true, noAutoItem: true }, // 71
+    { name: '開いた木のドア', color: 0xa8743d, icon: T.doorBottom, transparent: true, noAutoItem: true }, // 72
+    { name: '開いた木のドア(上)', color: 0xa8743d, icon: T.doorTop, transparent: true, noAutoItem: true }, // 73
     { name: '岩盤', color: 0x333639, icon: T.bedrock, mats: faceMats(T.bedrock), noAutoItem: true, unbreakable: true }, // 74
     { name: '深層岩', color: 0x4c4f55, icon: T.deepslate, mats: faceMats(T.deepslate) }, // 75
   ];
@@ -252,9 +252,9 @@
   TYPES[REDSTONE_TORCH].lightLevel = 7;      // 本家準拠: RSトーチは光レベル7
   TYPES[REDSTONE_LAMP_ON].lightLevel = 15;   // 受電で光レベル15（ライトエンジン連動）
 
+  // 本家準拠: 2/16角 × 10/16高 の1本の棒（炎はテクスチャ上部）
   TYPES[TORCH].model = [
-    { box: [0.43, 0.00, 0.43, 0.57, 0.72, 0.57] },
-    { box: [0.32, 0.62, 0.32, 0.68, 1.00, 0.68] },
+    { box: [0.4375, 0.00, 0.4375, 0.5625, 0.625, 0.5625] },
   ];
   TYPES[CHEST].model = [
     { box: [0.0625, 0.00, 0.0625, 0.9375, 0.875, 0.9375] },
@@ -282,6 +282,7 @@
     { box: [0.28, 0.00, 0.28, 0.72, 0.10, 0.72] },
     { box: [0.28, 0.86, 0.28, 0.72, 0.98, 0.72] },
   ];
+  // 旧1ブロックのベッド(ID 40)。既存セーブのために残す。新規設置は下の2ブロック版を使う
   TYPES[BED].model = [
     { box: [0.02, 0.18, 0.02, 0.98, 0.56, 0.98] },
     { box: [0.08, 0.00, 0.08, 0.22, 0.18, 0.22] },
@@ -298,20 +299,104 @@
   TYPES[SAPLING].model = [
     { kind: 'cross', y0: 0.00, y1: 0.82, r: 0.38 },
   ];
-  function setDoorShape(lower, upper, box) {
-    TYPES[lower].model = [{ box }];
-    TYPES[upper].model = [{ box }];
-    TYPES[lower].collisionBoxes = [box];
-    TYPES[upper].collisionBoxes = [box];
+  /* ---- ドア: facing×開閉×ヒンジ×上下 の32IDバリアント ----
+     facing はパネルが接するブロック面 0=n(-z) 1=e(+x) 2=s(+z) 3=w(-x)。設置時は必ずプレイヤーの
+     手前側の面になるので、facing = プレイヤーの視線方向の逆。hinge は設置者から見た左右 0=右 1=左。
+     既存16ID(50-57,66-73)はヒンジ右。セーブデータ互換のためIDは動かさず、左ヒンジ16IDを末尾に足す。 */
+  const DOOR_BOX = [
+    [0.00, 0.00, 0.0000, 1.00, 1.00, 0.1875], // 0: n(-z)側の板
+    [0.8125, 0.00, 0.00, 1.00, 1.00, 1.0000], // 1: e(+x)
+    [0.00, 0.00, 0.8125, 1.00, 1.00, 1.0000], // 2: s(+z)
+    [0.0000, 0.00, 0.00, 0.1875, 1.00, 1.0000], // 3: w(-x)
+  ];
+  // [facing][hinge] = { c:[閉じた板の位置, 鏡像か], o:[開いた板の位置, 鏡像か] }
+  // 開いた位置 = ヒンジ側へ90度回った先。鏡像は「ヒンジがテクスチャのu大側に来るか」で決まる
+  const DOOR_SHAPE = [
+    [{ c: [0, false], o: [3, false] }, { c: [0, true], o: [1, false] }], // n
+    [{ c: [1, false], o: [0, true] }, { c: [1, true], o: [2, true] }], // e
+    [{ c: [2, true], o: [1, true] }, { c: [2, false], o: [3, true] }], // s
+    [{ c: [3, true], o: [2, false] }, { c: [3, false], o: [0, false] }], // w
+  ];
+  const OAK_DOOR_HINGE_L = TYPES.length; // 118: ヒンジ左16ID（facing*4 + open*2 + top）
+  for (let i = 0; i < 16; i++) {
+    TYPES.push({
+      name: (i % 4 < 2) ? '木のドア' : '開いた木のドア', color: 0xa8743d,
+      icon: (i % 2) ? T.doorTop : T.doorBottom, transparent: true, noAutoItem: true,
+    });
   }
-  setDoorShape(OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, [0.00, 0.00, 0.0000, 1.00, 1.00, 0.1875]);
-  setDoorShape(OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, [0.0000, 0.00, 0.00, 0.1875, 1.00, 1.00]);
-  setDoorShape(OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, [0.8125, 0.00, 0.00, 1.00, 1.00, 1.00]);
-  setDoorShape(OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, [0.00, 0.00, 0.0000, 1.00, 1.00, 0.1875]);
-  setDoorShape(OAK_DOOR_S_CLOSED, OAK_DOOR_S_CLOSED_TOP, [0.00, 0.00, 0.8125, 1.00, 1.00, 1.00]);
-  setDoorShape(OAK_DOOR_S_OPEN, OAK_DOOR_S_OPEN_TOP, [0.8125, 0.00, 0.00, 1.00, 1.00, 1.00]);
-  setDoorShape(OAK_DOOR_W_CLOSED, OAK_DOOR_W_CLOSED_TOP, [0.0000, 0.00, 0.00, 0.1875, 1.00, 1.00]);
-  setDoorShape(OAK_DOOR_W_OPEN, OAK_DOOR_W_OPEN_TOP, [0.00, 0.00, 0.8125, 1.00, 1.00, 1.00]);
+  // DOOR_IDS[facing][hinge][open] = [下ID, 上ID]
+  const DOOR_IDS = [
+    [[[OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP], [OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP]], [[OAK_DOOR_HINGE_L + 0, OAK_DOOR_HINGE_L + 1], [OAK_DOOR_HINGE_L + 2, OAK_DOOR_HINGE_L + 3]]],
+    [[[OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP], [OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP]], [[OAK_DOOR_HINGE_L + 4, OAK_DOOR_HINGE_L + 5], [OAK_DOOR_HINGE_L + 6, OAK_DOOR_HINGE_L + 7]]],
+    [[[OAK_DOOR_S_CLOSED, OAK_DOOR_S_CLOSED_TOP], [OAK_DOOR_S_OPEN, OAK_DOOR_S_OPEN_TOP]], [[OAK_DOOR_HINGE_L + 8, OAK_DOOR_HINGE_L + 9], [OAK_DOOR_HINGE_L + 10, OAK_DOOR_HINGE_L + 11]]],
+    [[[OAK_DOOR_W_CLOSED, OAK_DOOR_W_CLOSED_TOP], [OAK_DOOR_W_OPEN, OAK_DOOR_W_OPEN_TOP]], [[OAK_DOOR_HINGE_L + 12, OAK_DOOR_HINGE_L + 13], [OAK_DOOR_HINGE_L + 14, OAK_DOOR_HINGE_L + 15]]],
+  ];
+  const DOOR_INFO = new Map(); // ID -> { facing, hinge, open, top }
+  const DOOR_TYPE_IDS = [];
+  // 広い面には扉の絵、細い面(厚み3/16)には doorEdge を貼る。本家の「側面はテクスチャ左3pxのスライス」相当
+  function doorMats(boxIdx, top, mirror) {
+    const face = top ? (mirror ? T.doorTopM : T.doorTop) : (mirror ? T.doorBottomM : T.doorBottom);
+    const box = DOOR_BOX[boxIdx];
+    const thinX = (box[3] - box[0]) < 0.5; // 板がx方向に薄い＝広い面は±x
+    const tex = [];
+    for (let f = 0; f < 6; f++) {
+      const wide = thinX ? (f === 0 || f === 1) : (f === 4 || f === 5);
+      tex.push(wide ? face : T.doorEdge);
+    }
+    return faceMats(tex, { transparent: true, alphaTest: 0.18 });
+  }
+  for (let facing = 0; facing < 4; facing++) for (let hinge = 0; hinge < 2; hinge++) for (let open = 0; open < 2; open++) {
+    const [boxIdx, mirror] = DOOR_SHAPE[facing][hinge][open ? 'o' : 'c'];
+    const box = DOOR_BOX[boxIdx];
+    for (let top = 0; top < 2; top++) {
+      const id = DOOR_IDS[facing][hinge][open][top];
+      const t = TYPES[id];
+      t.model = [{ box }];
+      t.collisionBoxes = [box];
+      t.mats = doorMats(boxIdx, !!top, mirror);
+      DOOR_INFO.set(id, { facing, hinge, open: !!open, top: !!top });
+      DOOR_TYPE_IDS.push(id);
+    }
+  }
+
+  /* ---- ベッド(134-141): 本家同様「足元＋枕元」の2ブロック × 4方位 ----
+     facing = 足元から枕元へ向かう向き 0=-z 1=+x 2=+z 3=-x。旧1ブロック版(ID 40)は
+     既存セーブのため温存し、新規設置はこちらを使う。 */
+  const BED_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  // 上面テクスチャは「枕元が画像の上(=+z側)」で描いてあるので、方位ごとに時計回りへ回す
+  const BED_TOP_TURNS = [2, 1, 0, 3];
+  const BED_PART = TYPES.length; // 134: facing*2 + (枕元なら1)
+  const BED_TOP_TEX = BED_TOP_TURNS.map(n => [rotTex(T.bedFootTop, n), rotTex(T.bedHeadTop, n)]);
+  // 枕の白は側面テクスチャの左端にある。枕元が +x/+z 側を向く方位では鏡像にして端を合わせる
+  const BED_SIDE_HEAD_M = mirrorTex(T.bedSideHead);
+  for (let facing = 0; facing < 4; facing++) for (let head = 0; head < 2; head++) {
+    const side = head ? ((facing === 1 || facing === 2) ? BED_SIDE_HEAD_M : T.bedSideHead) : T.bedSideFoot;
+    const top = BED_TOP_TEX[facing][head];
+    TYPES.push({
+      name: 'ベッド', color: 0xb03030, icon: T.bedTop, transparent: true, noAutoItem: true,
+      mats: faceMats([side, side, top, T.planks, side, side]),
+    });
+  }
+  const BED_TYPE_IDS = [];
+  const BED_INFO = new Map(); // ID -> { facing, head }
+  for (let facing = 0; facing < 4; facing++) for (let head = 0; head < 2; head++) {
+    const id = BED_PART + facing * 2 + head;
+    // 脚は外側の端（足元なら facing の逆、枕元なら facing の側）に2本
+    const [dx, dz] = BED_DIR[facing];
+    const ox = head ? dx : -dx, oz = head ? dz : -dz;
+    const L = 0.1875;
+    const legs = ox !== 0
+      ? [[ox > 0 ? 1 - L : 0, 0, 0, ox > 0 ? 1 : L, L, L], [ox > 0 ? 1 - L : 0, 0, 1 - L, ox > 0 ? 1 : L, L, 1]]
+      : [[0, 0, oz > 0 ? 1 - L : 0, L, L, oz > 0 ? 1 : L], [1 - L, 0, oz > 0 ? 1 - L : 0, 1, L, oz > 0 ? 1 : L]];
+    const mattress = [0, 0.1875, 0, 1, 0.5625, 1];
+    TYPES[id].model = [{ box: mattress }, ...legs.map(box => ({ box }))];
+    TYPES[id].collisionBoxes = [mattress];
+    BED_INFO.set(id, { facing, head: !!head });
+    BED_TYPE_IDS.push(id);
+  }
+  // BED_IDS[facing] = [足元ID, 枕元ID]
+  const BED_IDS = [0, 1, 2, 3].map(f => [BED_PART + f * 2, BED_PART + f * 2 + 1]);
+
   TYPES[OAK_TRAPDOOR_CLOSED].model = [{ box: [0.00, 0.00, 0.00, 1.00, 0.1875, 1.00] }];
   TYPES[OAK_TRAPDOOR_OPEN].model = [{ box: [0.00, 0.00, 0.8125, 1.00, 1.00, 1.00] }];
   TYPES[OAK_FENCE].model = [

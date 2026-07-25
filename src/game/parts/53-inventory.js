@@ -18,12 +18,12 @@
     snow:           { name: '雪', cat: 'block', block: SNOW },
     stone_brick:    { name: '石レンガ', cat: 'block', block: STONE_BRICK },
     // 階段/ハーフブロック（block は基準バリアント。設置時に向き/上下を確定する）
-    oak_stairs:         { name: '木の階段', cat: 'block', block: OAK_STAIRS, stairs: true, fuel: 1.5 },
-    cobblestone_stairs: { name: '丸石の階段', cat: 'block', block: OAK_STAIRS + 4, stairs: true },
-    stone_brick_stairs: { name: '石レンガの階段', cat: 'block', block: OAK_STAIRS + 8, stairs: true },
-    oak_slab:           { name: '木のハーフブロック', cat: 'block', block: OAK_SLAB, slab: true, fuel: 0.75 },
-    cobblestone_slab:   { name: '丸石のハーフブロック', cat: 'block', block: OAK_SLAB + 2, slab: true },
-    stone_brick_slab:   { name: '石レンガのハーフブロック', cat: 'block', block: OAK_SLAB + 4, slab: true },
+    oak_stairs:         { name: '木の階段', cat: 'block', block: OAK_STAIRS, stairs: true, fuel: 1.5 , iconShape: 'stairs' },
+    cobblestone_stairs: { name: '丸石の階段', cat: 'block', block: OAK_STAIRS + 4, stairs: true , iconShape: 'stairs' },
+    stone_brick_stairs: { name: '石レンガの階段', cat: 'block', block: OAK_STAIRS + 8, stairs: true , iconShape: 'stairs' },
+    oak_slab:           { name: '木のハーフブロック', cat: 'block', block: OAK_SLAB, slab: true, fuel: 0.75 , iconShape: 'slab' },
+    cobblestone_slab:   { name: '丸石のハーフブロック', cat: 'block', block: OAK_SLAB + 2, slab: true , iconShape: 'slab' },
+    stone_brick_slab:   { name: '石レンガのハーフブロック', cat: 'block', block: OAK_SLAB + 4, slab: true , iconShape: 'slab' },
     torch:          { name: '松明', cat: 'block', block: TORCH },
     crafting_table: { name: '作業台', cat: 'block', block: CRAFTING_TABLE, fuel: 1.5 },
     furnace:        { name: 'かまど', cat: 'block', block: FURNACE },
@@ -31,21 +31,21 @@
     bed:            { name: 'ベッド', cat: 'block', block: BED },
     lantern:        { name: 'ランタン', cat: 'block', block: LANTERN },
     oak_door:       { name: '木のドア', cat: 'block', block: OAK_DOOR_Z_CLOSED, fuel: 1.5 },
-    oak_trapdoor:   { name: '木のトラップドア', cat: 'block', block: OAK_TRAPDOOR_CLOSED, fuel: 1.5 },
-    oak_fence:      { name: '木のフェンス', cat: 'block', block: OAK_FENCE, fuel: 1.5 },
-    oak_fence_gate: { name: '木のフェンスゲート', cat: 'block', block: OAK_FENCE_GATE_Z_CLOSED, fuel: 1.5 },
-    cobblestone_wall: { name: '丸石の壁', cat: 'block', block: COBBLESTONE_WALL },
-    ladder:         { name: 'はしご', cat: 'block', block: LADDER, ladder: true, fuel: 1.5 },
-    glass_pane:     { name: '板ガラス', cat: 'block', block: GLASS_PANE },
-    sign:           { name: '看板', cat: 'block', block: SIGN, sign: true, fuel: 1.5 },
+    oak_trapdoor:   { name: '木のトラップドア', cat: 'block', block: OAK_TRAPDOOR_CLOSED, fuel: 1.5 , iconShape: 'trapdoor' },
+    oak_fence:      { name: '木のフェンス', cat: 'block', block: OAK_FENCE, fuel: 1.5 , iconShape: 'fence' },
+    oak_fence_gate: { name: '木のフェンスゲート', cat: 'block', block: OAK_FENCE_GATE_Z_CLOSED, fuel: 1.5 , iconShape: 'gate' },
+    cobblestone_wall: { name: '丸石の壁', cat: 'block', block: COBBLESTONE_WALL , iconShape: 'wall' },
+    ladder:         { name: 'はしご', cat: 'block', block: LADDER, ladder: true, fuel: 1.5 , iconShape: 'ladder' },
+    glass_pane:     { name: '板ガラス', cat: 'block', block: GLASS_PANE , iconShape: 'pane' },
+    sign:           { name: '看板', cat: 'block', block: SIGN, sign: true, fuel: 1.5 , iconShape: 'sign' },
     obsidian:       { name: '黒曜石', cat: 'block', block: OBSIDIAN },
     // レッドストーン部品（rsGround: 不透明ブロックの上面にのみ設置）
     redstone_dust:  { name: 'レッドストーンダスト', cat: 'material', block: REDSTONE_WIRE, rsGround: true },
     redstone_torch: { name: 'レッドストーントーチ', cat: 'block', block: REDSTONE_TORCH, rsGround: true, fuel: 0.5 },
     lever:          { name: 'レバー', cat: 'block', block: LEVER_OFF, rsGround: true },
-    stone_button:   { name: '石のボタン', cat: 'block', block: STONE_BUTTON_OFF, rsGround: true },
-    stone_pressure_plate:  { name: '石の感圧板', cat: 'block', block: STONE_PLATE_OFF, rsGround: true },
-    wooden_pressure_plate: { name: '木の感圧板', cat: 'block', block: WOOD_PLATE_OFF, rsGround: true, fuel: 1.5 },
+    stone_button:   { name: '石のボタン', cat: 'block', block: STONE_BUTTON_OFF, rsGround: true , iconShape: 'button' },
+    stone_pressure_plate:  { name: '石の感圧板', cat: 'block', block: STONE_PLATE_OFF, rsGround: true , iconShape: 'plate' },
+    wooden_pressure_plate: { name: '木の感圧板', cat: 'block', block: WOOD_PLATE_OFF, rsGround: true, fuel: 1.5 , iconShape: 'plate' },
     redstone_lamp:  { name: 'レッドストーンランプ', cat: 'block', block: REDSTONE_LAMP_OFF },
     glow_crystal:   { name: '発光結晶', cat: 'block', block: GLOW_CRYSTAL },
     gold_block:     { name: '金ブロック', cat: 'block', block: GOLD_BLOCK },
@@ -110,7 +110,11 @@
   };
   // 名前付きIDにない設置可能ブロック（和風建材など）も、採掘したら持てるよう自動登録する
   const ITEM_FOR_BLOCK = [];
-  for (const [id, def] of Object.entries(ITEM_DEFS)) if (def.block != null) ITEM_FOR_BLOCK[def.block] = id;
+  // 各定義に自分のIDを持たせる。設置処理は def.id で分岐する（ドア/ベッド/苗木など）
+  for (const [id, def] of Object.entries(ITEM_DEFS)) {
+    def.id = id;
+    if (def.block != null) ITEM_FOR_BLOCK[def.block] = id;
+  }
   // 階段/ハーフの全バリアント → 親アイテム（どの向きを壊しても同じアイテムをドロップ）
   for (let i = 0; i < 4; i++) {
     ITEM_FOR_BLOCK[OAK_STAIRS + i] = 'oak_stairs';
@@ -133,8 +137,11 @@
     ITEM_DEFS[id] = { name: TYPES[b].name, cat: 'block', block: b };
     ITEM_FOR_BLOCK[b] = id;
   }
-  for (const b of [OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_DOOR_S_CLOSED, OAK_DOOR_S_CLOSED_TOP, OAK_DOOR_S_OPEN, OAK_DOOR_S_OPEN_TOP, OAK_DOOR_W_CLOSED, OAK_DOOR_W_CLOSED_TOP, OAK_DOOR_W_OPEN, OAK_DOOR_W_OPEN_TOP]) {
+  for (const b of DOOR_TYPE_IDS) {
     ITEM_FOR_BLOCK[b] = 'oak_door';
+  }
+  for (const b of BED_TYPE_IDS) {
+    ITEM_FOR_BLOCK[b] = 'bed';
   }
   ITEM_FOR_BLOCK[OAK_TRAPDOOR_CLOSED] = 'oak_trapdoor';
   ITEM_FOR_BLOCK[OAK_TRAPDOOR_OPEN] = 'oak_trapdoor';
@@ -284,13 +291,42 @@
   }
 
   /* --- アイテムアイコン（ブロックはテクスチャ、その他は簡易ドット絵を生成） --- */
+  // 素材テクスチャが同じで形だけ違うブロック（階段/ハーフ/フェンス…）は、そのままだと
+  // アイコンが見分けられない。素材を形のシルエットで抜いて作り分ける。座標は32x32基準。
+  const ICON_SHAPES = {
+    stairs:   [[0, 16, 32, 16], [16, 0, 16, 16]],
+    slab:     [[0, 16, 32, 16]],
+    fence:    [[13, 1, 6, 30], [2, 8, 28, 5], [2, 19, 28, 5]],
+    gate:     [[2, 5, 6, 24], [24, 5, 6, 24], [8, 9, 16, 5], [8, 20, 16, 5]],
+    wall:     [[9, 3, 14, 29], [2, 11, 28, 9]],
+    pane:     [[12, 0, 8, 32]],
+    ladder:   [[5, 1, 4, 30], [23, 1, 4, 30], [9, 5, 14, 3], [9, 14, 14, 3], [9, 23, 14, 3]],
+    trapdoor: [[0, 11, 32, 10]],
+    button:   [[9, 12, 14, 8]],
+    plate:    [[2, 13, 28, 6]],
+    sign:     [[3, 3, 26, 16], [14, 19, 4, 11]],
+  };
+  function shapedIconUrl(tex, rects) {
+    const S = tex.image.width, k = S / 32;
+    const c = document.createElement('canvas');
+    c.width = c.height = S;
+    const g = c.getContext('2d');
+    for (const [x, y, w, h] of rects) {
+      g.save();
+      g.beginPath(); g.rect(x * k, y * k, w * k, h * k); g.clip();
+      g.drawImage(tex.image, 0, 0);
+      g.restore();
+    }
+    return c.toDataURL();
+  }
   const ITEM_ICON_CACHE = new Map();
   function itemIconUrl(id) {
     if (ITEM_ICON_CACHE.has(id)) return ITEM_ICON_CACHE.get(id);
     const d = ITEM_DEFS[id];
     let url = '';
     if (d && d.block != null && TYPES[d.block] && TYPES[d.block].icon) {
-      url = TYPES[d.block].icon.image.toDataURL();
+      const shape = ICON_SHAPES[d.iconShape];
+      url = shape ? shapedIconUrl(TYPES[d.block].icon, shape) : TYPES[d.block].icon.image.toDataURL();
     } else if (d) {
       const c = document.createElement('canvas');
       c.width = c.height = 32;

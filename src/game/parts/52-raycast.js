@@ -9,7 +9,8 @@
     const dx = sx !== 0 ? 1 / Math.abs(dir.x) : Infinity, dy = sy !== 0 ? 1 / Math.abs(dir.y) : Infinity, dz = sz !== 0 ? 1 / Math.abs(dir.z) : Infinity;
     let nx = 0, ny = 0, nz = 0, t = 0;
     for (let i = 0; i < 256 && t <= REACH; i++) {
-      if (isTargetableBlock(x, y, z)) return { block: [x, y, z], normal: [nx, ny, nz] };
+      // hit = 面に当たった座標。ドアのヒンジ左右など「ブロックのどちら側をクリックしたか」に使う
+      if (isTargetableBlock(x, y, z)) return { block: [x, y, z], normal: [nx, ny, nz], hit: [o.x + dir.x * t, o.y + dir.y * t, o.z + dir.z * t] };
       if (tx < ty) { if (tx < tz) { x += sx; t = tx; tx += dx; nx = -sx; ny = 0; nz = 0; } else { z += sz; t = tz; tz += dz; nx = 0; ny = 0; nz = -sz; } }
       else { if (ty < tz) { y += sy; t = ty; ty += dy; nx = 0; ny = -sy; nz = 0; } else { z += sz; t = tz; tz += dz; nx = 0; ny = 0; nz = -sz; } }
     }
@@ -37,31 +38,9 @@
     return type !== undefined && (TYPES[type].solid !== false || isInteractableBlock(type));
   }
 
-  const DOOR_INFO = new Map([
-    [OAK_DOOR_Z_CLOSED, { facing: 'n', open: false, top: false }],
-    [OAK_DOOR_Z_CLOSED_TOP, { facing: 'n', open: false, top: true }],
-    [OAK_DOOR_Z_OPEN, { facing: 'n', open: true, top: false }],
-    [OAK_DOOR_Z_OPEN_TOP, { facing: 'n', open: true, top: true }],
-    [OAK_DOOR_X_CLOSED, { facing: 'e', open: false, top: false }],
-    [OAK_DOOR_X_CLOSED_TOP, { facing: 'e', open: false, top: true }],
-    [OAK_DOOR_X_OPEN, { facing: 'e', open: true, top: false }],
-    [OAK_DOOR_X_OPEN_TOP, { facing: 'e', open: true, top: true }],
-    [OAK_DOOR_S_CLOSED, { facing: 's', open: false, top: false }],
-    [OAK_DOOR_S_CLOSED_TOP, { facing: 's', open: false, top: true }],
-    [OAK_DOOR_S_OPEN, { facing: 's', open: true, top: false }],
-    [OAK_DOOR_S_OPEN_TOP, { facing: 's', open: true, top: true }],
-    [OAK_DOOR_W_CLOSED, { facing: 'w', open: false, top: false }],
-    [OAK_DOOR_W_CLOSED_TOP, { facing: 'w', open: false, top: true }],
-    [OAK_DOOR_W_OPEN, { facing: 'w', open: true, top: false }],
-    [OAK_DOOR_W_OPEN_TOP, { facing: 'w', open: true, top: true }],
-  ]);
+  // DOOR_INFO / DOOR_IDS は 22-block-types.js で定義（32IDバリアント）
   function isDoorBlock(type) { return DOOR_INFO.has(type); }
-  function doorTypes(facing, open) {
-    if (facing === 's') return open ? [OAK_DOOR_S_OPEN, OAK_DOOR_S_OPEN_TOP] : [OAK_DOOR_S_CLOSED, OAK_DOOR_S_CLOSED_TOP];
-    if (facing === 'e') return open ? [OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP] : [OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP];
-    if (facing === 'w') return open ? [OAK_DOOR_W_OPEN, OAK_DOOR_W_OPEN_TOP] : [OAK_DOOR_W_CLOSED, OAK_DOOR_W_CLOSED_TOP];
-    return open ? [OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP] : [OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP];
-  }
+  function doorTypes(facing, hinge, open) { return DOOR_IDS[facing][hinge][open ? 1 : 0]; }
   function doorPairAt(x, y, z, type = blockAt(x, y, z)) {
     const info = DOOR_INFO.get(type);
     if (!info) return null;
@@ -71,14 +50,43 @@
     if (!bottomInfo || bottomInfo.top) return null;
     return { x, y: by, z, info: bottomInfo };
   }
-  function chooseDoorBaseType(normal) {
-    if (normal[0] > 0) return OAK_DOOR_W_CLOSED;
-    if (normal[0] < 0) return OAK_DOOR_X_CLOSED;
-    if (normal[2] > 0) return OAK_DOOR_Z_CLOSED;
-    if (normal[2] < 0) return OAK_DOOR_S_CLOSED;
+  // 本家同様、ドアの向きはクリックした面ではなくプレイヤーの視線方向で決まる。
+  // facing はパネルが接する面（=プレイヤー側の手前の面）なので視線の逆向きになる
+  function playerDoorFacing() {
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    if (Math.abs(dir.x) > Math.abs(dir.z)) return dir.x > 0 ? OAK_DOOR_W_CLOSED : OAK_DOOR_X_CLOSED;
-    return dir.z > 0 ? OAK_DOOR_Z_CLOSED : OAK_DOOR_S_CLOSED;
+    if (Math.abs(dir.x) > Math.abs(dir.z)) return dir.x > 0 ? 3 : 1; // 東を向く→w(-x)側 / 西→e(+x)側
+    return dir.z > 0 ? 0 : 2;                                        // 南を向く→n(-z)側 / 北→s(+z)側
+  }
+  // facing ごとの「設置者から見て左」方向（dx, dz）
+  const DOOR_LEFT_OFF = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+  // 本家準拠: 隣に同じ向きのドアがあれば反対側のヒンジ（＝観音開きになる）、
+  // なければクリックしたのが左半分か右半分かで決める
+  function chooseDoorHinge(x, y, z, facing, hit) {
+    const [lx, lz] = DOOR_LEFT_OFF[facing];
+    const leftInfo = DOOR_INFO.get(blockAt(x + lx, y, z + lz));
+    if (leftInfo && !leftInfo.top && leftInfo.facing === facing) return 0;
+    const rightInfo = DOOR_INFO.get(blockAt(x - lx, y, z - lz));
+    if (rightInfo && !rightInfo.top && rightInfo.facing === facing) return 1;
+    if (!hit) return 0;
+    const fx = Math.min(1, Math.max(0, hit[0] - x)), fz = Math.min(1, Math.max(0, hit[2] - z));
+    const along = lx !== 0 ? (lx > 0 ? fx : 1 - fx) : (lz > 0 ? fz : 1 - fz);
+    return along > 0.5 ? 1 : 0;
+  }
+  // 隣に同じ向きのドアが並んだら、双方のヒンジを外側へ揃えて観音開きにする。
+  // （本家は後から置いた側しか合わせないので、内側ヒンジ同士だと内開きのままになる）
+  // 設置時に加えて開閉時にも呼ぶので、この対応より前に置いた古いドアも使えば直る。
+  function alignDoubleDoor(x, y, z, facing) {
+    const [lx, lz] = DOOR_LEFT_OFF[facing];
+    // 相手が自分の左にいるなら 自分=右ヒンジ/相手=左ヒンジ。右にいればその逆
+    for (const [ox, oz, myHinge, itsHinge] of [[lx, lz, 0, 1], [-lx, -lz, 1, 0]]) {
+      const nx = x + ox, nz = z + oz;
+      const its = DOOR_INFO.get(blockAt(nx, y, nz));
+      if (!its || its.top || its.facing !== facing) continue;
+      if (its.hinge !== itsHinge) setDoorPair(nx, y, nz, ...DOOR_IDS[facing][itsHinge][its.open ? 1 : 0]);
+      const mine = DOOR_INFO.get(blockAt(x, y, z));
+      if (mine && !mine.top && mine.hinge !== myHinge) setDoorPair(x, y, z, ...DOOR_IDS[facing][myHinge][mine.open ? 1 : 0]);
+      break; // 3枚以上並んでいる場合は左隣とのペアを優先する
+    }
   }
   function setDoorPair(x, y, z, lower, upper) {
     const lowerId = key(x, y, z), upperId = key(x, y + 1, z);
@@ -89,8 +97,9 @@
   function toggleDoorAt(x, y, z, type) {
     const pair = doorPairAt(x, y, z, type);
     if (!pair) return false;
-    const [lower, upper] = doorTypes(pair.info.facing, !pair.info.open);
+    const [lower, upper] = doorTypes(pair.info.facing, pair.info.hinge, !pair.info.open);
     setDoorPair(pair.x, pair.y, pair.z, lower, upper);
+    alignDoubleDoor(pair.x, pair.y, pair.z, pair.info.facing);
     thock(pair.info.open ? 180 : 260);
     if (typeof setDebugToast === 'function') setDebugToast(pair.info.open ? 'ドアを閉めた' : 'ドアを開けた', 1.0);
     return true;
@@ -111,16 +120,72 @@
     const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
     if (y < CHUNK_Y_MIN || y + 1 > CHUNK_Y_MAX) return false;
     if (isPlacementBlocked(x, y, z) || isPlacementBlocked(x, y + 1, z) || overlapsPlayer(x, y, z) || overlapsPlayer(x, y + 1, z)) return false;
-    const lower = chooseDoorBaseType(tg.normal);
-    const [, upper] = doorTypes(DOOR_INFO.get(lower).facing, false);
+    const facing = playerDoorFacing();
+    const hinge = chooseDoorHinge(x, y, z, facing, tg.hit);
+    const [lower, upper] = doorTypes(facing, hinge, false);
     const s = selectedItem();
     if (!s) return false;
     s.n -= 1;
     if (s.n <= 0) INV[selected] = null;
     invChanged();
     setDoorPair(x, y, z, lower, upper);
+    alignDoubleDoor(x, y, z, facing);
     thock(260);
     if (typeof progressEvent === 'function') progressEvent('place', 'oak_door');
+    return true;
+  }
+  /* ---- ベッド: 足元＋枕元の2ブロック（BED_INFO / BED_IDS は 22-block-types.js） ---- */
+  // 旧1ブロック版(ID 40)も引き続きベッドとして扱う
+  function isBedBlock(type) { return type === BED || BED_INFO.has(type); }
+  // 足元セルに正規化する。旧版は自分自身が足元
+  function bedPairAt(x, y, z, type = blockAt(x, y, z)) {
+    if (type === BED) return { x, y, z, facing: null, legacy: true };
+    const info = BED_INFO.get(type);
+    if (!info) return null;
+    if (!info.head) return { x, y, z, facing: info.facing, legacy: false };
+    const [dx, dz] = BED_DIR[info.facing];
+    const fx = x - dx, fz = z - dz;
+    const footInfo = BED_INFO.get(blockAt(fx, y, fz));
+    if (!footInfo || footInfo.head || footInfo.facing !== info.facing) return null;
+    return { x: fx, y, z: fz, facing: info.facing, legacy: false };
+  }
+  function placeBedFromTarget(tg) {
+    if (tg.normal[1] !== 1) return false; // 本家同様、上向きの面にしか置けない
+    const fx = tg.block[0], fy = tg.block[1] + 1, fz = tg.block[2];
+    const facing = playerDoorFacing() ^ 2; // 視線の向き（facing の逆が playerDoorFacing なので反転）
+    const [dx, dz] = BED_DIR[facing];
+    const hx = fx + dx, hz = fz + dz;
+    if (fy > CHUNK_Y_MAX) return false;
+    if (isPlacementBlocked(fx, fy, fz) || isPlacementBlocked(hx, fy, hz)) return false;
+    if (overlapsPlayer(fx, fy, fz) || overlapsPlayer(hx, fy, hz)) return false;
+    if (!isSolid(hx, fy - 1, hz)) return false; // 枕元側にも土台が要る
+    const s = selectedItem();
+    if (!s) return false;
+    s.n -= 1;
+    if (s.n <= 0) INV[selected] = null;
+    invChanged();
+    const [footId, headId] = BED_IDS[facing];
+    setEdit(key(fx, fy, fz), footId); setEdit(key(hx, fy, hz), headId); saveEditsSoon();
+    setBlock(fx, fy, fz, footId); setBlock(hx, fy, hz, headId);
+    requestEditedBlockRebuild(fx, fy, fz); requestEditedBlockRebuild(hx, fy, hz);
+    thock(240);
+    if (typeof progressEvent === 'function') progressEvent('place', 'bed');
+    return true;
+  }
+  function removeBedPairAt(x, y, z, type) {
+    const pair = bedPairAt(x, y, z, type);
+    if (!pair) return false;
+    const cells = [[pair.x, pair.y, pair.z]];
+    if (!pair.legacy) {
+      const [dx, dz] = BED_DIR[pair.facing];
+      cells.push([pair.x + dx, pair.y, pair.z + dz]);
+    }
+    for (const [cx, cy, cz] of cells) {
+      setEdit(key(cx, cy, cz), -1);
+      setBlock(cx, cy, cz, null);
+      requestEditedBlockRebuild(cx, cy, cz);
+    }
+    saveEditsSoon();
     return true;
   }
   function isTrapdoorBlock(type) { return type === OAK_TRAPDOOR_CLOSED || type === OAK_TRAPDOOR_OPEN; }
@@ -274,7 +339,7 @@
     if (isStairsBlock(type)) return (type < OAK_STAIRS + 4) ? 'axe' : 'pickaxe';       // 木=斧 / 石系=ツルハシ
     if (isSlabBlock(type)) return (type < OAK_SLAB + 2) ? 'axe' : 'pickaxe';
     if ([STONE, DEEPSLATE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, REDSTONE_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK, OBSIDIAN, STONE_BUTTON_OFF, STONE_BUTTON_ON, STONE_PLATE_OFF, STONE_PLATE_ON].includes(type)) return 'pickaxe';
-    if (isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type) || type === OAK_FENCE) return 'axe';
+    if (isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type) || isBedBlock(type) || type === OAK_FENCE) return 'axe';
     if (isLadderBlock(type) || isSignBlock(type)) return 'axe';
     if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN, OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_TRAPDOOR_CLOSED, OAK_TRAPDOOR_OPEN, OAK_FENCE, OAK_FENCE_GATE_Z_CLOSED, OAK_FENCE_GATE_Z_OPEN, OAK_FENCE_GATE_X_CLOSED, OAK_FENCE_GATE_X_OPEN].includes(type)) return 'axe';
     if ([DIRT, GRASS, SAND, SNOW, FARMLAND].includes(type)) return 'shovel';
@@ -336,7 +401,7 @@
   // 破壊にかかる秒数。適正ツールを持っていると速い。岩盤(unbreakable)は無限＝ゲージが進まない。
   function miningTime(type) {
     if (TYPES[type] && TYPES[type].unbreakable) return Infinity;
-    const base = isDoorBlock(type) ? 1.0 : (BLOCK_HARDNESS.get(type) || 1.2);
+    const base = isDoorBlock(type) ? 1.0 : (isBedBlock(type) ? 0.9 : (BLOCK_HARDNESS.get(type) || 1.2));
     const tool = blockPreferredTool(type);
     if (!tool) return Math.min(base, 1.2);
     const held = heldToolInfo();
@@ -349,6 +414,7 @@
   // ブロック -> ドロップするアイテム（[id, n] の配列）
   function blockDrops(type) {
     if (isDoorBlock(type)) return [['oak_door', 1]];
+    if (isBedBlock(type)) return [['bed', 1]];   // 2ブロックでもアイテムは1個
     if (isTrapdoorBlock(type)) return [['oak_trapdoor', 1]];
     if (isFenceGateBlock(type)) return [['oak_fence_gate', 1]];
     if (type === STONE) return [['cobblestone', 1]];
@@ -404,7 +470,11 @@
     // 中身持ちブロックの後始末
     if (t === CHEST) { rollWorldChestLoot(id); spillChest(id); delete SAVE.chestSeen[id]; markSaveDirty(); }
     if (t === FURNACE || t === FURNACE_LIT) spillFurnace(id);
-    if (t === BED && SAVE.spawn && SAVE.spawn.x === x && SAVE.spawn.y === y && SAVE.spawn.z === z) { SAVE.spawn = null; markSaveDirty(); }
+    // ベッドを壊したらリスポーン地点を解除（2ブロック版はどちらの半分でも足元セルと照合する）
+    if (isBedBlock(t) && SAVE.spawn) {
+      const p = bedPairAt(x, y, z, t);
+      if (p && SAVE.spawn.x === p.x && SAVE.spawn.y === p.y && SAVE.spawn.z === p.z) { SAVE.spawn = null; markSaveDirty(); }
+    }
     // 耕地を壊したら上の作物も一緒に撤去する
     if (t === FARMLAND) {
       const above = blockAt(x, y + 1, z);
@@ -432,6 +502,11 @@
     if (isSignBlock(t) && typeof deleteSignText === 'function') deleteSignText(x, y, z); // 看板テキストを削除
     if (isDoorBlock(t)) {
       removeDoorPairAt(x, y, z, t);
+      thock(150);
+      return;
+    }
+    if (isBedBlock(t)) {          // ベッドはどちらの半分を壊しても2ブロックとも消える
+      removeBedPairAt(x, y, z, t);
       thock(150);
       return;
     }
@@ -601,7 +676,7 @@
         return;
       }
       if (hitType === OPEN_CHEST) { openContainer('chest', { key: key(bx, by, bz) }); return; }
-      if (hitType === BED) { trySleepInBed(bx, by, bz); return; }
+      if (isBedBlock(hitType)) { const p = bedPairAt(bx, by, bz, hitType); if (p) trySleepInBed(p.x, p.y, p.z); return; }
       if (hitType === TNT) { igniteTNT(bx, by, bz); return; }   // TNTを右クリックで着火
       if (hitType === LEVER_OFF || hitType === LEVER_ON) { rsToggleLeverAt(bx, by, bz, hitType); return; }
       if (hitType === STONE_BUTTON_OFF) { rsPressButtonAt(bx, by, bz); return; }
@@ -633,6 +708,7 @@
     }
     // 食べ物を持っていたら食べる
     if (def && def.food) { eatSelectedFood(); return; }
+    if (tg && def && def.id === 'bed') { placeBedFromTarget(tg); return; }
     if (tg && def && def.id === 'oak_door') { placeDoorFromTarget(tg); return; }
     if (tg && def && def.id === 'oak_fence_gate') { placeFenceGateFromTarget(tg); return; }
     if (tg && def && def.stairs) { placeStairsFromTarget(tg, def); return; }

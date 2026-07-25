@@ -48,7 +48,7 @@
   function respawnPoint() {
     // ベッドで設定したリスポーン地点（ベッドが撤去されていたら初期スポーンへ）
     const s = SAVE.spawn;
-    if (s && blockAt(s.x, s.y, s.z) === BED) return { x: s.x + 0.5, y: s.y + 2.2, z: s.z + 0.5 };
+    if (s && isBedBlock(blockAt(s.x, s.y, s.z))) return { x: s.x + 0.5, y: s.y + 2.2, z: s.z + 0.5 };
     return { x: spawnX, y: heightAt(spawnPt.x, spawnPt.z) + 3, z: spawnZ };
   }
   function respawnPlayer() {

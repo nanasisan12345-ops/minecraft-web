@@ -27,6 +27,46 @@
     const n = Math.round(S * S * dens);
     for (let i = 0; i < n; i++) { g.fillStyle = tint(hex, f); g.fillRect(Math.random() * S | 0, Math.random() * S | 0, 1, 1); }
   }
+  // ドアの下地: 縦板 + ヒンジ側(画像左)の縦框 + 外縁。top=上半分（外縁を上端に描く）
+  function doorBase(g, S, top) {
+    noise(g, S, 0xa8743d, 0.9, 1.06);
+    g.fillStyle = tint(0x8a5f2a, 0.80);
+    for (const x of [13, 22]) g.fillRect(x, 0, 1, S);
+    g.fillStyle = tint(0x5a361a, 1.0); g.fillRect(6, 0, 1, S);
+    g.fillStyle = 'rgba(255,228,175,0.12)'; g.fillRect(7, 0, 1, S);
+    g.fillStyle = tint(0x5a361a, 0.85);
+    g.fillRect(0, 0, 1, S); g.fillRect(S - 1, 0, 1, S);
+    if (top) g.fillRect(0, 0, S, 1); else g.fillRect(0, S - 1, S, 1);
+  }
+  // 上面テクスチャを方位ごとに回す（turns = 時計回りの90度単位）。ベッドの枕の向きなどに使う
+  function rotTex(src, turns) {
+    const S = src.image.width, c = document.createElement('canvas');
+    c.width = c.height = S;
+    const g = c.getContext('2d');
+    g.translate(S / 2, S / 2); g.rotate(turns * Math.PI / 2); g.translate(-S / 2, -S / 2);
+    g.drawImage(src.image, 0, 0);
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestMipmapNearestFilter;
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  }
+  // ヒンジ左右で扉の絵柄が鏡像になる（取っ手がヒンジの反対側に来る）
+  function mirrorTex(src) {
+    const S = src.image.width, c = document.createElement('canvas');
+    c.width = c.height = S;
+    const g = c.getContext('2d');
+    g.translate(S, 0); g.scale(-1, 1); g.drawImage(src.image, 0, 0);
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestMipmapNearestFilter;
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  }
   function oreTex(oreHex, sparkleHex = oreHex) {
     return makeTex((g, S) => {
       noise(g, S, 0x7d8388, 0.82, 1.06);
@@ -82,29 +122,29 @@
       for (let y = 0; y < S; y += step) { g.fillStyle = tint(0x6d4c1b, 0.72); g.fillRect(0, y, S, 1); }
       for (let row = 0; row * step < S; row++) { const y = row * step, sx = (row % 2) ? S / 2 : 0; g.fillStyle = tint(0x6d4c1b, 0.78); g.fillRect(sx, y, 1, step); }
     }),
-    doorLower: makeTex((g, S) => {
-      noise(g, S, 0xa8743d, 0.88, 1.08);
-      g.fillStyle = tint(0x5a361a, 0.9);
-      g.fillRect(0, 0, S, 2); g.fillRect(0, S - 2, S, 2); g.fillRect(0, 0, 2, S); g.fillRect(S - 2, 0, 2, S);
-      g.fillRect(S / 2 - 1, 0, 2, S);
-      g.fillStyle = tint(0x6d4c1b, 0.82);
-      g.fillRect(6, 8, 8, 15); g.fillRect(18, 8, 8, 15);
-      g.fillStyle = '#d2a844'; g.fillRect(22, 13, 3, 3);
-      g.fillStyle = 'rgba(255,220,150,0.18)'; g.fillRect(4, 3, S - 8, 1);
+    // ドアは1ブロック=1枚扉。上下でつながって見えるよう、合わせ目側には外縁を描かない。
+    // ヒンジは画像左端の縦框。取っ手は反対側の端・扉全体の中央高さ（=下半分の上部）。
+    doorBottom: makeTex((g, S) => {
+      doorBase(g, S, false);
+      g.fillStyle = tint(0x2e2312, 1.0); g.fillRect(25, 4, 3, 7);
+      g.fillStyle = '#cfae5e'; g.fillRect(25, 5, 2, 5);
+      g.fillStyle = '#f2dc9a'; g.fillRect(25, 5, 1, 2);
     }),
-    doorUpper: makeTex((g, S) => {
-      noise(g, S, 0xa8743d, 0.88, 1.08);
-      g.fillStyle = tint(0x5a361a, 0.9);
-      g.fillRect(0, 0, S, 2); g.fillRect(0, S - 2, S, 2); g.fillRect(0, 0, 2, S); g.fillRect(S - 2, 0, 2, S);
-      g.fillRect(S / 2 - 1, 0, 2, S);
-      g.fillStyle = tint(0x6d4c1b, 0.82);
-      g.fillRect(6, 17, 8, 10); g.fillRect(18, 17, 8, 10);
-      g.clearRect(7, 5, 7, 8); g.clearRect(18, 5, 7, 8);
-      g.fillStyle = 'rgba(180,232,255,0.42)';
-      g.fillRect(7, 5, 7, 8); g.fillRect(18, 5, 7, 8);
-      g.fillStyle = tint(0x5a361a, 0.9);
-      g.fillRect(7, 5, 7, 1); g.fillRect(7, 12, 7, 1); g.fillRect(18, 5, 7, 1); g.fillRect(18, 12, 7, 1);
-      g.fillRect(7, 5, 1, 8); g.fillRect(13, 5, 1, 8); g.fillRect(18, 5, 1, 8); g.fillRect(24, 5, 1, 8);
+    doorTop: makeTex((g, S) => {
+      doorBase(g, S, true);
+      const x0 = 10, y0 = 5, x1 = 29, y1 = 18, bw = 2;
+      g.fillStyle = tint(0x5a361a, 1.0); g.fillRect(x0, y0, x1 - x0, y1 - y0);
+      const gw = ((x1 - x0) - bw * 3) / 2, gh = ((y1 - y0) - bw * 3) / 2;
+      for (const [px, py] of [[x0 + bw, y0 + bw], [x0 + bw * 2 + gw, y0 + bw], [x0 + bw, y0 + bw * 2 + gh], [x0 + bw * 2 + gw, y0 + bw * 2 + gh]]) {
+        g.clearRect(px, py, gw, gh);
+        g.fillStyle = 'rgba(176,226,255,0.42)'; g.fillRect(px, py, gw, gh);
+        g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(px, py, gw, 1);
+      }
+    }),
+    // 厚み3/16の側面に貼る帯。本家はテクスチャ左端3pxのスライスなので無地の板目にする
+    doorEdge: makeTex((g, S) => {
+      noise(g, S, 0xa8743d, 0.88, 1.04);
+      g.fillStyle = tint(0x5a361a, 0.85); g.fillRect(0, 0, 1, S); g.fillRect(S - 1, 0, 1, S);
     }),
     trapdoor: makeTex((g, S) => {
       noise(g, S, 0xa8743d, 0.88, 1.08);
@@ -219,19 +259,36 @@
     ironOre: oreTex(0xc78a55, 0xf1bd7d),
     goldOre: oreTex(0xe2b93c, 0xffdf66),
     diamondOre: oreTex(0x55d9e8, 0x9dffff),
+    // 松明は箱そのものが本家の形（2/16角 × 10/16高）なので、テクスチャは全幅を使って
+    // 下2/3が棒・上1/3が炎になるように描く（以前は絵の中に細い松明を描いていて塊に見えていた）
     torch: makeTex((g, S) => {
-      noise(g, S, 0x5a361a, 0.85, 1.08);
-      g.fillStyle = '#3a2412'; g.fillRect(10, 12, 12, 20);
-      g.fillStyle = '#8a5525'; g.fillRect(13, 12, 6, 20);
-      g.fillStyle = '#ffdb55'; g.fillRect(8, 4, 16, 10);
-      g.fillStyle = '#ff8a22'; g.fillRect(11, 7, 10, 9);
-      g.fillStyle = '#fff2a3'; g.fillRect(13, 3, 6, 7);
+      noise(g, S, 0x6d4c1b, 0.86, 1.06);
+      g.fillStyle = '#4a2f14'; g.fillRect(0, 0, 3, S); g.fillRect(S - 3, 0, 3, S);
+      g.fillStyle = 'rgba(255,225,170,0.10)'; g.fillRect(11, 11, 4, S - 11);
+      g.fillStyle = '#ff8a22'; g.fillRect(0, 0, S, 11);
+      g.fillStyle = '#ffdb55'; g.fillRect(2, 0, S - 4, 8);
+      g.fillStyle = '#fff2a3'; g.fillRect(6, 0, S - 12, 5);
+    }),
+    torchFlame: makeTex((g, S) => {                          // 松明の上面（炎の芯）
+      g.fillStyle = '#ffdb55'; g.fillRect(0, 0, S, S);
+      g.fillStyle = '#fff2a3'; g.fillRect(4, 4, S - 8, S - 8);
     }),
     crafting: makeTex((g, S) => {
       noise(g, S, 0xb5824a, 0.9, 1.08);
       g.fillStyle = tint(0x5a361a, 0.9); g.fillRect(0, 7, S, 2); g.fillRect(0, 16, S, 2); g.fillRect(7, 0, 2, S); g.fillRect(16, 0, 2, S);
       g.fillStyle = '#d7a66a'; g.fillRect(3, 3, 7, 4); g.fillRect(20, 4, 7, 4); g.fillRect(5, 22, 8, 4);
       g.fillStyle = '#6d4c1b'; g.fillRect(21, 19, 3, 8); g.fillRect(18, 22, 9, 3);
+    }),
+    // 作業台の天板。本家同様3x3のクラフトグリッド（側面の道具柄とは別）
+    craftingTop: makeTex((g, S) => {
+      noise(g, S, 0xb5824a, 0.9, 1.08);
+      g.fillStyle = tint(0x5a361a, 0.9);
+      g.fillRect(0, 0, S, 2); g.fillRect(0, S - 2, S, 2); g.fillRect(0, 0, 2, S); g.fillRect(S - 2, 0, 2, S);
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+        const x = 3 + i * 9, y = 3 + j * 9;
+        g.fillStyle = tint(0x8a5f2a, 0.72); g.fillRect(x, y, 8, 8);
+        g.fillStyle = tint(0xd7a66a, 0.95); g.fillRect(x + 1, y + 1, 6, 6);
+      }
     }),
     furnace: makeTex((g, S) => {
       noise(g, S, 0x757a7d, 0.78, 1.08);
@@ -308,6 +365,15 @@
       g.fillStyle = tint(0x5a361a, 0.9); g.fillRect(0, 5, S, 1); g.fillRect(0, 15, S, 1);
       g.fillStyle = '#e0bd52'; g.fillRect(S / 2 - 3, 8, 6, 6);
       g.fillStyle = '#8a6a1a'; g.fillRect(S / 2 - 1, 11, 2, 3);
+      dots(g, S, 0x6d4c1b, 0.05, 0.75);
+    }),
+    // チェスト上面/底面。錠前は正面だけなので、蓋の面には金具の縦帯だけを側面と揃えて描く
+    chestTop: makeTex((g, S) => {
+      noise(g, S, 0x8a5a2b, 0.82, 1.08);
+      g.fillStyle = tint(0x5a361a, 0.92);
+      g.fillRect(3, 0, 2, S); g.fillRect(S - 5, 0, 2, S);
+      g.fillStyle = tint(0x5a361a, 0.9);
+      g.fillRect(0, 0, S, 1); g.fillRect(0, S - 1, S, 1); g.fillRect(0, 0, 1, S); g.fillRect(S - 1, 0, 1, S);
       dots(g, S, 0x6d4c1b, 0.05, 0.75);
     }),
     lantern: makeTex((g, S) => {
@@ -387,6 +453,34 @@
       g.fillStyle = tint(0x8c1f1f, 0.95); g.fillRect(0, 12, S, 2);            // 毛布の折り返し
       g.fillStyle = 'rgba(255,255,255,0.14)'; for (let y = 17; y < S - 2; y += 5) g.fillRect(3, y, S - 6, 1);
       g.fillStyle = tint(0x6d4c1b, 0.9); g.fillRect(0, S - 2, S, 2);
+    }),
+    // 2ブロックのベッド。上面は「枕元が画像の上」で描き、方位ごとに rotTex で回す
+    bedHeadTop: makeTex((g, S) => {                          // 枕元。木枠＋白い枕＋赤い毛布。
+      noise(g, S, 0xb03030, 0.9, 1.06);
+      g.fillStyle = tint(0x6d4c1b, 0.9); g.fillRect(0, 0, S, 2);              // headboard 側の木枠
+      g.fillStyle = tint(0xf2f0e6, 1.0); g.fillRect(2, 3, S - 4, 11);         // 枕
+      g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(2, 13, S - 4, 1);
+      g.fillStyle = tint(0x8c1f1f, 0.95); g.fillRect(0, 15, S, 2);            // 毛布の折り返し
+      g.fillStyle = 'rgba(255,255,255,0.14)'; for (let y = 20; y < S; y += 5) g.fillRect(3, y, S - 6, 1);
+    }),
+    bedFootTop: makeTex((g, S) => {                          // 足元。赤い毛布＋足側の木枠。
+      noise(g, S, 0xb03030, 0.9, 1.06);
+      g.fillStyle = 'rgba(255,255,255,0.14)'; for (let y = 2; y < S - 4; y += 5) g.fillRect(3, y, S - 6, 1);
+      g.fillStyle = tint(0x8c1f1f, 0.95); g.fillRect(0, S - 6, S, 2);
+      g.fillStyle = tint(0x6d4c1b, 0.9); g.fillRect(0, S - 3, S, 3);          // 足側の木枠
+    }),
+    bedSideFoot: makeTex((g, S) => {                         // 足元の側面。木枠＋赤い毛布のみ。
+      noise(g, S, 0x8a5a35, 0.9, 1.06);
+      g.fillStyle = tint(0xb03030, 1.0); g.fillRect(0, 4, S, 12);
+      g.fillStyle = tint(0x6d4c1b, 0.85); g.fillRect(0, 16, S, 3);
+      g.fillStyle = tint(0x5a3d1a, 0.9); g.fillRect(0, S - 4, 4, 4); g.fillRect(S - 4, S - 4, 4, 4);
+    }),
+    bedSideHead: makeTex((g, S) => {                         // 枕元の側面。枕の白が画像左端に出る。
+      noise(g, S, 0x8a5a35, 0.9, 1.06);
+      g.fillStyle = tint(0xb03030, 1.0); g.fillRect(0, 4, S, 12);
+      g.fillStyle = tint(0xf2f0e6, 1.0); g.fillRect(0, 4, 9, 12);
+      g.fillStyle = tint(0x6d4c1b, 0.85); g.fillRect(0, 16, S, 3);
+      g.fillStyle = tint(0x5a3d1a, 0.9); g.fillRect(0, S - 4, 4, 4); g.fillRect(S - 4, S - 4, 4, 4);
     }),
     bedSide: makeTex((g, S) => {                             // ベッド側面。木枠＋赤い毛布。
       noise(g, S, 0x8a5a35, 0.9, 1.06);
@@ -513,8 +607,10 @@
       dots(g, S, 0xfff2a3, 0.08, 1.15);
     }),
   };
+  TX.doorBottomM = mirrorTex(TX.doorBottom);
+  TX.doorTopM = mirrorTex(TX.doorTop);
   TX.lava.wrapS = TX.lava.wrapT = THREE.RepeatWrapping;
   TX.cactus.userData.normalMap = normalFromCanvas(TX.cactus.image, 2.2);
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
-  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'doorLower', 'doorUpper', 'trapdoor', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'furnaceSide', 'furnaceTop', 'furnaceFront', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'farmland', 'furnaceLit', 'tntSide', 'tntTop', 'ironBlock', 'diamondBlock', 'coalBlock', 'bedrock', 'deepslate', 'redstoneOre', 'redstoneLamp', 'redstoneLampOn'])
+  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'doorBottom', 'doorTop', 'doorBottomM', 'doorTopM', 'doorEdge', 'trapdoor', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'furnaceSide', 'furnaceTop', 'furnaceFront', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'chestTop', 'craftingTop', 'torch', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'bedHeadTop', 'bedFootTop', 'bedSideHead', 'bedSideFoot', 'farmland', 'furnaceLit', 'tntSide', 'tntTop', 'ironBlock', 'diamondBlock', 'coalBlock', 'bedrock', 'deepslate', 'redstoneOre', 'redstoneLamp', 'redstoneLampOn'])
     TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);

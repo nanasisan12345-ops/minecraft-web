@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 17; // 14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高。17: RS鉱石+RS部品モデル
+  const MESH_WORKER_VERSION = 22; // 14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高。17: RS鉱石+RS部品モデル。18: ドア32IDバリアント+面別マテリアル。19-20: モデルブロックの面別UV。21: ベッド2ブロック化。22: 松明の形状
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {
@@ -125,7 +125,10 @@
     const x0 = x + b[0], y0 = y + b[1], z0 = z + b[2];
     const x1 = x + b[3], y1 = y + b[4], z1 = z + b[5];
     if (x1 <= x0 || y1 <= y0 || z1 <= z0) return false;
-    const uvCoords = part.uv || FACE_DEFS[0].uv;
+    // UVは面ごと（FACE_DEFS[f].uv）を使う。面によって頂点の並び順が違うため、
+    // 1種類のUVを全面に使い回すと面1(-x)と面4(+z)でu,vが入れ替わり絵柄が90度回る。
+    // part.uv を明示した場合のみ全面をそれで上書きする
+    const uvCoords = part.uv || null;
     const faces = [
       [[x1,y0,z0], [x1,y1,z0], [x1,y1,z1], [x1,y0,z1]],
       [[x0,y0,z0], [x0,y0,z1], [x0,y1,z1], [x0,y1,z0]],
@@ -136,7 +139,7 @@
     ];
     for (let f = 0; f < FACE_DEFS.length; f++) {
       const fd = FACE_DEFS[f];
-      addQuadToState(state, faces[f], fd.n, uvCoords, part.mat ?? fd.m, rgbIn);
+      addQuadToState(state, faces[f], fd.n, uvCoords || fd.uv, part.mat ?? fd.m, rgbIn);
     }
     return true;
   }
