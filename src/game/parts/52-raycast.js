@@ -710,6 +710,7 @@
       const [bx, by, bz] = tg.block;
       const hitType = blockAt(bx, by, bz);
       if (hitType === CRAFTING_TABLE) { openContainer('table'); return; }
+      if (hitType === ANVIL) { openContainer('anvil', { key: key(bx, by, bz) }); return; }
       if (hitType === ENCHANT_TABLE) { openContainer('enchant', { key: key(bx, by, bz), shelves: bookshelvesAround(bx, by, bz) }); return; }
       if (hitType === FURNACE || hitType === FURNACE_LIT) { openContainer('furnace', { key: key(bx, by, bz) }); return; }
       if (hitType === CHEST) {

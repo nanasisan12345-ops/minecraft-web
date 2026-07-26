@@ -240,6 +240,13 @@
     },
     shelves: (x, y, z) => bookshelvesAround(Math.floor(x), Math.floor(y), Math.floor(z)),
     // エンチャント台UIをブロック設置なしで開く（検証用）
+    openAnvil: (aId = null, aDur, bId = null, bDur, aEnch = null, bEnch = null) => {
+      openContainer('anvil', { key: 'dbg' });
+      if (aId) SAVE.anvilA = { id: aId, n: 1, dur: aDur, ...(aEnch ? { ench: aEnch } : {}) };
+      if (bId) SAVE.anvilB = { id: bId, n: 1, dur: bDur, ...(bEnch ? { ench: bEnch } : {}) };
+      renderContainer();
+      return { a: SAVE.anvilA, b: SAVE.anvilB };
+    },
     openEnchant: (shelves = 0, itemId = null) => {
       openContainer('enchant', { key: 'dbg', shelves });
       if (itemId) { SAVE.enchSlot = { id: itemId, n: 1 }; UI.enchSig = null; renderContainer(); }

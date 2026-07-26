@@ -92,3 +92,34 @@
     }
     return offers;
   }
+
+  /* --- 金床（C11） ---
+   * 同種の道具2つ → 残耐久の合計 + 上限の12%（上限まで）。道具+修理素材 → 上限の50%回復。
+   * エンチャントは高い方を引き継ぐ。 */
+  const REPAIR_MATERIAL = { wood: 'planks', stone: 'cobblestone', iron: 'iron_ingot', gold: 'gold_ingot', diamond: 'diamond' };
+  function repairMaterialFor(id) {
+    for (const k of Object.keys(REPAIR_MATERIAL)) if (id.startsWith(k + '_')) return REPAIR_MATERIAL[k];
+    return null;
+  }
+  function anvilResult(a, b) {
+    if (!a || !b) return null;
+    const da = ITEM_DEFS[a.id];
+    if (!da || !da.durability) return null;
+    const max = da.durability;
+    const durA = Number.isFinite(a.dur) ? a.dur : max;
+    let out = null, cost = 0;
+    if (b.id === a.id) {
+      const durB = Number.isFinite(b.dur) ? b.dur : max;
+      out = { id: a.id, n: 1, dur: Math.min(max, durA + durB + Math.round(max * 0.12)) };
+      cost = 2;
+    } else if (b.id === repairMaterialFor(a.id)) {
+      out = { id: a.id, n: 1, dur: Math.min(max, durA + Math.round(max * 0.5)) };
+      cost = 1;
+    } else {
+      return null;
+    }
+    const merged = { ...(a.ench || {}) };
+    for (const [k, v] of Object.entries(b.ench || {})) merged[k] = Math.max(merged[k] || 0, v);
+    if (Object.keys(merged).length) { out.ench = merged; cost += 1; }
+    return { item: out, cost: Math.min(3, cost) };
+  }

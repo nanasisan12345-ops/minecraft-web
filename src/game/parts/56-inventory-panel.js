@@ -33,6 +33,8 @@
     if (src === 'ffuel') return furnaceState(UI.ctx.key).fuel;
     if (src === 'fout') return furnaceState(UI.ctx.key).out;
     if (src === 'ench') return SAVE.enchSlot || null;
+    if (src === 'anvA') return SAVE.anvilA || null;
+    if (src === 'anvB') return SAVE.anvilB || null;
     if (src === 'armor') return SAVE.armor;
     const arr = slotArrayFor(src);
     return arr ? arr[idx] || null : null;
@@ -55,6 +57,8 @@
       return;
     }
     if (src === 'ench') { SAVE.enchSlot = item; markSaveDirty(); return; }
+    if (src === 'anvA') { SAVE.anvilA = item; markSaveDirty(); return; }
+    if (src === 'anvB') { SAVE.anvilB = item; markSaveDirty(); return; }
     if (src === 'armor') { SAVE.armor = item; markSaveDirty(); return; }
     const arr = slotArrayFor(src);
     if (arr) arr[idx] = item;
@@ -192,6 +196,36 @@
           opts.appendChild(b);
         }
       }
+      top.appendChild(wrap);
+    } else if (UI.mode === 'anvil') {
+      head.textContent = '金床';
+      const a = getSlot('anvA', 0), b = getSlot('anvB', 0);
+      const res = anvilResult(a, b);
+      const wrap = document.createElement('div');
+      wrap.className = 'furnace-area';
+      wrap.innerHTML = `<div class="ench-col"><div class="furnace-slot-label">道具</div><div class="a-1"></div></div>
+        <div class="ench-col"><div class="furnace-slot-label">同じ道具 / 修理素材</div><div class="a-2"></div></div>
+        <div class="furnace-mid"><div class="furnace-progress-label">${res ? `消費 ${res.cost} レベル` : '組み合わせ不可'}</div></div>
+        <div class="ench-col"><div class="furnace-slot-label">完成</div><div class="a-out"></div></div>`;
+      wrap.querySelector('.a-1').appendChild(makeSlotEl('anvA', 0));
+      wrap.querySelector('.a-2').appendChild(makeSlotEl('anvB', 0));
+      const outSlot = document.createElement('div');
+      outSlot.className = 'inv-slot result-slot';
+      renderSlotContent(outSlot, res ? res.item : null);
+      if (res) {
+        outSlot.style.cursor = XP.level >= res.cost ? 'pointer' : 'not-allowed';
+        outSlot.addEventListener('click', () => {
+          if (XP.level < res.cost) { thock(90); return; }
+          XP.level -= res.cost; XP.points = 0; updateXpHud();
+          SAVE.anvilA = null; SAVE.anvilB = null;
+          giveExistingItem(res.item);
+          markSaveDirty();
+          thock(700);
+          renderContainer();
+          invChanged();
+        });
+      }
+      wrap.querySelector('.a-out').appendChild(outSlot);
       top.appendChild(wrap);
     } else if (UI.mode === 'furnace') {
       head.textContent = 'かまど';
@@ -428,6 +462,8 @@
     }
     // エンチャント枠に置いたままのアイテムはインベントリへ戻す（エンチャントは保持したまま）
     if (SAVE.enchSlot) { giveExistingItem(SAVE.enchSlot); SAVE.enchSlot = null; markSaveDirty(); }
+    if (SAVE.anvilA) { giveExistingItem(SAVE.anvilA); SAVE.anvilA = null; markSaveDirty(); }
+    if (SAVE.anvilB) { giveExistingItem(SAVE.anvilB); SAVE.anvilB = null; markSaveDirty(); }
     if (UI.cursor) { giveItem(UI.cursor.id, UI.cursor.n, UI.cursor.dur); UI.cursor = null; }
     UI.mode = null;
     UI.ctx = null;
