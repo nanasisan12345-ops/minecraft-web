@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 24; // 14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高。17: RS鉱石+RS部品モデル。18: ドア32IDバリアント+面別マテリアル。19-20: モデルブロックの面別UV。21: ベッド2ブロック化。22: 松明の形状。23: 壁掛け松明+モデル回転。24: 砂利の地形生成
+  const MESH_WORKER_VERSION = 25; // 14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高。17: RS鉱石+RS部品モデル。18: ドア32IDバリアント+面別マテリアル。19-20: モデルブロックの面別UV。21: ベッド2ブロック化。22: 松明の形状。23: 壁掛け松明+モデル回転。24: 砂利の地形生成。25: 掘り跡に流れ込んだ液体を描く
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {
@@ -467,6 +467,10 @@
       if (eb) for (const [id, t] of eb) {
         const c = id.split(','), x = +c[0], y = +c[1], z = +c[2];
         if (!includeXYZ(x, y, z)) continue;
+        // 掘り跡(-1)にシム液体が流れ込んでいるセルは編集を送らない。ワーカーの blockAt は
+        // edit<0 を無条件に空気とするので、送ると浸水した穴が空気のまま描かれる（メイン側の
+        // blockAt は liquids を見るので、送らないことで両者の見え方が一致する）。
+        if (t < 0 && typeof getLiquid === 'function' && getLiquid(x, y, z)) continue;
         editEntries.push(x, y, z, t);
         hash = fnvAdd(fnvAdd(fnvAdd(fnvAdd(hash, x ^ 0xabc), y ^ 0xdef), z ^ 0x123), t);
       }

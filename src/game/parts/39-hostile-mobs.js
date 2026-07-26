@@ -50,7 +50,12 @@
       if (typeof rsOnBlockChanged === 'function') rsOnBlockChanged(x, y, z, -1); // RS部品の登録解除/回路の再評価
       touched.push([x, y, z]);
     }
-    if (touched.length) { saveEditsSoon(); for (const [x, y, z] of touched) requestEditedBlockRebuild(x, y, z); }
+    if (touched.length) {
+      saveEditsSoon();
+      for (const [x, y, z] of touched) requestEditedBlockRebuild(x, y, z);
+      // 爆破跡が海/湖/溶岩に面していたら流れ込む（本家準拠）
+      if (typeof liquidOnBlockRemoved === 'function') for (const [x, y, z] of touched) liquidOnBlockRemoved(x, y, z);
+    }
     // 派手なパーティクル
     for (let k = 0; k < 26; k++) burst(cx + rnd(-power, power), cy + rnd(-1, power), cz + rnd(-power, power), k % 2 ? 0xff8a26 : 0x555555);
     if (typeof playExplosionSound === 'function') playExplosionSound(power / 3);

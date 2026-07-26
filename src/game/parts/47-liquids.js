@@ -1,9 +1,12 @@
   /* ============== 流れる液体（水/溶岩）: イベント駆動セルオートマトン ==============
    * liquids: "x,y,z" -> { t: WATER|LAVA, lv: 0-7 }（0=源, 1-7=流れ）。
    * 流水セルは setBlock で world に置くだけ（永続化しない）。源のみ SAVE.liquids に保存し、
-   * ロード時に再シムして流れを作り直す。自然地形の海/川/湖は暗黙ブロックのままシム対象外。
+   * ロード時に再シムして流れを作り直す。自然地形の海/川/湖/溶岩は暗黙ブロックなので普段はシム対象外だが、
+   * 隣を掘られたセルだけ nat 源としてシムへ取り込み、本家同様「掘れば流れ込む」を再現する。
    * 毎フレーム全走査は禁止：pending(再評価待ち集合) が空ならコスト0。 */
   const liquids = new Map();
+  // 32-world-window.js の blockAt に liquids を見せる（掘り跡へ流れ込んだ液体を空気にしないため）
+  if (typeof bindLiquidCells === 'function') bindLiquidCells(liquids);
   const LIQ_MAXLV = { [WATER]: 7, [LAVA]: 6 };   // 地上: 水は7マス(lv1-7)、溶岩は3マス(lv2,4,6)
   const LIQ_DROP = { [WATER]: 1, [LAVA]: 2 };     // 水平1マスあたりの減衰
   const LIQ_TICK = { water: 0.25, lava: 1.5 };    // 更新間隔（秒）
@@ -13,6 +16,13 @@
   const pending = new Set();
   const procCount = new Map(); // セルごとの処理回数（1操作あたり）。振動する境界セルを凍結して必ずアイドルへ収束させる安全弁
   const PROC_CAP = 40;         // 正常な氾濫は数〜十数回で収束。これを超えたセルは以後スキップ（静止）
+  // 浸水セルの総数上限。超えたら新しいセルを作らず静止する（本家より安全側の安全弁）。
+  // 溶岩は水より厳しく抑える: 山の斜面に流すと落下ごとにレベルが1へ戻るため延々と流れ落ち続け、
+  // しかも地形を不可逆に変える（石化）うえダメージ源でもある。
+  let NAT_FLOOD_CAP = 1500;
+  const LAVA_FLOOD_RATIO = 0.4;
+  function liquidCellCap(type) { return type === LAVA ? Math.floor(NAT_FLOOD_CAP * LAVA_FLOOD_RATIO) : NAT_FLOOD_CAP; }
+  function setFloodCap(n) { NAT_FLOOD_CAP = Math.max(1, Math.floor(n)); return NAT_FLOOD_CAP; }
   const dirtyLiquidChunks = new Set();
   let liqWaterClock = 0, liqLavaClock = 0;
   let liqProcessedLastTick = 0;
@@ -115,13 +125,17 @@
     // 流れ: 下が空気なら落下（足元で広がるので水平拡散はしない）、塞がっていれば水平へ拡散。
     // 拡散先は enqueueLiquid のみ（enqueueNeighbors は自セルを再登録し無限振動を招くため使わない。
     // 下流の再評価は「変化した/枯れたセル」側の enqueueNeighbors が担う）。
+    const cap = liquidCellCap(T);
     if (blockAt(x, y - 1, z) === undefined) {
-      setLiquidCell(x, y - 1, z, T, 1);
-      enqueueLiquid(x, y - 1, z);
+      if (liquids.size < cap) {
+        setLiquidCell(x, y - 1, z, T, 1);
+        enqueueLiquid(x, y - 1, z);
+      }
     } else if (curLv < maxlv) {
       for (const [dx, dz] of DIRS4) {
         const nx = x + dx, nz = z + dz, nb = blockAt(nx, y, nz);
         if (nb === undefined) {
+          if (liquids.size >= cap) continue;
           setLiquidCell(nx, y, nz, T, curLv + drop); enqueueLiquid(nx, y, nz);
         } else if (nb === WATER && T === LAVA) {
           // 溶岩が水セルへ流れ込む → 石
@@ -169,6 +183,52 @@
     flushLiquidRebuilds();
   }
 
+  /* --- 自然の水/溶岩からの浸水（本家の「掘れば流れ込む」） ---
+   * 自然地形の海/川/湖/滝/溶岩は暗黙ブロックでシム対象外なので、隣に空気ができても自力では
+   * 流れ出さない。掘った/爆破したセルの隣に自然液体があれば、その液体セルだけを源として
+   * シムへ取り込み（nat=true）、あとは既存のフローに任せる。
+   * nat 源は SAVE.natFlood に保存し、ロード時に「今もそこが液体なら」復元する。 */
+  function registerNaturalSource(x, y, z, type) {
+    const k = liqKey(x, y, z);
+    if (liquids.has(k)) { enqueueLiquid(x, y, z); return false; }
+    liquids.set(k, { t: type, lv: 0, nat: true });
+    if (!SAVE.natFlood) SAVE.natFlood = {};
+    SAVE.natFlood[k] = type;
+    markSaveDirty();
+    enqueueLiquid(x, y, z);
+    return true;
+  }
+  // 破壊/爆発で (x,y,z) が空気になった直後に呼ぶ（rsOnBlockChanged と同じ立ち位置）
+  function liquidOnBlockRemoved(x, y, z) {
+    if (blockAt(x, y, z) !== undefined) return 0;
+    let added = 0;
+    for (const [dx, dy, dz] of DIRS6) {
+      const nx = x + dx, ny = y + dy, nz = z + dz;
+      if (liquids.has(liqKey(nx, ny, nz))) { enqueueLiquid(nx, ny, nz); continue; }
+      const b = blockAt(nx, ny, nz);
+      if (b !== WATER && b !== LAVA) continue;
+      if (registerNaturalSource(nx, ny, nz, b)) added++;
+    }
+    if (added) { procCount.clear(); flushLiquidRebuilds(); }
+    return added;
+  }
+  // 緊急脱出用: 浸水と流水を全部消し、浸水起点の記録も捨てる（リロードで乾いた状態に戻る）
+  function dryUpFlood() {
+    const keys = [...liquids.keys()];
+    for (const k of keys) {
+      const c = k.split(','), x = +c[0], z = +c[2];
+      liquids.delete(k);
+      if (SAVE.liquids) delete SAVE.liquids[k];
+      if (typeof deleteBlockKey === 'function') deleteBlockKey(k); else setBlock(x, +c[1], z, null);
+      markLiquidDirty(x, z);
+    }
+    SAVE.natFlood = {};
+    pending.clear(); procCount.clear();
+    markSaveDirty();
+    flushLiquidRebuilds();
+    return { cleared: keys.length };
+  }
+
   /* --- 公開API（バケツ/セーブ/デバッグ用） --- */
   function placeLiquidSource(x, y, z, type) {
     procCount.clear();
@@ -184,6 +244,7 @@
     const l = getLiquid(x, y, z);
     if (!l || l.lv !== 0) return null;
     const type = l.t;
+    if (l.nat) return type;   // 自然の海/湖/溶岩は汲んでも減らない（本家の無限水源）
     procCount.clear();
     clearLiquidCell(x, y, z);
     enqueueNeighbors(x, y, z);
@@ -197,11 +258,21 @@
     procCount.clear();
     liquids.delete(k);
     if (SAVE.liquids) delete SAVE.liquids[k];
+    if (SAVE.natFlood) delete SAVE.natFlood[k];
     enqueueNeighbors(x, y, z);
     flushLiquidRebuilds();
   }
   function restoreLiquids() {
-    if (!SAVE.liquids) return;
+    // 自然からの浸水起点: 地形が今もその液体のままなら源として取り込む（掘り跡が edits に残っているので再浸水する）
+    if (SAVE.natFlood) {
+      for (const k of Object.keys(SAVE.natFlood)) {
+        const c = k.split(','), x = +c[0], y = +c[1], z = +c[2], type = SAVE.natFlood[k];
+        if (blockAt(x, y, z) !== type) { delete SAVE.natFlood[k]; continue; }
+        liquids.set(k, { t: type, lv: 0, nat: true });
+        enqueueLiquid(x, y, z); enqueueNeighbors(x, y, z);
+      }
+    }
+    if (!SAVE.liquids) { flushLiquidRebuilds(); return; }
     for (const k of Object.keys(SAVE.liquids)) {
       const c = k.split(','), type = SAVE.liquids[k];
       setLiquidCell(+c[0], +c[1], +c[2], type, 0);
@@ -240,9 +311,9 @@
     return { pos: [x, y, z], liquid: l ? { type: l.t === WATER ? 'water' : 'lava', level: l.lv } : null, block: blockAt(x, y, z) };
   }
   function liquidSimStats() {
-    let sources = 0, flowing = 0;
-    for (const v of liquids.values()) (v.lv === 0 ? sources++ : flowing++);
+    let sources = 0, flowing = 0, natural = 0;
+    for (const v of liquids.values()) { (v.lv === 0 ? sources++ : flowing++); if (v.nat) natural++; }
     const sample = [];
     for (const k of pending) { if (sample.length >= 8) break; const l = liquids.get(k); sample.push({ k, l: l ? { t: l.t === WATER ? 'W' : 'L', lv: l.lv } : null }); }
-    return { cells: liquids.size, sources, flowing, pending: pending.size, processedLastTick: liqProcessedLastTick, pendingSample: sample };
+    return { cells: liquids.size, sources, flowing, natural, cap: NAT_FLOOD_CAP, lavaCap: liquidCellCap(LAVA), pending: pending.size, processedLastTick: liqProcessedLastTick, pendingSample: sample };
   }

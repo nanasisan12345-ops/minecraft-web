@@ -388,6 +388,7 @@
     placeAt: (t = TORCH, dx = 2, dy = 0, dz = 0) => {
       const x = Math.floor(player.pos.x) + dx, z = Math.floor(player.pos.z) + dz;
       const y = Math.floor(player.pos.y) + dy;
+      if (typeof displaceLiquidAt === 'function') displaceLiquidAt(x, y, z); // 実際の設置経路と同じく液体を塞ぐ
       setEdit(key(x, y, z), t); setBlock(x, y, z, t); requestEditedBlockRebuild(x, y, z, t);
       return { x, y, z, type: TYPES[t] && TYPES[t].name };
     },
@@ -395,8 +396,9 @@
       const x = Math.floor(player.pos.x) + dx, z = Math.floor(player.pos.z) + dz;
       const y = Math.floor(player.pos.y) + dy;
       const t = blockAt(x, y, z);
-      setEdit(key(x, y, z), -1); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z, t);
+      setEdit(key(x, y, z), -1); saveEditsSoon(); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z, t);
       if (typeof rsOnBlockChanged === 'function') rsOnBlockChanged(x, y, z, -1);
+      if (typeof liquidOnBlockRemoved === 'function') liquidOnBlockRemoved(x, y, z);
       return { x, y, z, was: t != null ? TYPES[t] && TYPES[t].name : null };
     },
     // ライトエンジン確認: 現在地の空の見え方＋近くの発光ブロック＋直近チャンクビルド時間。
@@ -505,6 +507,18 @@
     stepRedstone: (n = 5) => { for (let i = 0; i < n; i++) updateRedstone(RS_TICK_SEC); return rsStats(); },
     // C15 テスト: edits からRS部品レジストリを復元（通常は起動1フレーム目に自動実行。rAF停止時の手動用）
     rsRestore: () => { if (typeof restoreRedstone === 'function') restoreRedstone(); return rsStats(); },
+    // 自然浸水テスト: 浸水の状況（起点数/セル数/上限）
+    floodInfo: () => ({ ...liquidSimStats(), natSaved: Object.keys(SAVE.natFlood || {}).length }),
+    // 重くなったときの緊急脱出: 浸水と流水を全部消して起点の記録も捨てる（リロードで乾く）
+    dryUp: () => dryUpFlood(),
+    // 浸水セル数の上限を変更する（安全弁の効きを確認する用。既定4000）
+    floodCap: (n) => setFloodCap(n),
+    // 任意座標へテレポート（海際など遠方の検証用）
+    tp: (x, y, z) => {
+      player.pos.set(x + 0.5, y, z + 0.5); player.vel.set(0, 0, 0); player.onGround = false;
+      regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z));
+      return { pos: player.pos.toArray().map(n => +n.toFixed(1)), block: blockAt(Math.floor(x), Math.floor(y), Math.floor(z)) };
+    },
     // C9 テスト: 水中判定・酸素・青い霧・採掘減速の現在値
     waterState: () => waterStateInfo(),
     // C9 テスト: プレイヤーの周りの空気を水で満たす/戻す（on=false で撤去）。地形は壊さない

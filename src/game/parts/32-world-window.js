@@ -9,6 +9,10 @@
   const airChunkIndex = new Map();   // chunkKey(cx,cz) -> Set<id>
   const editsChunkIndex = new Map(); // chunkKey(cx,cz) -> Map<id,type>
   const key = (x, y, z) => x + ',' + y + ',' + z;
+  // 47-liquids.js が起動時に自分の liquids Map を渡す。掘り跡(edit=-1)へ流れ込んだ液体を
+  // blockAt に見せるために使う（edit=-1 を無条件に空気として返すと、浸水した穴が空気のままになる）。
+  let liquidCellsRef = null;
+  function bindLiquidCells(m) { liquidCellsRef = m; }
   const columnKey = (x, z) => x + ',' + z;
   const blockChunkKey = (x, z) => chunkKey(chunkCoord(x), chunkCoord(z));
   function indexBucketAdd(indexMap, ck, id, value) {
@@ -134,7 +138,10 @@
   function blockAt(x, y, z) {
     const id = key(x, y, z);
     const edit = edits.get(id);
-    if (edit < 0) return undefined;
+    if (edit < 0) {
+      if (liquidCellsRef && liquidCellsRef.size) { const l = liquidCellsRef.get(id); if (l) return l.t; }
+      return undefined;
+    }
     if (edit != null && edit >= 0) return edit;
     const t = world.get(id);
     if (t !== undefined) return t;

@@ -114,6 +114,10 @@
     setBlock(pair.x, pair.y + 1, pair.z, null);
     requestEditedBlockRebuild(pair.x, pair.y, pair.z);
     requestEditedBlockRebuild(pair.x, pair.y + 1, pair.z);
+    if (typeof liquidOnBlockRemoved === 'function') {
+      liquidOnBlockRemoved(pair.x, pair.y, pair.z);
+      liquidOnBlockRemoved(pair.x, pair.y + 1, pair.z);
+    }
     return true;
   }
   function placeDoorFromTarget(tg) {
@@ -184,6 +188,7 @@
       setEdit(key(cx, cy, cz), -1);
       setBlock(cx, cy, cz, null);
       requestEditedBlockRebuild(cx, cy, cz);
+      if (typeof liquidOnBlockRemoved === 'function') liquidOnBlockRemoved(cx, cy, cz);
     }
     saveEditsSoon();
     return true;
@@ -565,6 +570,7 @@
     setEdit(id, -1); saveEditsSoon(); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z, t); thock(150);
     breakDetachedLadders(x, y, z); // 背面(壁)を失ったはしごを剥がしてアイテム化
     if (typeof rsOnBlockChanged === 'function') { rsOnBlockChanged(x, y, z, -1); breakUnsupportedRsBlocks(x, y, z); }
+    if (typeof liquidOnBlockRemoved === 'function') liquidOnBlockRemoved(x, y, z); // 隣が海/湖/溶岩なら流れ込む
   }
   // (bx,by,bz) を足場にしていたRS部品（ワイヤ/トーチ/レバー/ボタン/感圧板）を剥がしてアイテム化
   function breakUnsupportedRsBlocks(bx, by, bz) {
