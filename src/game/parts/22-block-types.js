@@ -397,6 +397,30 @@
   // BED_IDS[facing] = [足元ID, 枕元ID]
   const BED_IDS = [0, 1, 2, 3].map(f => [BED_PART + f * 2, BED_PART + f * 2 + 1]);
 
+  /* ---- 壁掛け松明(142-145): 本家同様、壁から斜めに生える ----
+     index = 松明が倒れる側（＝設置面の法線）0=-z 1=+x 2=+z 3=-x。
+     collisionBoxes:[] で当たり判定なし（solid のままにして採掘対象には残す）。 */
+  const TORCH_WALL = TYPES.length; // 142
+  for (let i = 0; i < 4; i++) {
+    TYPES.push({
+      name: 'たいまつ', color: 0xffb23a, icon: T.torch,
+      mats: faceMats([T.torch, T.torch, T.torchFlame, T.torch, T.torch, T.torch], { emissive: 0xffa324, emissiveIntensity: 0.75, shininess: 16, specular: 0x442200 }),
+      transparent: true, noAutoItem: true, lightLevel: 14, collisionBoxes: [],
+    });
+  }
+  const TORCH_TILT = 0.44; // 約25度。本家の壁掛け松明の傾き
+  const TORCH_WALL_MODEL = [
+    { box: [0.4375, 0.22, 0.8750, 0.5625, 0.97, 1.0000], rot: { origin: [0.5000, 0.22, 0.9375], axis: 'x', angle: -TORCH_TILT } }, // 0: -z へ倒れる
+    { box: [0.0000, 0.22, 0.4375, 0.1250, 0.97, 0.5625], rot: { origin: [0.0625, 0.22, 0.5000], axis: 'z', angle: -TORCH_TILT } }, // 1: +x
+    { box: [0.4375, 0.22, 0.0000, 0.5625, 0.97, 0.1250], rot: { origin: [0.5000, 0.22, 0.0625], axis: 'x', angle: TORCH_TILT } },  // 2: +z
+    { box: [0.8750, 0.22, 0.4375, 1.0000, 0.97, 0.5625], rot: { origin: [0.9375, 0.22, 0.5000], axis: 'z', angle: TORCH_TILT } },  // 3: -x
+  ];
+  const TORCH_WALL_IDS = [];
+  for (let i = 0; i < 4; i++) {
+    TYPES[TORCH_WALL + i].model = [TORCH_WALL_MODEL[i]];
+    TORCH_WALL_IDS.push(TORCH_WALL + i);
+  }
+
   TYPES[OAK_TRAPDOOR_CLOSED].model = [{ box: [0.00, 0.00, 0.00, 1.00, 0.1875, 1.00] }];
   TYPES[OAK_TRAPDOOR_OPEN].model = [{ box: [0.00, 0.00, 0.8125, 1.00, 1.00, 1.00] }];
   TYPES[OAK_FENCE].model = [

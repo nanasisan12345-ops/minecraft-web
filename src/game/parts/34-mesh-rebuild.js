@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 22; // 14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高。17: RS鉱石+RS部品モデル。18: ドア32IDバリアント+面別マテリアル。19-20: モデルブロックの面別UV。21: ベッド2ブロック化。22: 松明の形状
+  const MESH_WORKER_VERSION = 23; // 14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高。17: RS鉱石+RS部品モデル。18: ドア32IDバリアント+面別マテリアル。19-20: モデルブロックの面別UV。21: ベッド2ブロック化。22: 松明の形状。23: 壁掛け松明+モデル回転
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {
@@ -137,11 +137,30 @@
       [[x0,y0,z1], [x1,y0,z1], [x1,y1,z1], [x0,y1,z1]],
       [[x0,y0,z0], [x0,y1,z0], [x1,y1,z0], [x1,y0,z0]],
     ];
+    // part.rot: ブロックローカルの origin まわりに1軸だけ回す（壁掛け松明の傾きなど）
+    const norms = applyPartRotation(part, faces, x, y, z);
     for (let f = 0; f < FACE_DEFS.length; f++) {
       const fd = FACE_DEFS[f];
-      addQuadToState(state, faces[f], fd.n, uvCoords || fd.uv, part.mat ?? fd.m, rgbIn);
+      addQuadToState(state, faces[f], norms ? norms[f] : fd.n, uvCoords || fd.uv, part.mat ?? fd.m, rgbIn);
     }
     return true;
+  }
+  // faces を破壊的に回し、回転後の面法線を返す（回転が無ければ null）
+  function applyPartRotation(part, faces, x, y, z) {
+    const rot = part && part.rot;
+    if (!rot) return null;
+    const c = Math.cos(rot.angle), s = Math.sin(rot.angle);
+    const ox = x + rot.origin[0], oy = y + rot.origin[1], oz = z + rot.origin[2];
+    const rv = rot.axis === 'z' ? (a, b, d) => [a * c - b * s, a * s + b * c, d]
+      : rot.axis === 'x' ? (a, b, d) => [a, b * c - d * s, b * s + d * c]
+        : (a, b, d) => [a * c + d * s, b, -a * s + d * c];
+    for (let f = 0; f < faces.length; f++) {
+      faces[f] = faces[f].map(p => {
+        const r = rv(p[0] - ox, p[1] - oy, p[2] - oz);
+        return [ox + r[0], oy + r[1], oz + r[2]];
+      });
+    }
+    return FACE_DEFS.map(fd => rv(fd.n[0], fd.n[1], fd.n[2]));
   }
 
   function addCrossPartToState(state, x, y, z, part, rgbIn) {

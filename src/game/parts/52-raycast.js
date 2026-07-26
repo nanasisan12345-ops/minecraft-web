@@ -188,6 +188,27 @@
     saveEditsSoon();
     return true;
   }
+  /* ---- 壁掛け松明: 壁面をクリックしたら斜めに張り付く版を置く ---- */
+  function isWallTorch(type) { return type >= TORCH_WALL && type < TORCH_WALL + 4; }
+  const TORCH_WALL_INDEX = { '0,0,-1': 0, '1,0,0': 1, '0,0,1': 2, '-1,0,0': 3 };
+  function placeWallTorchFromTarget(tg) {
+    const idx = TORCH_WALL_INDEX[tg.normal.join(',')];
+    if (idx === undefined) return false;
+    if (!isSolid(tg.block[0], tg.block[1], tg.block[2])) return false; // 支えになる壁が要る
+    const x = tg.block[0] + tg.normal[0], y = tg.block[1] + tg.normal[1], z = tg.block[2] + tg.normal[2];
+    if (y < CHUNK_Y_MIN || y > CHUNK_Y_MAX || isPlacementBlocked(x, y, z)) return false;
+    const s = selectedItem();
+    if (!s) return false;
+    s.n -= 1;
+    if (s.n <= 0) INV[selected] = null;
+    invChanged();
+    const type = TORCH_WALL + idx;
+    setEdit(key(x, y, z), type); saveEditsSoon();
+    setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z);
+    thock(240);
+    if (typeof progressEvent === 'function') progressEvent('place', 'torch');
+    return true;
+  }
   function isTrapdoorBlock(type) { return type === OAK_TRAPDOOR_CLOSED || type === OAK_TRAPDOOR_OPEN; }
   function toggleTrapdoorAt(x, y, z, type) {
     if (!isTrapdoorBlock(type)) return false;
@@ -379,6 +400,7 @@
   // レッドストーン
   BLOCK_HARDNESS.set(REDSTONE_ORE, 3.4);
   BLOCK_HARDNESS.set(REDSTONE_WIRE, 0.05);
+  for (const t of TORCH_WALL_IDS) BLOCK_HARDNESS.set(t, 0.1);
   BLOCK_HARDNESS.set(REDSTONE_TORCH, 0.1); BLOCK_HARDNESS.set(REDSTONE_TORCH_OFF, 0.1);
   BLOCK_HARDNESS.set(LEVER_OFF, 0.5); BLOCK_HARDNESS.set(LEVER_ON, 0.5);
   BLOCK_HARDNESS.set(STONE_BUTTON_OFF, 0.5); BLOCK_HARDNESS.set(STONE_BUTTON_ON, 0.5);
@@ -708,6 +730,7 @@
     }
     // 食べ物を持っていたら食べる
     if (def && def.food) { eatSelectedFood(); return; }
+    if (tg && def && def.id === 'torch' && tg.normal[1] === 0) { placeWallTorchFromTarget(tg); return; }
     if (tg && def && def.id === 'bed') { placeBedFromTarget(tg); return; }
     if (tg && def && def.id === 'oak_door') { placeDoorFromTarget(tg); return; }
     if (tg && def && def.id === 'oak_fence_gate') { placeFenceGateFromTarget(tg); return; }

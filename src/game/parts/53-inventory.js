@@ -143,6 +143,9 @@
   for (const b of BED_TYPE_IDS) {
     ITEM_FOR_BLOCK[b] = 'bed';
   }
+  for (const b of TORCH_WALL_IDS) {
+    ITEM_FOR_BLOCK[b] = 'torch';
+  }
   ITEM_FOR_BLOCK[OAK_TRAPDOOR_CLOSED] = 'oak_trapdoor';
   ITEM_FOR_BLOCK[OAK_TRAPDOOR_OPEN] = 'oak_trapdoor';
   ITEM_FOR_BLOCK[OAK_FENCE_GATE_Z_CLOSED] = 'oak_fence_gate';
