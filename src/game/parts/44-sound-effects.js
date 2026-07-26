@@ -250,11 +250,12 @@
       o.start(st); o.stop(st + 1.0);
     }
   }
-  function updateEnvironmentAudio(dt, rainAmount = 0) {
+  function updateEnvironmentAudio(dt, rainAmount = 0, underwater = false) {
     if (!actx || !ENV.ready) return;
     const now = actx.currentTime;
     const outdoor = started && !(typeof RAVE !== 'undefined' && RAVE.on);
-    ENV.master.gain.setTargetAtTime(outdoor ? 0.75 : 0.0001, now, 0.6);
+    // 水中は環境音がこもる（C9: 全体の音量を-30%）
+    ENV.master.gain.setTargetAtTime(outdoor ? (underwater ? 0.75 * 0.7 : 0.75) : 0.0001, now, 0.6);
     ENV.rainGain.gain.setTargetAtTime(outdoor ? Math.max(0.0001, rainAmount * 0.075) : 0.0001, now, 0.4);
     const mp3Active = ENV.mp3Ok && ENV.el && !ENV.el.paused && !ENV.el.ended;
     const theme = ambientThemeForWorld(rainAmount);

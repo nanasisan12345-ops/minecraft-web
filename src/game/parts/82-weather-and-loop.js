@@ -43,7 +43,15 @@
   const rainMat = new THREE.LineBasicMaterial({ color: 0xbcd2e6, transparent: true, opacity: 0, fog: true });
   const rain = new THREE.LineSegments(rainGeo, rainMat); rain.frustumCulled = false; rain.visible = false; scene.add(rain);
   let lightning = 0, lightningNext = rnd(4, 10);
+  // 水中視界（C9）: 頭が水没している間だけ、青い霧で視程を詰め、画面全体を青く沈める。
+  // 霧だけでは空/パノラマが素の色で見えてしまうので、オーバーレイと併用する。
+  const FOG_WATER = new THREE.Color(0x3f76e4);
+  const waterOverlay = document.createElement('div');
+  waterOverlay.id = 'waterOverlay';
+  document.body.appendChild(waterOverlay);
   function updateWeather(dt) {
+    const headUnderwater = !RAVE.on && !DEBUG.fly && started && playerHeadInWater();
+    waterOverlay.classList.toggle('show', headUnderwater);
     if (RAVE.on) { rain.visible = false; skyTint.visible = false; skyDome.visible = false; sunGlow.visible = false; photoSky.visible = false; photoOvercast.visible = false; photoSunrise.visible = false; photoSunset.visible = false; photoNight.visible = false; updateEnvironmentAudio(dt, 0); return; } // 会場起動中は会場が大気を支配
     const dayLight = typeof DAY !== 'undefined' ? DAY.light : 1;
     skyDome.visible = true; sunGlow.visible = true; photoSky.visible = skyReady; // 写真の読込完了まで青いグラデ空を見せる
@@ -74,7 +82,12 @@
       .lerp(FOG_SUNSET, dayA.sunsetAmt * 0.45)
       .lerp(FOG_SUNRISE, dayA.sunriseAmt * 0.45)
       .lerp(WHITE, flash * 0.6);
-    scene.fog.color.copy(_fogTmp); scene.fog.near = wCur.near; scene.fog.far = wCur.far;
+    if (headUnderwater) {
+      _fogTmp.copy(FOG_WATER).lerp(FOG_NIGHT, dayA.nightAmt * 0.55);
+      scene.fog.color.copy(_fogTmp); scene.fog.near = 0.1; scene.fog.far = 15;
+    } else {
+      scene.fog.color.copy(_fogTmp); scene.fog.near = wCur.near; scene.fog.far = wCur.far;
+    }
     scene.background.copy(_fogTmp);
     sun.intensity = wCur.sun * dayLight + flash * 1.6; sun.color.copy(wCur.sunCol);
     hemi.intensity = wCur.hemi * (0.42 + dayLight * 0.58) + flash * 1.2; hemi.color.copy(wCur.hSky); hemi.groundColor.copy(wCur.hGnd);
@@ -109,7 +122,7 @@
     photoSunrise.material.opacity = Math.min(1, dayA.sunriseAmt) * clear * nf;
     photoSunset.material.opacity = Math.min(1, dayA.sunsetAmt) * clear * nf;
     for (const pano of [photoNight, photoSunrise, photoSunset]) { pano.position.copy(camera.position); }
-    updateEnvironmentAudio(dt, wCur.rain);
+    updateEnvironmentAudio(dt, wCur.rain, headUnderwater);
   }
 
   function animate() {
@@ -133,12 +146,16 @@
         player.onGround = true;
         updateSurvival(dt, len > 0.05 || up !== 0);
       } else {
-        const spd = (keys['ShiftLeft'] || keys['ShiftRight']) ? SPRINT : WALK;
+        // 水中（C9）: 歩きの50%（ダッシュ泳ぎで1.5倍）、重力1/4、Space で浮上
+        const inWater = playerBodyInWater();
+        const sprintKey = keys['ShiftLeft'] || keys['ShiftRight'];
+        const spd = inWater ? WALK * WATER_MOVE * (sprintKey ? WATER_SPRINT : 1) : (sprintKey ? SPRINT : WALK);
         player.vel.x = mx * spd; player.vel.z = mz * spd;
-        player.vel.y -= GRAVITY * dt;
+        player.vel.y -= GRAVITY * (inWater ? WATER_GRAVITY : 1) * dt;
         if (keys['Space'] && player.onGround) {
           player.vel.y = JUMP; player.onGround = false;
         }
+        if (inWater) applyWaterPhysics(!!keys['Space']);
         // はしご: 重なっている間は重力を打ち消し、W/Space で上昇・入力なしでゆっくり滑降。
         // 触れている間は落下速度をリセット＝着地で落下ダメージなし。
         const onLadder = playerOnLadder();
@@ -152,7 +169,8 @@
         }
         player.onGround = false;
         const fallVel = player.vel.y;
-        if (moveAxis('y', player.vel.y * dt)) { if (player.vel.y < 0) { player.onGround = true; if (!onLadder) applyFallDamage(fallVel); } player.vel.y = 0; }
+        // 水に着水/水中で着底したときは落下ダメージなし（本家準拠: 深さ1ブロックでも無効）
+        if (moveAxis('y', player.vel.y * dt)) { if (player.vel.y < 0) { player.onGround = true; if (!onLadder && !playerBodyInWater()) applyFallDamage(fallVel); } player.vel.y = 0; }
         if (player.pos.y < CHUNK_Y_MIN - 40) damagePlayer(999);
         updateSurvival(dt, len > 0.05 || Math.abs(player.vel.y) > 0.1);
       }
@@ -215,6 +233,18 @@
   loadSavedDrops(); // 前回の落ちものを復元
   animate();
   window.__mcReady = true;
+  // C9 検証用: 水中判定・酸素・視界・採掘減速をまとめて返す
+  function waterStateInfo() {
+    return {
+      headInWater: playerHeadInWater(), bodyInWater: playerBodyInWater(),
+      air: +SURVIVAL.air.toFixed(2), drownClock: +(SURVIVAL.drownClock || 0).toFixed(2),
+      health: SURVIVAL.health,
+      y: +player.pos.y.toFixed(2), vy: +player.vel.y.toFixed(2), onGround: player.onGround,
+      fog: '#' + scene.fog.color.getHexString(), fogNear: scene.fog.near, fogFar: scene.fog.far,
+      blueOverlay: waterOverlay.classList.contains('show'),
+      miningFactor: miningWaterFactor(),
+    };
+  }
   // 動作検証用のデバッグフック（本番でも軽量なので常時公開）
   window.__mcDbg = {
     give: (id, n = 1) => giveItem(id, n),
@@ -475,4 +505,46 @@
     stepRedstone: (n = 5) => { for (let i = 0; i < n; i++) updateRedstone(RS_TICK_SEC); return rsStats(); },
     // C15 テスト: edits からRS部品レジストリを復元（通常は起動1フレーム目に自動実行。rAF停止時の手動用）
     rsRestore: () => { if (typeof restoreRedstone === 'function') restoreRedstone(); return rsStats(); },
+    // C9 テスト: 水中判定・酸素・青い霧・採掘減速の現在値
+    waterState: () => waterStateInfo(),
+    // C9 テスト: プレイヤーの周りの空気を水で満たす/戻す（on=false で撤去）。地形は壊さない
+    submerge: (on = true, r = 1, up = 2, down = 3) => {
+      const px = Math.floor(player.pos.x), py = Math.floor(player.pos.y), pz = Math.floor(player.pos.z);
+      let n = 0;
+      for (let x = px - r; x <= px + r; x++) for (let z = pz - r; z <= pz + r; z++) for (let y = py - down; y <= py + up; y++) {
+        const t = blockAt(x, y, z);
+        if (on) { if (t === undefined) { setEdit(key(x, y, z), WATER); setBlock(x, y, z, WATER); n++; } }
+        else if (t === WATER) { setEdit(key(x, y, z), -1); setBlock(x, y, z, null); n++; }
+      }
+      saveEditsSoon();
+      requestEditedBlockRebuild(px, py, pz, WATER);
+      return { cells: n, ...waterStateInfo() };
+    },
+    // C9 テスト: rAF停止時に鉛直の泳ぎ物理を手動で進める（メインループの鉛直部と同じ順序）
+    stepSwim: (n = 60, dt = 1 / 60, up = false) => {
+      const log = [];
+      for (let i = 0; i < n; i++) {
+        const inWater = playerBodyInWater();
+        player.vel.y -= GRAVITY * (inWater ? WATER_GRAVITY : 1) * dt;
+        if (inWater) applyWaterPhysics(up);
+        const fallVel = player.vel.y;
+        player.onGround = false;
+        if (moveAxis('y', player.vel.y * dt)) {
+          if (player.vel.y < 0) { player.onGround = true; if (!playerBodyInWater()) applyFallDamage(fallVel); }
+          player.vel.y = 0;
+        }
+        if (i % 10 === 0) log.push(`y=${player.pos.y.toFixed(2)} vy=${player.vel.y.toFixed(2)}`);
+      }
+      return { log, state: waterStateInfo() };
+    },
+    // C9 テスト: 鉛直にテレポートして落下を仕込む（高所→着水で落下ダメージが出ないことの確認用）
+    lift: (dy = 25) => { player.pos.y += dy; player.vel.set(0, 0, 0); player.onGround = false; return waterStateInfo(); },
+    // C9 テスト: rAF停止時に天候/視界の更新を手動で1回進める（青い霧の確認用）
+    stepWeather: (dt = 1 / 60) => { updateWeather(dt); return waterStateInfo(); },
+    // C9 テスト: 水平の泳ぎ速度（陸/水中/ダッシュ泳ぎ）を数値で比較する
+    swimSpeed: () => ({
+      陸歩き: WALK, 陸ダッシュ: SPRINT,
+      水中: WALK * WATER_MOVE, 水中ダッシュ: WALK * WATER_MOVE * WATER_SPRINT,
+      inWater: playerBodyInWater(),
+    }),
   };

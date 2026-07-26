@@ -432,9 +432,17 @@
     if (!d || !d.tool || d.tool === 'sword') return null;
     return { id: s.id, tool: d.tool, tier: d.tier, speed: d.speed, item: s };
   }
+  // 水中の採掘減速（C9・本家準拠）: 頭が水没していると5倍遅く、さらに足が接地していないと追加で5倍
+  function miningWaterFactor() {
+    if (typeof playerHeadInWater !== 'function' || !playerHeadInWater()) return 1;
+    return player.onGround ? 5 : 25;
+  }
   // 破壊にかかる秒数。適正ツールを持っていると速い。岩盤(unbreakable)は無限＝ゲージが進まない。
   function miningTime(type) {
     if (TYPES[type] && TYPES[type].unbreakable) return Infinity;
+    return miningTimeOnLand(type) * miningWaterFactor();
+  }
+  function miningTimeOnLand(type) {
     const base = isDoorBlock(type) ? 1.0 : (isBedBlock(type) ? 0.9 : (BLOCK_HARDNESS.get(type) || 1.2));
     const tool = blockPreferredTool(type);
     if (!tool) return Math.min(base, 1.2);

@@ -7,6 +7,10 @@
   let yaw = 0, pitch = 0;
   const EYE = 1.6, HALF = 0.3, TOP_H = 0.2;
   const WALK = 4.6, SPRINT = 6.3, GRAVITY = 30, JUMP = 9, REACH = 6;
+  // 水中（C9）: 重力1/4・沈降は最大2.2/s・Spaceで浮上2.0/s・水平は歩きの50%（泳ぎダッシュで1.5倍）。
+  // 水面で頭が出ている間だけ、Space で小さく跳ねられる。
+  const WATER_GRAVITY = 0.25, WATER_SINK_MAX = -2.2, WATER_RISE = 2.0;
+  const WATER_MOVE = 0.5, WATER_SPRINT = 1.5, WATER_HOP = 4.2;
 
   function blockCollisionHeight(type) {
     const def = TYPES[type];
@@ -71,6 +75,33 @@
       if (t !== undefined && t >= LADDER && t < LADDER + 4) return true;
     }
     return false;
+  }
+  // 水セルか（自然の海/川/湖の暗黙ブロックと、C8のシム水セルの両方）
+  function isWaterCell(x, y, z) {
+    if (blockAt(x, y, z) === WATER) return true;
+    return typeof liquidTypeAt === 'function' ? liquidTypeAt(x, y, z) === WATER : false;
+  }
+  // 目線（=カメラ位置）が水中か。酸素・青い霧・採掘減速の判定に使う
+  function playerHeadInWater() {
+    const p = player.pos;
+    return isWaterCell(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z));
+  }
+  // AABBのどこか（足元〜頭）が水中か。泳ぎの物理はこちらで切り替える
+  function playerBodyInWater() {
+    const p = player.pos;
+    const x0 = Math.floor(p.x - HALF), x1 = Math.floor(p.x + HALF);
+    const y0 = Math.floor(p.y - EYE), y1 = Math.floor(p.y + TOP_H);
+    const z0 = Math.floor(p.z - HALF), z1 = Math.floor(p.z + HALF);
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
+      if (isWaterCell(x, y, z)) return true;
+    }
+    return false;
+  }
+  // 水中の鉛直運動: Space で浮上（頭が出ていれば小さく跳ねる）、沈降は上限つき。
+  // 沈降上限で落下速度が消えるので、着水すると落下ダメージも無効になる。
+  function applyWaterPhysics(wantUp) {
+    if (wantUp) player.vel.y = playerHeadInWater() ? WATER_RISE : Math.max(player.vel.y, WATER_HOP);
+    if (player.vel.y < WATER_SINK_MAX) player.vel.y = WATER_SINK_MAX;
   }
   function overlapsPlayer(x, y, z, type = null) {
     const p = player.pos;

@@ -8,7 +8,18 @@
 
 - **今後の全実装は `計画書/`（手順書00〜23）に従うこと。設計判断のマスターは `ORCHESTRATION_PLAN.md`（§0-3 アーキテクチャ決定事項が最終判断基準）。**
 
-- **計画書の進捗: C1 / C2 / C4 / C5 / C6 / C7 / C8 / C10 / C11 / C12 / C13 / C15 / C19 が完了（13本）。C14 は一部のみ。残り: C3・C9・C14残り(羊毛/氷)・C16・C17・C18・S1〜S4。**
+- **計画書の進捗: C1 / C2 / C4 / C5 / C6 / C7 / C8 / C9 / C10 / C11 / C12 / C13 / C15 / C19 が完了（14本）。C14 は一部のみ。残り: C3(中止)・C14残り(羊毛/氷)・C16・C17・C18・S1〜S4。次は手順書15(C16)=ネザー。**
+
+- **2026-07-26: 手順書09(C9)=水中物理【完了】。メッシュ出力は不変なので `MESH_WORKER_VERSION` は据え置き。**
+  - `50-player-physics.js`: 水中定数（`WATER_GRAVITY=0.25` / `WATER_SINK_MAX=-2.2` / `WATER_RISE=2.0` / `WATER_MOVE=0.5` / `WATER_SPRINT=1.5` / `WATER_HOP=4.2`）＋ **`isWaterCell` / `playerHeadInWater`（目線=カメラ位置のセル） / `playerBodyInWater`（AABB全セル） / `applyWaterPhysics(wantUp)`**。`isWaterCell` は `blockAt===WATER` と **C8の `liquidTypeAt`（バケツ水/流水）の両方**を見るので、シム水でも潜れる（実測済み）。**EYE/HALF/TOP_H は変更していない。**
+  - `82-weather-and-loop.js` メインループ: 水中は水平速度 `WALK*0.5`（Shiftダッシュ泳ぎで1.5倍=3.45）・重力1/4・Spaceで浮上。**ジャンプの既存挙動は据え置き**（`Space && onGround` の分岐はそのまま。水中補正はその後に掛ける＝浅瀬のジャンプは従来どおり9）。落下ダメージは `!playerBodyInWater()` を条件に追加（**着水フレームで速度が-2.2に潰れるだけでなく、1フレームで水柱を抜けた場合も着底位置が水中なら無効**）。
+  - `51-survival.js`: `AIR_MAX=10 / AIR_DRAIN=10/15 / AIR_REFILL=10/1.0`、`SURVIVAL.air` と `drownClock`。目線が水中の間だけ減り、0で1秒ごとに `damagePlayer(2,'溺れ')`。頭が出れば1秒で全回復。**セーブは `SAVE.player.air`（旧セーブに無ければ 10 で読む）**。HUDは `<div class="air">` を `#survivalHud` の**上**に絶対配置（`bottom:100%`）で、**満タンの時は出さない**（本家と同じ。仕様文の「頭が水中の時のみ」より少し長く、息継ぎ後1秒の回復が見える）。
+  - `52-raycast.js`: `miningTime` を `miningTimeOnLand(type) * miningWaterFactor()` に分割。**頭が水没で5倍、さらに非接地で25倍**（本家準拠）。岩盤の `Infinity` は係数の前に return するので不変。
+  - 視界: `82` に `FOG_WATER=0x3f76e4` と **`#waterOverlay`（DOMの全画面レイヤ、`z-index:11`＝HUDの下）**。頭が水没している間だけ `scene.fog` を青・near0.1/far15 にし、オーバーレイに `.show`（`opacity:1`）を付ける。**霧だけだと空/実写パノラマが素の色で残るのでDOMオーバーレイと併用した。** 音は `updateEnvironmentAudio(dt, rain, underwater)` に第3引数を追加して master を -30%。
+  - **新 `__mcDbg` フック**: `waterState()`（水中判定/酸素/霧/採掘係数を一括）・`submerge(on, r, up, down)`（**周囲の空気セルだけを水にする＝地形は壊さない**。off で撤去）・`stepSwim(n, dt, up)`（rAF停止時に鉛直の泳ぎ物理を手動で回す）・`lift(dy)`（鉛直テレポート＝高所落下の仕込み）・`stepWeather(dt)`（青い霧の確認）・`swimSpeed()`。
+  - 実測（`pump(600)`→`__startGame()`→3x3x9のプールを掘って検証）: 酸素は**15.0秒でちょうど0**、以後1秒ごとに2ダメージ（20→18→16→14）、頭を出すと**1.00秒で10に全回復**／沈降は3フレームで **-2.20/s に頭打ち**・浮上は **+2.00/s 一定**／**25m落下（vy -30.5）→着水で即-2.2・HP不変**、水を抜いた同じ穴では落下ダメージ3が出る（既存挙動は生きている）／水面（足元だけ水）でSpace= **vy 4.20 の小さな跳ね**、水没時は 2.00 の一定浮上／霧 `#9fa9b9 near36/far70` →水中 `#3f76e4 near0.1/far15`・オーバーレイ `.show` ON→水を抜くと復帰／採掘は 石 5.76秒→**水中144秒(×25)**・接地時 土 0.96→4.8(×5)・岩盤は Infinity のまま／HUDバブルは1.5秒ごとに1個減り（●●●●●●●●●○…）空腹バーの上に水色で出る／**air=4 で死亡→`mc_save_941798336` に `player.air:4` が載り、リロードで air=4 が復元**／回帰: クラフト（作業台/本棚/ダイヤツルハシ/松明）一致・設置/破壊・ゾンビ湧き・液体シム pending 0・`npm.cmd run check` 成功・console error/warn 0・worker errors=0 fallbacks=0。
+  - **未確認: 実プレイでの目視（青い画面の濃さ、バブルの見え方、泳ぎの手触り）と水中BGMのこもり**（プレビューペインが hidden で compositing が止まり、スクリーンショットも CSS transition も進まないため）。**次回起動時に、深い水に飛び込む→沈む→Spaceで浮上→息継ぎ の一連と、画面の青さ・バブルの見え方を目視確認すること。**
+  - **テスト残骸**: localhost 開発ワールド（`mc_save_941798336`）のスポーン直下に 3x3x9 の縦穴（掘った edits）が残っている。水は全て撤去済み（`simStats().cells=0`）。**GitHub Pages 側の本番セーブは無関係。**
 
 - **2026-07-26: 手順書12(C12)=クモとエンダーマン【完了】。**
   - `39-hostile-mobs.js` に `spider`（HP16/攻撃2/速2.4）と `enderman`（HP40/攻撃7）を追加。モデルは既存の `mobBox` 方式（クモ=平たい胴＋8脚、エンダーマン=長身＋紫の目）。`MOB_MAKERS` と湧き抽選の末尾枠に組み込み（**既存モブの比率は変えていない**）。

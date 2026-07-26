@@ -1,7 +1,11 @@
   /* ============== サバイバル基礎（体力・空腹・ダメージ・死亡/リスポーン） ============== */
+  // 酸素（C9）: バブル10個を15秒で使い切り、尽きたら1秒ごとに2ダメージ。頭が出たら約1秒で全回復。
+  const AIR_MAX = 10, AIR_DRAIN = AIR_MAX / 15, AIR_REFILL = AIR_MAX / 1.0;
   const SURVIVAL = {
     health: 20,
     hunger: 20,
+    air: AIR_MAX,     // 残り酸素（バブル数）
+    drownClock: 0,
     hurtFlash: 0,
     saturation: 5,    // 隠し満腹度。空腹より先に減る
     absorb: 0,        // 吸収ハート（金リンゴ）。通常HPより先に減る
@@ -31,6 +35,7 @@
     // 旧セーブには無いので既定値で読む
     SURVIVAL.saturation = Number.isFinite(SAVE.player.saturation) ? SAVE.player.saturation : 5;
     SURVIVAL.absorb = Number.isFinite(SAVE.player.absorb) ? SAVE.player.absorb : 0;
+    SURVIVAL.air = Number.isFinite(SAVE.player.air) ? SAVE.player.air : AIR_MAX;
     SURVIVAL.absorbClock = SURVIVAL.absorb > 0 ? 120 : 0;
     if (Number.isFinite(SAVE.player.x) && Number.isFinite(SAVE.player.y) && Number.isFinite(SAVE.player.z)) {
       player.pos.set(SAVE.player.x, SAVE.player.y, SAVE.player.z);
@@ -46,6 +51,7 @@
       x: player.pos.x, y: player.pos.y, z: player.pos.z,
       yaw, pitch,
       hp: SURVIVAL.health, hunger: SURVIVAL.hunger, saturation: SURVIVAL.saturation, absorb: SURVIVAL.absorb,
+      air: SURVIVAL.air,
     };
     SAVE.time = DAY.time;
     SAVE.selected = selected;
@@ -69,6 +75,8 @@
     SURVIVAL.saturation = 5;
     SURVIVAL.absorb = 0;
     SURVIVAL.absorbClock = 0;
+    SURVIVAL.air = AIR_MAX;
+    SURVIVAL.drownClock = 0;
     SURVIVAL.hurtFlash = 0;
     SURVIVAL.invuln = 2.0;
     SURVIVAL.burn = 0;
@@ -176,6 +184,21 @@
     } else {
       SURVIVAL.starveClock = 0;
     }
+    // 酸素と溺れ（C9）: 目線が水中の間だけ減り、頭が出れば約1秒で満タンに戻る
+    const headInWater = !(typeof DEBUG !== 'undefined' && DEBUG.fly)
+      && typeof playerHeadInWater === 'function' && playerHeadInWater();
+    if (headInWater) {
+      SURVIVAL.air = Math.max(0, SURVIVAL.air - dt * AIR_DRAIN);
+      if (SURVIVAL.air <= 0) {
+        SURVIVAL.drownClock += dt;
+        if (SURVIVAL.drownClock >= 1.0) { SURVIVAL.drownClock = 0; damagePlayer(2, '溺れ'); }
+      } else {
+        SURVIVAL.drownClock = 0;
+      }
+    } else {
+      SURVIVAL.air = Math.min(AIR_MAX, SURVIVAL.air + dt * AIR_REFILL);
+      SURVIVAL.drownClock = 0;
+    }
     // 溶岩・炎上・サボテン
     if (!(typeof DEBUG !== 'undefined' && DEBUG.fly)) {
       const fx = Math.floor(player.pos.x), fz = Math.floor(player.pos.z);
@@ -213,6 +236,11 @@
     const fire = (SURVIVAL.burn || 0) > 0 ? '🔥 ' : '';
     const abs = Math.max(0, Math.ceil((SURVIVAL.absorb || 0) / 2));
     const absHearts = abs > 0 ? `<span class="absorb">${'♥'.repeat(abs)}</span>` : '';
-    survivalHud.innerHTML = `<div class="health">${fire}${hearts}${absHearts}</div><div class="hunger">${meat}</div>`;
+    // 酸素バブル（C9）: 満タンの時は出さない＝水中と息継ぎ直後だけ空腹バーの上に見える
+    const air = Number.isFinite(SURVIVAL.air) ? SURVIVAL.air : AIR_MAX;
+    const bubbles = Math.ceil(air - 0.001);
+    const airBar = air < AIR_MAX - 0.001
+      ? `<div class="air">${'●'.repeat(Math.max(0, bubbles))}${'○'.repeat(AIR_MAX - Math.max(0, bubbles))}</div>` : '';
+    survivalHud.innerHTML = `<div class="health">${fire}${hearts}${absHearts}</div><div class="hunger">${meat}</div>${airBar}`;
   }
   updateSurvivalHud();

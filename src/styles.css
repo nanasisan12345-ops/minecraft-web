@@ -192,6 +192,13 @@
   #survivalHud .health { color: #ff4d65; }
   #survivalHud .hunger { color: #ffb24a; }
   #survivalHud .health .absorb { color: #ffd23a; }  /* 吸収ハート（金リンゴ） */
+  /* 酸素バブル（水中のみ表示）。空腹バーの上に重ねる */
+  #survivalHud .air { position: absolute; right: 9px; bottom: 100%; margin-bottom: 5px;
+    color: #9fd8ff; font-size: 15px; letter-spacing: 0; }
+  /* 水中の青いオーバーレイ（頭が水没している間だけ） */
+  #waterOverlay { position: fixed; inset: 0; z-index: 11; pointer-events: none;
+    background: rgba(45,105,205,.42); opacity: 0; transition: opacity .16s linear; }
+  #waterOverlay.show { opacity: 1; }
   #survivalHud.hurt { animation: hurtBlink .16s alternate 4; }
   @keyframes hurtBlink { from { filter: brightness(1); } to { filter: brightness(2.2); transform: translateX(-50%) scale(1.04); } }
   #debugHud { position: fixed; left: 50%; top: 42px; transform: translateX(-50%); z-index: 33;
