@@ -52,7 +52,7 @@
   function updateWeather(dt) {
     const headUnderwater = !RAVE.on && !DEBUG.fly && started && playerHeadInWater();
     waterOverlay.classList.toggle('show', headUnderwater);
-    if (RAVE.on) { rain.visible = false; skyTint.visible = false; skyDome.visible = false; sunGlow.visible = false; photoSky.visible = false; photoOvercast.visible = false; photoSunrise.visible = false; photoSunset.visible = false; photoNight.visible = false; updateEnvironmentAudio(dt, 0); return; } // 会場起動中は会場が大気を支配
+    if (RAVE.on) { rain.visible = false; skyTint.visible = false; skyDome.visible = false; sunGlow.visible = false; photoSky.visible = false; photoOvercast.visible = false; photoSunrise.visible = false; photoSunset.visible = false; photoNight.visible = false; updateEnvironmentAudio(dt, 0); updateLiquidAudio(dt, false); return; } // 会場起動中は会場が大気を支配
     const dayLight = typeof DAY !== 'undefined' ? DAY.light : 1;
     skyDome.visible = true; sunGlow.visible = true; photoSky.visible = skyReady; // 写真の読込完了まで青いグラデ空を見せる
     if (started) { weatherClock += dt; if (weatherClock > weatherNext) pickWeather(); }
@@ -123,6 +123,20 @@
     photoSunset.material.opacity = Math.min(1, dayA.sunsetAmt) * clear * nf;
     for (const pano of [photoNight, photoSunrise, photoSunset]) { pano.position.copy(camera.position); }
     updateEnvironmentAudio(dt, wCur.rain, headUnderwater);
+    updateLiquidAudio(dt, headUnderwater);
+  }
+
+  // 液体の見た目のアニメーション。溶岩は本家同様、水よりずっとゆっくり流れて明るさが脈動する。
+  // 発光を動かすのはチャンク用のクローン（litChunkMats）だけ。TYPES.mats 本体は手持ち/ドロップと
+  // 共有しているので触らない（24-instanced-meshes.js の注記どおり）。
+  const lavaChunkMats = (typeof litChunkMats === 'function' && typeof LAVA !== 'undefined')
+    ? [].concat(litChunkMats(TYPES[LAVA])) : [];
+  function animateLiquidLook(dt, nowMs) {
+    if (typeof TX === 'undefined' || !TX.lava) return;
+    TX.lava.offset.y -= dt * 0.006;                       // 水(0.03/s)の1/5。本家の溶岩は非常に遅い
+    TX.lava.offset.x = Math.sin(nowMs * 0.00035) * 0.02;  // 横にわずかに揺らいで「うねり」を出す
+    const pulse = 0.78 + 0.22 * (0.5 + 0.5 * Math.sin(nowMs * 0.0021));
+    for (const m of lavaChunkMats) m.emissiveIntensity = pulse;
   }
 
   function animate() {
@@ -208,6 +222,7 @@
     updateFurnaces(dt);
     updateFurnaceBars();
     updateLiquids(dt);
+    updateLiquidFx(dt);
     updateRedstone(dt);
     updateCrops(dt);
     updateSaplings(dt);
@@ -222,6 +237,7 @@
     cloudTex.offset.x += dt * 0.004;
     clouds.position.x = camera.position.x; clouds.position.z = camera.position.z;
     TX.water.offset.x += dt * 0.02; TX.water.offset.y -= dt * 0.03; // 水面の流れ
+    animateLiquidLook(dt, now);
 
     const px = Math.floor(player.pos.x), pz = Math.floor(player.pos.z);
     const biomeLabel = biomeLabelAt(px, pz);
@@ -507,6 +523,19 @@
     stepRedstone: (n = 5) => { for (let i = 0; i < n; i++) updateRedstone(RS_TICK_SEC); return rsStats(); },
     // C15 テスト: edits からRS部品レジストリを復元（通常は起動1フレーム目に自動実行。rAF停止時の手動用）
     rsRestore: () => { if (typeof restoreRedstone === 'function') restoreRedstone(); return rsStats(); },
+    // 液体の演出テスト: 近くの液体量・生きているパーティクル数・溶岩の脈動とUVオフセット
+    liquidFx: () => ({
+      ...(typeof liquidAmbience === 'function' ? liquidAmbience() : {}),
+      particles: (typeof fxActiveCount === 'function') ? fxActiveCount() : null,
+      lavaPulse: lavaChunkMats[0] ? +lavaChunkMats[0].emissiveIntensity.toFixed(3) : null,
+      lavaOffset: [+TX.lava.offset.x.toFixed(4), +TX.lava.offset.y.toFixed(4)],
+      waterOffset: [+TX.water.offset.x.toFixed(4), +TX.water.offset.y.toFixed(4)],
+    }),
+    // 液体の演出を手動で n フレーム進める（rAF停止時の検証用）
+    stepLiquidFx: (n = 30, dt = 1 / 60) => {
+      for (let i = 0; i < n; i++) { updateLiquidFx(dt); animateLiquidLook(dt, performance.now() + i * 16); }
+      return { ...(typeof liquidAmbience === 'function' ? liquidAmbience() : {}), particles: fxActiveCount() };
+    },
     // 自然浸水テスト: 浸水の状況（起点数/セル数/上限）
     floodInfo: () => ({ ...liquidSimStats(), natSaved: Object.keys(SAVE.natFlood || {}).length }),
     // 重くなったときの緊急脱出: 浸水と流水を全部消して起点の記録も捨てる（リロードで乾く）

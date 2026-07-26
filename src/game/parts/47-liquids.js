@@ -229,6 +229,65 @@
     return { cleared: keys.length };
   }
 
+  /* --- 液体の演出（滝のしぶき / 溶岩の火花と煙 / 環境音の音量） ---
+   * 自然の海・川・湖・火山も対象にしたいので liquids Map ではなく blockAt を見る。
+   * 毎フレーム走査は重いので 0.25 秒ごとにプレイヤー周辺の 15x7x15（≈1600セル）だけ調べる。 */
+  const FX_R = 7, FX_RY = 3, FX_INTERVAL = 0.25;
+  const _fxVel = new THREE.Vector3();
+  let fxClock = 0, fxWaterAmt = 0, fxLavaAmt = 0;
+  function spawnWaterSplash(x, y, z) {
+    if (Math.random() > 0.3) return;
+    for (let i = 0; i < 2; i++) {
+      _fxVel.set(rnd(-0.8, 0.8), rnd(0.6, 2.2), rnd(-0.8, 0.8));
+      spawnFx(x + 0.5 + rnd(-0.4, 0.4), y + rnd(0, 0.25), z + 0.5 + rnd(-0.4, 0.4),
+        0xcfe6ff, _fxVel, rnd(0.35, 0.6), rnd(0.6, 1.1), 20, true);
+    }
+  }
+  function spawnLavaFx(x, y, z) {
+    const r = Math.random();
+    if (r < 0.05) {           // 火花（本家の lava pop）
+      _fxVel.set(rnd(-0.6, 0.6), rnd(2.2, 4.0), rnd(-0.6, 0.6));
+      spawnFx(x + 0.5 + rnd(-0.35, 0.35), y + 1.0, z + 0.5 + rnd(-0.35, 0.35),
+        0xffb43a, _fxVel, rnd(0.5, 0.85), rnd(0.8, 1.4), 20, true);
+      if (typeof playLavaPop === 'function') playLavaPop(x, y, z);
+    } else if (r < 0.13) {    // 煙（負の重力でゆっくり上へ）
+      _fxVel.set(rnd(-0.2, 0.2), rnd(0.5, 1.0), rnd(-0.2, 0.2));
+      spawnFx(x + 0.5 + rnd(-0.4, 0.4), y + 1.05, z + 0.5 + rnd(-0.4, 0.4),
+        0x5a5148, _fxVel, rnd(1.2, 2.0), rnd(1.4, 2.4), -0.35, true);
+    }
+  }
+  function updateLiquidFx(dt) {
+    if (typeof updateFxParticles !== 'function') return;
+    updateFxParticles(dt);
+    if (!started) return;   // プリロード中は演出を出さない
+    fxClock += dt;
+    if (fxClock < FX_INTERVAL) return;
+    fxClock = 0;
+    const px = Math.floor(player.pos.x), py = Math.floor(player.pos.y), pz = Math.floor(player.pos.z);
+    let water = 0, lava = 0;
+    for (let x = px - FX_R; x <= px + FX_R; x++) for (let z = pz - FX_R; z <= pz + FX_R; z++) for (let y = py - FX_RY; y <= py + FX_RY; y++) {
+      const t = blockAt(x, y, z);
+      if (t !== WATER && t !== LAVA) continue;
+      const openAbove = blockAt(x, y + 1, z) === undefined;
+      const openBelow = blockAt(x, y - 1, z) === undefined;
+      if (t === WATER) {
+        if (openAbove) water++;
+        // 滝＝上から水が供給されていて、横が開いている柱。柱全体からしぶきが散る（本家と同じ見え方）。
+        // 「下が空気」だけで判定すると柱の先端1セルしか出ないので、横の開きも見る。
+        const fed = blockAt(x, y + 1, z) === WATER;
+        const sideOpen = fed && (blockAt(x + 1, y, z) === undefined || blockAt(x - 1, y, z) === undefined
+          || blockAt(x, y, z + 1) === undefined || blockAt(x, y, z - 1) === undefined);
+        if (sideOpen || openBelow) { water += 2; spawnWaterSplash(x, y, z); }
+      } else {
+        if (openAbove) { lava++; spawnLavaFx(x, y, z); }
+        if (openBelow) lava += 2;
+      }
+    }
+    fxWaterAmt = water; fxLavaAmt = lava;
+  }
+  // 44-sound-effects.js の環境音が参照する「近くの液体の量」
+  function liquidAmbience() { return { water: fxWaterAmt, lava: fxLavaAmt }; }
+
   /* --- 公開API（バケツ/セーブ/デバッグ用） --- */
   function placeLiquidSource(x, y, z, type) {
     procCount.clear();
