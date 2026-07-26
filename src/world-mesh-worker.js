@@ -9,7 +9,7 @@ const FACE_DEFS = [
 
 const GRASS = 0, DIRT = 1, STONE = 2, SAND = 5, WATER = 9, SNOW = 10;
 const COAL_ORE = 11, IRON_ORE = 12, GOLD_ORE = 13, DIAMOND_ORE = 14, LAVA = 24;
-const BEDROCK = 74, DEEPSLATE = 75, REDSTONE_ORE = 104; // 22-block-types.js の同名定数と一致させること
+const BEDROCK = 74, DEEPSLATE = 75, REDSTONE_ORE = 104, GRAVEL = 146; // 22-block-types.js の同名定数と一致させること
 const SEA = 8, SNOW_LINE = 30, ROCK_LINE = 23;
 const SPAWN_GROUND_Y = 12, SPAWN_FLAT_R = 28, SPAWN_CLEAR_R = 38;
 
@@ -415,6 +415,8 @@ function oreTypeAt(x, y, z, h) {
   if (y <= 24 && oreBand > 0.40 - deep && speck > 0.915 - deep) return GOLD_ORE;
   if (y <= 15 && oreBand > 0.34 && speck > 0.875) return REDSTONE_ORE; // 本家準拠: y<16。32-world-window.js と完全同一に保つこと
   if (y <= 44 && oreBand > 0.30 && speck > 0.84) return IRON_ORE;
+  // 砂利: 地中にまばらな塊（C14）。32-world-window.js と完全同一に保つこと
+  if (oreBand > 0.26 && speck > 0.79 && speck < 0.815) return GRAVEL;
   if (y <= h - 5 && oreBand > 0.20 && speck > 0.75) return COAL_ORE;
   return baseStoneAt(x, y, z);
 }

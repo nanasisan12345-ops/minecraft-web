@@ -5,6 +5,15 @@
   const RECIPES = [
     { out: 'planks', n: 4, pattern: ['L'], keys: { L: 'log' } },
     { out: 'flint_and_steel', n: 1, pattern: ['I ', ' F'], keys: { I: 'iron_ingot', F: 'flint' } },
+    // C14: 紙/本/本棚（本棚は C11 のエンチャント強化に使う）
+    { out: 'paper', n: 3, pattern: ['WWW'], keys: { W: 'wheat' } },
+    { out: 'book', n: 1, pattern: ['PP', 'PL'], keys: { P: 'paper', L: 'leather' } },
+    { out: 'bookshelf', n: 1, pattern: ['PPP', 'BBB', 'PPP'], keys: { P: 'planks', B: 'book' } },
+    // C14: 金ツール
+    { out: 'gold_pickaxe', n: 1, pattern: ['GGG', ' S ', ' S '], keys: { G: 'gold_ingot', S: 'stick' } },
+    { out: 'gold_axe', n: 1, pattern: ['GG', 'GS', ' S'], keys: { G: 'gold_ingot', S: 'stick' } },
+    { out: 'gold_shovel', n: 1, pattern: ['G', 'S', 'S'], keys: { G: 'gold_ingot', S: 'stick' } },
+    { out: 'gold_sword', n: 1, pattern: ['G', 'G', 'S'], keys: { G: 'gold_ingot', S: 'stick' } },
     // 金のリンゴ: 金インゴット8でリンゴを囲む（本家準拠）
     { out: 'golden_apple', n: 1, pattern: ['GGG', 'GAG', 'GGG'], keys: { G: 'gold_ingot', A: 'apple' } },
     { out: 'stick', n: 4, pattern: ['P', 'P'], keys: { P: 'planks' } },

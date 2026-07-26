@@ -28,11 +28,11 @@
   // 動物のHPとドロップ（攻撃すると生肉などが手に入る。羊は布も落とす）
   const ANIMAL_HP = { cow: 10, sheep: 8, pig: 8, chicken: 4, deer: 8, squirrel: 3, duck: 4, bear: 16, hedgehog: 3, sparrow: 2 };
   const ANIMAL_DROPS = {
-    cow: [['raw_meat', 1, 3]],
+    cow: [['raw_meat', 1, 3], ['leather', 1, 2]],
     sheep: [['raw_meat', 1, 2], ['cloth', 1, 2]],
     pig: [['raw_meat', 1, 2]],
     chicken: [['raw_meat', 1, 1], ['fiber', 0, 1]],
-    deer: [['raw_meat', 1, 2]],
+    deer: [['raw_meat', 1, 2], ['leather', 0, 1]],
     bear: [['raw_meat', 2, 3]],
     duck: [['raw_meat', 1, 1]],
     squirrel: [['raw_meat', 0, 1]],

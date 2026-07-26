@@ -361,9 +361,9 @@
     if (isSlabBlock(type)) return (type < OAK_SLAB + 2) ? 'axe' : 'pickaxe';
     if ([STONE, DEEPSLATE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, REDSTONE_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK, OBSIDIAN, STONE_BUTTON_OFF, STONE_BUTTON_ON, STONE_PLATE_OFF, STONE_PLATE_ON].includes(type)) return 'pickaxe';
     if (isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type) || isBedBlock(type) || type === OAK_FENCE) return 'axe';
-    if (isLadderBlock(type) || isSignBlock(type)) return 'axe';
+    if (isLadderBlock(type) || isSignBlock(type) || type === BOOKSHELF) return 'axe';
     if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN, OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_TRAPDOOR_CLOSED, OAK_TRAPDOOR_OPEN, OAK_FENCE, OAK_FENCE_GATE_Z_CLOSED, OAK_FENCE_GATE_Z_OPEN, OAK_FENCE_GATE_X_CLOSED, OAK_FENCE_GATE_X_OPEN].includes(type)) return 'axe';
-    if ([DIRT, GRASS, SAND, SNOW, FARMLAND].includes(type)) return 'shovel';
+    if ([DIRT, GRASS, SAND, SNOW, FARMLAND, GRAVEL].includes(type)) return 'shovel';
     return null;
   }
   const BLOCK_HARDNESS = new Map([
@@ -396,6 +396,8 @@
   }
   for (let i = 0; i < 4; i++) { BLOCK_HARDNESS.set(LADDER + i, 0.4); BLOCK_HARDNESS.set(SIGN + i, 1.0); }
   BLOCK_HARDNESS.set(GLASS_PANE, 0.3);
+  BLOCK_HARDNESS.set(GRAVEL, 0.6);
+  BLOCK_HARDNESS.set(BOOKSHELF, 1.5);
   BLOCK_HARDNESS.set(OBSIDIAN, 50); // 本家準拠。ダイヤツルハシで約9.4秒
   // レッドストーン
   BLOCK_HARDNESS.set(REDSTONE_ORE, 3.4);
@@ -425,7 +427,7 @@
     const s = selectedItem();
     const d = s ? ITEM_DEFS[s.id] : null;
     if (!d || !d.tool || d.tool === 'sword') return null;
-    return { id: s.id, tool: d.tool, tier: d.tier };
+    return { id: s.id, tool: d.tool, tier: d.tier, speed: d.speed };
   }
   // 破壊にかかる秒数。適正ツールを持っていると速い。岩盤(unbreakable)は無限＝ゲージが進まない。
   function miningTime(type) {
@@ -438,12 +440,15 @@
       // ツルハシ必須ブロックを素手で掘ると非常に遅い
       return requiredToolTier(type) >= 1 ? base * 2.4 : base * 1.6;
     }
-    return base / ({ 1: 2.2, 2: 4.0, 3: 6.5, 4: 9.0 }[held.tier] || 2.0);
+    // speed 指定があればそれを使う（金ツールは tier1 だが採掘は最速）
+    return base / (held.speed || { 1: 2.2, 2: 4.0, 3: 6.5, 4: 9.0 }[held.tier] || 2.0);
   }
   // ブロック -> ドロップするアイテム（[id, n] の配列）
   function blockDrops(type) {
     if (isDoorBlock(type)) return [['oak_door', 1]];
     if (isBedBlock(type)) return [['bed', 1]];   // 2ブロックでもアイテムは1個
+    if (type === GRAVEL) return Math.random() < 0.1 ? [['flint', 1]] : [['gravel', 1]]; // 本家準拠: 10%で火打石
+    if (type === BOOKSHELF) return [['book', 3]]; // 本家準拠: 板材は返らない
     if (isTrapdoorBlock(type)) return [['oak_trapdoor', 1]];
     if (isFenceGateBlock(type)) return [['oak_fence_gate', 1]];
     if (type === STONE) return [['cobblestone', 1]];

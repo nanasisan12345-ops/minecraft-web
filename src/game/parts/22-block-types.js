@@ -421,6 +421,12 @@
     TORCH_WALL_IDS.push(TORCH_WALL + i);
   }
 
+  // 砂利(146) / 本棚(147)。C14 建材と素材の拡充
+  const GRAVEL = TYPES.length;
+  TYPES.push({ name: '砂利', color: 0x8b8377, icon: T.gravel, mats: faceMats(T.gravel) });
+  const BOOKSHELF = TYPES.length;
+  TYPES.push({ name: '本棚', color: 0xb5824a, icon: T.bookshelf, mats: faceMats([T.bookshelf, T.bookshelf, T.planks, T.planks, T.bookshelf, T.bookshelf]) });
+
   TYPES[OAK_TRAPDOOR_CLOSED].model = [{ box: [0.00, 0.00, 0.00, 1.00, 0.1875, 1.00] }];
   TYPES[OAK_TRAPDOOR_OPEN].model = [{ box: [0.00, 0.00, 0.8125, 1.00, 1.00, 1.00] }];
   TYPES[OAK_FENCE].model = [

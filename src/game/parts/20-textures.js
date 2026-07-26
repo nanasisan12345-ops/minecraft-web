@@ -376,6 +376,30 @@
       g.fillRect(0, 0, S, 1); g.fillRect(0, S - 1, S, 1); g.fillRect(0, 0, 1, S); g.fillRect(S - 1, 0, 1, S);
       dots(g, S, 0x6d4c1b, 0.05, 0.75);
     }),
+    gravel: makeTex((g, S) => {                              // 砂利。丸い小石が混ざった土色
+      noise(g, S, 0x8b8377, 0.78, 1.12);
+      dots(g, S, 0x5f5a51, 0.10, 0.8);
+      dots(g, S, 0xb8b1a4, 0.07, 1.05);
+      for (const [cx, cy] of [[5, 6], [19, 4], [11, 17], [24, 21], [4, 25], [27, 12]]) {
+        g.fillStyle = tint(0x6f6a60, 1.0); g.fillRect(cx, cy, 3, 3);
+        g.fillStyle = tint(0xa9a294, 1.05); g.fillRect(cx, cy, 2, 2);
+      }
+    }),
+    bookshelf: makeTex((g, S) => {                           // 本棚の側面。板枠に本が並ぶ
+      noise(g, S, 0xb5824a, 0.9, 1.06);
+      g.fillStyle = tint(0x5a361a, 0.9); g.fillRect(0, 0, S, 4); g.fillRect(0, S - 4, S, 4);
+      g.fillStyle = '#2b1c0e'; g.fillRect(0, 14, S, 4);
+      const cols = ['#b03030', '#3a6fb0', '#c8a23a', '#4a8a44', '#8a4ab0', '#c46a2a'];
+      for (let row = 0; row < 2; row++) {
+        let x = 1;
+        while (x < S - 2) {
+          const w = 2 + (Math.random() * 2 | 0);
+          g.fillStyle = cols[(Math.random() * cols.length) | 0];
+          g.fillRect(x, row === 0 ? 5 : 19, w, 8);
+          x += w + 1;
+        }
+      }
+    }),
     lantern: makeTex((g, S) => {
       g.fillStyle = '#191610'; g.fillRect(0, 0, S, S);
       g.fillStyle = '#3a342a'; g.fillRect(4, 2, S - 8, 4); g.fillRect(4, S - 6, S - 8, 4);
@@ -612,5 +636,5 @@
   TX.lava.wrapS = TX.lava.wrapT = THREE.RepeatWrapping;
   TX.cactus.userData.normalMap = normalFromCanvas(TX.cactus.image, 2.2);
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
-  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'doorBottom', 'doorTop', 'doorBottomM', 'doorTopM', 'doorEdge', 'trapdoor', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'furnaceSide', 'furnaceTop', 'furnaceFront', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'chestTop', 'craftingTop', 'torch', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'bedHeadTop', 'bedFootTop', 'bedSideHead', 'bedSideFoot', 'farmland', 'furnaceLit', 'tntSide', 'tntTop', 'ironBlock', 'diamondBlock', 'coalBlock', 'bedrock', 'deepslate', 'redstoneOre', 'redstoneLamp', 'redstoneLampOn'])
+  for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'doorBottom', 'doorTop', 'doorBottomM', 'doorTopM', 'doorEdge', 'trapdoor', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'furnaceSide', 'furnaceTop', 'furnaceFront', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'chestTop', 'craftingTop', 'torch', 'gravel', 'bookshelf', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'bedHeadTop', 'bedFootTop', 'bedSideHead', 'bedSideFoot', 'farmland', 'furnaceLit', 'tntSide', 'tntTop', 'ironBlock', 'diamondBlock', 'coalBlock', 'bedrock', 'deepslate', 'redstoneOre', 'redstoneLamp', 'redstoneLampOn'])
     TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);

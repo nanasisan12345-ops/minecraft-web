@@ -550,6 +550,8 @@
     if (y <= 24 && oreBand > 0.40 - deep && speck > 0.915 - deep) return GOLD_ORE;
     if (y <= 15 && oreBand > 0.34 && speck > 0.875) return REDSTONE_ORE; // 本家準拠: y<16
     if (y <= 44 && oreBand > 0.30 && speck > 0.84) return IRON_ORE;
+    // 砂利: 地中にまばらな塊（C14）。石炭より手前で判定して薄く散らす
+    if (oreBand > 0.26 && speck > 0.79 && speck < 0.815) return GRAVEL;
     if (y <= h - 5 && oreBand > 0.20 && speck > 0.75) return COAL_ORE;
     return baseStoneAt(x, y, z);
   }
