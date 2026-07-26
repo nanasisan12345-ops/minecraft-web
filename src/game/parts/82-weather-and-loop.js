@@ -220,6 +220,25 @@
     inv: () => INV,
     save: () => SAVE,
     survival: SURVIVAL,
+    // C13 調理と満腹度の検証用: 食べる→hunger/saturation/absorb の遷移を数値で見る
+    eat: (id) => {
+      const d = ITEM_DEFS[id];
+      if (!d || !d.food) return 'not food: ' + id;
+      INV[selected] = { id, n: 1 };
+      const before = { hunger: SURVIVAL.hunger, sat: +(SURVIVAL.saturation || 0).toFixed(2), absorb: SURVIVAL.absorb || 0, hp: SURVIVAL.health };
+      const ok = eatSelectedFood();
+      return { id, ok, before, after: { hunger: SURVIVAL.hunger, sat: +(SURVIVAL.saturation || 0).toFixed(2), absorb: SURVIVAL.absorb || 0, hp: SURVIVAL.health } };
+    },
+    // 空腹の消耗を n 回ぶん早送りする（saturation が先に減ることの確認用）
+    starve: (n = 1, moving = true) => {
+      const log = [];
+      for (let i = 0; i < n; i++) {
+        SURVIVAL.hungerClock = 29;
+        updateSurvival(0.001, moving);
+        log.push(`hunger=${SURVIVAL.hunger} sat=${(SURVIVAL.saturation || 0).toFixed(2)}`);
+      }
+      return log;
+    },
     mobs: () => MOBS,
     drops: () => ITEM_DROPS,
     drop: (id, n = 1) => spawnItemDrop(Math.floor(player.pos.x) + 2, Math.floor(player.pos.y), Math.floor(player.pos.z), id, n),

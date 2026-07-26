@@ -76,12 +76,14 @@
     tnt:          { name: 'TNT', cat: 'block', block: TNT },
     sapling:      { name: '苗木', cat: 'block', block: SAPLING, fuel: 0.5 },
     // --- 食料 ---
-    apple:        { name: 'リンゴ', cat: 'food', food: 4, heal: 1 },
-    berries:      { name: 'ベリー', cat: 'food', food: 2 },
-    bread:        { name: 'パン', cat: 'food', food: 5 },
-    raw_meat:     { name: '生肉', cat: 'food', food: 2 },
-    cooked_meat:  { name: '焼いた肉', cat: 'food', food: 8, heal: 1 },
-    rotten_flesh: { name: '腐った肉', cat: 'food', food: 2 },
+    // food=空腹回復 / sat=隠し満腹度(saturation)。数値は本家準拠
+    apple:        { name: 'リンゴ', cat: 'food', food: 4, sat: 2.4, heal: 1 },
+    berries:      { name: 'ベリー', cat: 'food', food: 2, sat: 0.4 },
+    bread:        { name: 'パン', cat: 'food', food: 5, sat: 6.0 },
+    raw_meat:     { name: '生肉', cat: 'food', food: 3, sat: 1.8 },
+    cooked_meat:  { name: '焼いた肉', cat: 'food', food: 8, sat: 12.8, heal: 1 },
+    rotten_flesh: { name: '腐った肉', cat: 'food', food: 4, sat: 0.8 },
+    golden_apple: { name: '金のリンゴ', cat: 'food', food: 4, sat: 9.6, absorb: 4 },
     // --- 道具（スタック1・耐久値つき。tier: 1木 2石 3鉄 4ダイヤ） ---
     wood_pickaxe:    { name: '木のツルハシ', cat: 'tool', tool: 'pickaxe', tier: 1, durability: 60, damage: 2 },
     stone_pickaxe:   { name: '石のツルハシ', cat: 'tool', tool: 'pickaxe', tier: 2, durability: 132, damage: 3 },
@@ -281,10 +283,17 @@
   function eatSelectedFood() {
     const s = selectedItem(), d = s ? ITEM_DEFS[s.id] : null;
     if (!s || !d || !d.food) return false;
-    if (SURVIVAL.hunger >= 20 && SURVIVAL.health >= 20) return false;
+    // 金リンゴは満腹でも吸収ハート目当てに食べられる（本家と同じ）
+    if (SURVIVAL.hunger >= 20 && SURVIVAL.health >= 20 && !d.absorb) return false;
     s.n -= 1;
     if (s.n <= 0) INV[selected] = null;
     SURVIVAL.hunger = Math.min(20, SURVIVAL.hunger + d.food);
+    // 隠し満腹度は「現在の空腹値」が上限。空腹の消耗はまずここから引かれる
+    SURVIVAL.saturation = Math.min(SURVIVAL.hunger, (SURVIVAL.saturation || 0) + (d.sat || 0));
+    if (d.absorb) {
+      SURVIVAL.absorb = Math.max(SURVIVAL.absorb || 0, d.absorb);
+      SURVIVAL.absorbClock = 120; // 2分で消える
+    }
     if (d.heal) SURVIVAL.health = Math.min(20, SURVIVAL.health + d.heal);
     updateSurvivalHud();
     invChanged();
@@ -376,11 +385,12 @@
       px(14, 2, 4, 18, metal); px(15, 3, 1, 15, '#ffffff');
       px(9, 20, 14, 3, darkMetal); px(14, 23, 4, 7, '#7a4d24');
     } else if (d.food) {
-      const body = id === 'apple' ? '#d43b2f' : id === 'berries' ? '#7a3ca8' : id === 'bread' ? '#c98d46' : id === 'rotten_flesh' ? '#7a8a3a' : id === 'cooked_meat' ? '#9a5a30' : '#d4747e';
+      const body = id === 'apple' ? '#d43b2f' : id === 'golden_apple' ? '#e8c23a' : id === 'berries' ? '#7a3ca8' : id === 'bread' ? '#c98d46' : id === 'rotten_flesh' ? '#7a8a3a' : id === 'cooked_meat' ? '#9a5a30' : '#d4747e';
       px(8, 10, 16, 14, body);
       px(10, 8, 12, 4, body);
       px(11, 12, 4, 3, 'rgba(255,255,255,0.45)');
-      if (id === 'apple') px(15, 4, 3, 5, '#5a8a3a');
+      if (id === 'apple' || id === 'golden_apple') px(15, 4, 3, 5, '#5a8a3a');
+      if (id === 'golden_apple') { px(8, 10, 16, 2, '#fff0a8'); px(20, 14, 3, 8, '#fff0a8'); }
       if (id === 'bread') { px(8, 14, 16, 2, '#a06a2e'); px(8, 19, 16, 2, '#a06a2e'); }
       if (id === 'raw_meat' || id === 'cooked_meat') px(20, 12, 4, 10, '#f2e6d8');
     } else if (id === 'bucket' || id.endsWith('_bucket')) {

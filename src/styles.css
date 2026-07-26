@@ -172,6 +172,7 @@
     pointer-events: none; font-family: "Segoe UI Symbol", "Yu Gothic", sans-serif; }
   #survivalHud .health { color: #ff4d65; }
   #survivalHud .hunger { color: #ffb24a; }
+  #survivalHud .health .absorb { color: #ffd23a; }  /* 吸収ハート（金リンゴ） */
   #survivalHud.hurt { animation: hurtBlink .16s alternate 4; }
   @keyframes hurtBlink { from { filter: brightness(1); } to { filter: brightness(2.2); transform: translateX(-50%) scale(1.04); } }
   #debugHud { position: fixed; left: 50%; top: 42px; transform: translateX(-50%); z-index: 33;

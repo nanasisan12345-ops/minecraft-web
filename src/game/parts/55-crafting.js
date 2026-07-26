@@ -4,6 +4,8 @@
    * 左右反転も一致とみなす（斧などの利き手違い）。 */
   const RECIPES = [
     { out: 'planks', n: 4, pattern: ['L'], keys: { L: 'log' } },
+    // 金のリンゴ: 金インゴット8でリンゴを囲む（本家準拠）
+    { out: 'golden_apple', n: 1, pattern: ['GGG', 'GAG', 'GGG'], keys: { G: 'gold_ingot', A: 'apple' } },
     { out: 'stick', n: 4, pattern: ['P', 'P'], keys: { P: 'planks' } },
     { out: 'crafting_table', n: 1, pattern: ['PP', 'PP'], keys: { P: 'planks' } },
     { out: 'furnace', n: 1, pattern: ['CCC', 'C C', 'CCC'], keys: { C: 'cobblestone' } },

@@ -3,6 +3,9 @@
     health: 20,
     hunger: 20,
     hurtFlash: 0,
+    saturation: 5,    // 隠し満腹度。空腹より先に減る
+    absorb: 0,        // 吸収ハート（金リンゴ）。通常HPより先に減る
+    absorbClock: 0,
     hungerClock: 0,
     healClock: 0,
     invuln: 0,      // 被弾後の無敵時間
@@ -25,6 +28,10 @@
   if (SAVE.player) {
     SURVIVAL.health = Number.isFinite(SAVE.player.hp) ? SAVE.player.hp : 20;
     SURVIVAL.hunger = Number.isFinite(SAVE.player.hunger) ? SAVE.player.hunger : 20;
+    // 旧セーブには無いので既定値で読む
+    SURVIVAL.saturation = Number.isFinite(SAVE.player.saturation) ? SAVE.player.saturation : 5;
+    SURVIVAL.absorb = Number.isFinite(SAVE.player.absorb) ? SAVE.player.absorb : 0;
+    SURVIVAL.absorbClock = SURVIVAL.absorb > 0 ? 120 : 0;
     if (Number.isFinite(SAVE.player.x) && Number.isFinite(SAVE.player.y) && Number.isFinite(SAVE.player.z)) {
       player.pos.set(SAVE.player.x, SAVE.player.y, SAVE.player.z);
     }
@@ -38,7 +45,7 @@
     SAVE.player = {
       x: player.pos.x, y: player.pos.y, z: player.pos.z,
       yaw, pitch,
-      hp: SURVIVAL.health, hunger: SURVIVAL.hunger,
+      hp: SURVIVAL.health, hunger: SURVIVAL.hunger, saturation: SURVIVAL.saturation, absorb: SURVIVAL.absorb,
     };
     SAVE.time = DAY.time;
     SAVE.selected = selected;
@@ -58,6 +65,9 @@
     player.onGround = false;
     SURVIVAL.health = 20;
     SURVIVAL.hunger = 18;
+    SURVIVAL.saturation = 5;
+    SURVIVAL.absorb = 0;
+    SURVIVAL.absorbClock = 0;
     SURVIVAL.hurtFlash = 0;
     SURVIVAL.invuln = 2.0;
     SURVIVAL.burn = 0;
@@ -84,6 +94,13 @@
         if (typeof setDebugToast === 'function') setDebugToast(`${armorDef.name} が壊れた！`, 2.0);
       }
       markSaveDirty();
+    }
+    // 吸収ハートがあれば先に削る（本家と同じ）
+    if ((SURVIVAL.absorb || 0) > 0) {
+      const taken = Math.min(SURVIVAL.absorb, amount);
+      SURVIVAL.absorb -= taken;
+      amount -= taken;
+      if (SURVIVAL.absorb <= 0) SURVIVAL.absorbClock = 0;
     }
     SURVIVAL.health = Math.max(0, SURVIVAL.health - amount);
     SURVIVAL.hurtFlash = 0.75;
@@ -123,10 +140,17 @@
     }
     SURVIVAL.wasNight = isNight;
     // 空腹の減り（動くと早い）
+    // 吸収ハート（金リンゴ）は時間で消える
+    if ((SURVIVAL.absorb || 0) > 0) {
+      SURVIVAL.absorbClock = (SURVIVAL.absorbClock || 0) - dt;
+      if (SURVIVAL.absorbClock <= 0) { SURVIVAL.absorb = 0; SURVIVAL.absorbClock = 0; }
+    }
     SURVIVAL.hungerClock += dt * (moving ? 1.0 : 0.35);
     if (SURVIVAL.hungerClock > 28) {
       SURVIVAL.hungerClock = 0;
-      SURVIVAL.hunger = Math.max(0, SURVIVAL.hunger - 1);
+      // 隠し満腹度がある間は空腹が減らない（本家と同じ順序）
+      if ((SURVIVAL.saturation || 0) > 0) SURVIVAL.saturation = Math.max(0, SURVIVAL.saturation - 1);
+      else SURVIVAL.hunger = Math.max(0, SURVIVAL.hunger - 1);
     }
     // 空腹が満ちていれば自然回復
     if (SURVIVAL.hunger >= 18 && SURVIVAL.health < 20) {
@@ -134,11 +158,14 @@
       if (SURVIVAL.healClock > 3.0) {
         SURVIVAL.healClock = 0;
         SURVIVAL.health = Math.min(20, SURVIVAL.health + 1);
-        SURVIVAL.hunger = Math.max(0, SURVIVAL.hunger - 0.4); // 回復は腹が減る
+        // 回復のコストも隠し満腹度から先に払う
+        if ((SURVIVAL.saturation || 0) >= 0.4) SURVIVAL.saturation -= 0.4;
+        else SURVIVAL.hunger = Math.max(0, SURVIVAL.hunger - 0.4);
       }
     } else {
       SURVIVAL.healClock = 0;
     }
+    if ((SURVIVAL.saturation || 0) > SURVIVAL.hunger) SURVIVAL.saturation = SURVIVAL.hunger;
     // 飢餓ダメージ
     if (SURVIVAL.hunger <= 0) {
       SURVIVAL.starveClock = (SURVIVAL.starveClock || 0) + dt;
@@ -181,6 +208,8 @@
     const meat = '◆'.repeat(Math.ceil(food / 2)).padEnd(10, '◇');
     survivalHud.classList.toggle('hurt', SURVIVAL.hurtFlash > 0);
     const fire = (SURVIVAL.burn || 0) > 0 ? '🔥 ' : '';
-    survivalHud.innerHTML = `<div class="health">${fire}${hearts}</div><div class="hunger">${meat}</div>`;
+    const abs = Math.max(0, Math.ceil((SURVIVAL.absorb || 0) / 2));
+    const absHearts = abs > 0 ? `<span class="absorb">${'♥'.repeat(abs)}</span>` : '';
+    survivalHud.innerHTML = `<div class="health">${fire}${hearts}${absHearts}</div><div class="hunger">${meat}</div>`;
   }
   updateSurvivalHud();
