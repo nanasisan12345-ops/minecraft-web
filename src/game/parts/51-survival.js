@@ -88,7 +88,9 @@
     // 防具によるダメージ軽減（空腹と奈落は防げない）。防具は被弾のたびに消耗する
     const armor = SAVE.armor, armorDef = armor ? ITEM_DEFS[armor.id] : null;
     if (armorDef && armorDef.armor && amount < 900 && cause !== '空腹') {
-      amount = Math.max(1, Math.round(amount * (1 - armorDef.armor * 0.06)));
+      // 防護N: さらに -4%×N（上限64%）（C11）
+      const cut = Math.min(0.85, armorDef.armor * 0.06 + enchProtectionCut(armor));
+      amount = Math.max(1, Math.round(amount * (1 - cut)));
       armor.dur = (Number.isFinite(armor.dur) ? armor.dur : armorDef.durability) - 1;
       if (armor.dur <= 0) {
         SAVE.armor = null;

@@ -426,6 +426,20 @@
   TYPES.push({ name: '砂利', color: 0x8b8377, icon: T.gravel, mats: faceMats(T.gravel) });
   const BOOKSHELF = TYPES.length;
   TYPES.push({ name: '本棚', color: 0xb5824a, icon: T.bookshelf, mats: faceMats([T.bookshelf, T.bookshelf, T.planks, T.planks, T.bookshelf, T.bookshelf]) });
+  // エンチャントテーブル(148) / 金床(149)。C11
+  const ENCHANT_TABLE = TYPES.length;
+  TYPES.push({ name: 'エンチャントテーブル', color: 0x2b1f36, icon: T.enchantTableTop, transparent: true,
+    mats: faceMats([T.enchantTable, T.enchantTable, T.enchantTableTop, T.enchantTable, T.enchantTable, T.enchantTable]) });
+  TYPES[ENCHANT_TABLE].model = [{ box: [0, 0, 0, 1, 0.75, 1] }];
+  TYPES[ENCHANT_TABLE].collisionBoxes = [[0, 0, 0, 1, 0.75, 1]];
+  const ANVIL = TYPES.length;
+  TYPES.push({ name: '金床', color: 0x3f4348, icon: T.anvil, mats: faceMats(T.anvil), transparent: true });
+  TYPES[ANVIL].model = [
+    { box: [0.125, 0.00, 0.125, 0.875, 0.25, 0.875] },
+    { box: [0.250, 0.25, 0.312, 0.750, 0.625, 0.688] },
+    { box: [0.000, 0.625, 0.125, 1.000, 1.000, 0.875] },
+  ];
+  TYPES[ANVIL].collisionBoxes = [[0, 0, 0.125, 1, 1, 0.875]];
 
   TYPES[OAK_TRAPDOOR_CLOSED].model = [{ box: [0.00, 0.00, 0.00, 1.00, 0.1875, 1.00] }];
   TYPES[OAK_TRAPDOOR_OPEN].model = [{ box: [0.00, 0.00, 0.8125, 1.00, 1.00, 1.00] }];

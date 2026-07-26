@@ -362,6 +362,7 @@
     if ([STONE, DEEPSLATE, COBBLESTONE, COBBLESTONE_WALL, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, REDSTONE_ORE, BRICK, FURNACE, FURNACE_LIT, GLOW_CRYSTAL, DRIPSTONE, STONE_BRICK, MOSSY_BRICK, PLASTER, ROOF_TILE, GOLD_BLOCK, COPPER_ROOF, BRONZE, BRONZE_DARK, IRON_BLOCK, DIAMOND_BLOCK, COAL_BLOCK, OBSIDIAN, STONE_BUTTON_OFF, STONE_BUTTON_ON, STONE_PLATE_OFF, STONE_PLATE_ON].includes(type)) return 'pickaxe';
     if (isDoorBlock(type) || isTrapdoorBlock(type) || isFenceGateBlock(type) || isBedBlock(type) || type === OAK_FENCE) return 'axe';
     if (isLadderBlock(type) || isSignBlock(type) || type === BOOKSHELF) return 'axe';
+    if (type === ENCHANT_TABLE || type === ANVIL) return 'pickaxe';
     if ([LOG, PLANKS, CRAFTING_TABLE, CHEST, OPEN_CHEST, BED, CACTUS, VILLAGE_SIGN, VERMILION, TATAMI, SHOJI, NOREN, PAPER_LANTERN, OAK_DOOR_Z_CLOSED, OAK_DOOR_Z_CLOSED_TOP, OAK_DOOR_Z_OPEN, OAK_DOOR_Z_OPEN_TOP, OAK_DOOR_X_CLOSED, OAK_DOOR_X_CLOSED_TOP, OAK_DOOR_X_OPEN, OAK_DOOR_X_OPEN_TOP, OAK_TRAPDOOR_CLOSED, OAK_TRAPDOOR_OPEN, OAK_FENCE, OAK_FENCE_GATE_Z_CLOSED, OAK_FENCE_GATE_Z_OPEN, OAK_FENCE_GATE_X_CLOSED, OAK_FENCE_GATE_X_OPEN].includes(type)) return 'axe';
     if ([DIRT, GRASS, SAND, SNOW, FARMLAND, GRAVEL].includes(type)) return 'shovel';
     return null;
@@ -397,6 +398,8 @@
   for (let i = 0; i < 4; i++) { BLOCK_HARDNESS.set(LADDER + i, 0.4); BLOCK_HARDNESS.set(SIGN + i, 1.0); }
   BLOCK_HARDNESS.set(GLASS_PANE, 0.3);
   BLOCK_HARDNESS.set(GRAVEL, 0.6);
+  BLOCK_HARDNESS.set(ENCHANT_TABLE, 5.0);
+  BLOCK_HARDNESS.set(ANVIL, 5.0);
   BLOCK_HARDNESS.set(BOOKSHELF, 1.5);
   BLOCK_HARDNESS.set(OBSIDIAN, 50); // 本家準拠。ダイヤツルハシで約9.4秒
   // レッドストーン
@@ -427,7 +430,7 @@
     const s = selectedItem();
     const d = s ? ITEM_DEFS[s.id] : null;
     if (!d || !d.tool || d.tool === 'sword') return null;
-    return { id: s.id, tool: d.tool, tier: d.tier, speed: d.speed };
+    return { id: s.id, tool: d.tool, tier: d.tier, speed: d.speed, item: s };
   }
   // 破壊にかかる秒数。適正ツールを持っていると速い。岩盤(unbreakable)は無限＝ゲージが進まない。
   function miningTime(type) {
@@ -441,7 +444,9 @@
       return requiredToolTier(type) >= 1 ? base * 2.4 : base * 1.6;
     }
     // speed 指定があればそれを使う（金ツールは tier1 だが採掘は最速）
-    return base / (held.speed || { 1: 2.2, 2: 4.0, 3: 6.5, 4: 9.0 }[held.tier] || 2.0);
+    // 効率N: 採掘速度に N^2+1 を加算（C11）
+    const sp = (held.speed || { 1: 2.2, 2: 4.0, 3: 6.5, 4: 9.0 }[held.tier] || 2.0) + enchMiningBonus(held.item);
+    return base / sp;
   }
   // ブロック -> ドロップするアイテム（[id, n] の配列）
   function blockDrops(type) {
@@ -705,6 +710,7 @@
       const [bx, by, bz] = tg.block;
       const hitType = blockAt(bx, by, bz);
       if (hitType === CRAFTING_TABLE) { openContainer('table'); return; }
+      if (hitType === ENCHANT_TABLE) { openContainer('enchant', { key: key(bx, by, bz), shelves: bookshelvesAround(bx, by, bz) }); return; }
       if (hitType === FURNACE || hitType === FURNACE_LIT) { openContainer('furnace', { key: key(bx, by, bz) }); return; }
       if (hitType === CHEST) {
         const id = key(bx, by, bz);

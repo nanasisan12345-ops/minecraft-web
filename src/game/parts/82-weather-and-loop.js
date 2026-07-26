@@ -221,6 +221,31 @@
     inv: () => INV,
     save: () => SAVE,
     survival: SURVIVAL,
+    // C11 エンチャント検証用
+    enchant: (id, level, slot = selected) => {
+      const it = INV[slot];
+      if (!it) return 'empty slot';
+      applyEnch(it, id, level);
+      invChanged();
+      return { item: it.id, ench: it.ench, 表示: enchDisplayLines(it) };
+    },
+    enchInfo: (slot = selected) => {
+      const it = INV[slot];
+      if (!it) return 'empty slot';
+      return {
+        item: it.id, ench: it.ench || null, 付けられる: enchantableFor(it),
+        採掘速度加算: enchMiningBonus(it), ダメージ加算: enchDamageBonus(it),
+        防護カット: enchProtectionCut(it), 炎上秒: enchFireSeconds(it),
+      };
+    },
+    shelves: (x, y, z) => bookshelvesAround(Math.floor(x), Math.floor(y), Math.floor(z)),
+    // エンチャント台UIをブロック設置なしで開く（検証用）
+    openEnchant: (shelves = 0, itemId = null) => {
+      openContainer('enchant', { key: 'dbg', shelves });
+      if (itemId) { SAVE.enchSlot = { id: itemId, n: 1 }; UI.enchSig = null; renderContainer(); }
+      return UI.mode;
+    },
+    offers: (shelves = 0, slot = selected) => enchantOffers(INV[slot], shelves),
     // C10 XP検証用
     xp: () => ({ level: XP.level, points: +XP.points.toFixed(2), toNext: xpToNext(XP.level), orbs: XP_ORBS.length }),
     giveXp: (n) => { addXpPoints(n); return { level: XP.level, points: +XP.points.toFixed(2), toNext: xpToNext(XP.level) }; },

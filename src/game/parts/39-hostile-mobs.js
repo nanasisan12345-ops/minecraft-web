@@ -244,7 +244,8 @@
       thock(90);
       return false;
     }
-    takeItems([['arrow', 1]]);
+    // 無限: 矢を1本以上持っていれば消費しない（C11）
+    if (enchLevel(typeof selectedItem === 'function' ? selectedItem() : null, 'infinity') <= 0) takeItems([['arrow', 1]]);
     PLAYER_BOW.cd = 0.6;
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     const mesh = new THREE.Mesh(arrowGeo, arrowMat);
@@ -549,8 +550,13 @@
     if (!target) return false;
     PLAYER_ATTACK.cd = 0.45;
     const def = selectedItemDef();
-    const damage = def && def.damage ? def.damage : 1;
+    const held = typeof selectedItem === 'function' ? selectedItem() : null;
+    // ダメージ増加N: +0.5N+0.5（C11）
+    const damage = (def && def.damage ? def.damage : 1) + enchDamageBonus(held);
     const u = target.userData;
+    // 火属性N: 命中で 4N 秒燃やす
+    const fire = enchFireSeconds(held);
+    if (fire > 0) u.burn = Math.max(u.burn || 0, fire);
     const dir = target.position.clone().sub(player.pos); dir.y = 0; dir.normalize();
     if (u.kind && MOB_DEFS[u.kind]) {
       damageMobBy(target, damage, dir);

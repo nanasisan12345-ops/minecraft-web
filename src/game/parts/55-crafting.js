@@ -9,6 +9,9 @@
     { out: 'paper', n: 3, pattern: ['WWW'], keys: { W: 'wheat' } },
     { out: 'book', n: 1, pattern: ['PP', 'PL'], keys: { P: 'paper', L: 'leather' } },
     { out: 'bookshelf', n: 1, pattern: ['PPP', 'BBB', 'PPP'], keys: { P: 'planks', B: 'book' } },
+    // C11: エンチャントテーブル(本1+ダイヤ2+黒曜石4) / 金床(鉄ブロック3+鉄4)
+    { out: 'enchanting_table', n: 1, pattern: [' B ', 'DOD', 'OOO'], keys: { B: 'book', D: 'diamond', O: 'obsidian' } },
+    { out: 'anvil', n: 1, pattern: ['III', ' N ', 'NNN'], keys: { I: 'iron_block', N: 'iron_ingot' } },
     // C14: 金ツール
     { out: 'gold_pickaxe', n: 1, pattern: ['GGG', ' S ', ' S '], keys: { G: 'gold_ingot', S: 'stick' } },
     { out: 'gold_axe', n: 1, pattern: ['GG', 'GS', ' S'], keys: { G: 'gold_ingot', S: 'stick' } },

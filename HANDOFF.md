@@ -8,7 +8,18 @@
 
 - **今後の全実装は `計画書/`（手順書00〜23）に従うこと。設計判断のマスターは `ORCHESTRATION_PLAN.md`（§0-3 アーキテクチャ決定事項が最終判断基準）。**
 
-- **計画書の進捗: C1 / C2 / C4 / C5 / C6 / C7 / C8 / C10 / C13 / C15 / C19 が完了（11本）。C14 は一部のみ。残り: C3・C9・C11・C12・C14残り・C16・C17・C18・S1〜S4。**
+- **計画書の進捗: C1 / C2 / C4 / C5 / C6 / C7 / C8 / C10 / C13 / C15 / C19 が完了（11本）。C11・C14 は一部のみ。残り: C3・C9・C11残り(金床)・C12・C14残り(羊毛/氷)・C16・C17・C18・S1〜S4。**
+
+- **2026-07-26: 手順書11(C11)=エンチャントと金床【エンチャント部分のみ完了。金床UIは未実装】。**
+  - **新ファイル `45-enchanting.js`**: `ENCH_DEFS`（効率/耐久/ダメージ増加/火属性/無限/防護）、`applyEnch` / `enchLevel` / `enchDisplayLines` / `enchantableFor`、効果計算（`enchMiningBonus` = N²+1 / `enchConsumesDurability` = 1/(N+1) / `enchDamageBonus` = 0.5N+0.5 / `enchProtectionCut` = 4%×N上限64% / `enchFireSeconds` = 4N）、`bookshelvesAround`（半径2・同高〜+1・最大15）、`enchantOffers`（0冊で最上段req8、15冊で30の線形）。
+  - **付与情報はスロットの item に `ench: {id: level}` として持たせる**。旧セーブには無いフィールドなので「無ければ0」で読むだけでよく、既存ワールドはそのまま動く。**INV はスロットオブジェクトごと保存されるので `ench` も自動で永続化される**（実測確認済み）。
+  - 効果の適用先: 採掘速度=52の`miningTime`（`heldToolInfo` に `item` を追加した）／耐久=53の`damageSelectedTool`冒頭／攻撃力と火属性=39の`attackWithSelected`／防護=51の`damagePlayer`の防具軽減／無限=39の`shootPlayerArrow`の矢消費。
+  - 新ブロック: **エンチャントテーブル(148)・金床(149)**。レシピは本1+ダイヤ2+黒曜石4 / 鉄ブロック3+鉄4。テーブルを右クリックで `openContainer('enchant', {key, shelves})`。
+  - **エンチャント枠は `SAVE.enchSlot` に置いている**（パネルを閉じると `giveExistingItem` でインベントリへ戻す。`giveItem` は id/n/dur しか運べず ench が消えるので**専用の `giveExistingItem` を 53 に追加した**）。**インベントリが満杯だと閉じたときに床へ落ちる**点は要注意。
+  - **新 `__mcDbg` フック**: `enchant(id, lvl, slot)` / `enchInfo(slot)` / `shelves(x,y,z)` / `offers(shelves, slot)` / `openEnchant(shelves, itemId)`（ブロックを置かずにUIを開ける。第2引数でエンチャント枠に品を入れる）。
+  - 実測: 効率III→採掘速度加算10(3²+1)、ダメージ増加III→+2.0、火属性I→4秒、付けられる候補の絞り込みも道具種別どおり。15冊で要求Lv 10/20/30、0冊で 3/5/8。UIで3枠目クリック→Lv42→39（消費3）→`efficiency:3` 付きのダイヤツルハシがインベントリへ戻り、`mc_save_*` の `inv[0]` に `ench:{efficiency:3}` が保存された。console error 0・既存の回帰スイート全通過。
+  - **未実装（C11の残り）**: 金床のUI（耐久合算+12%・修理・エンチャント引き継ぎ）。ブロック・レシピ・設置は入っているので、`56-inventory-panel.js` に `UI.mode === 'anvil'`（素材2＋出力）を足すだけの状態。
+  - **未確認: 実プレイでのUI目視、効率IIIの体感速度。**
 
 - **2026-07-26: 手順書14(C14)=建材と素材の拡充【部分完了】。`MESH_WORKER_VERSION=24`。**
   - **やったぶん**: 砂利(ID **146**)＋火打石／紙・本・革・本棚(ID **147**)／金ツール4種。

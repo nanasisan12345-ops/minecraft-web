@@ -39,6 +39,8 @@
     glass_pane:     { name: '板ガラス', cat: 'block', block: GLASS_PANE , iconShape: 'pane' },
     sign:           { name: '看板', cat: 'block', block: SIGN, sign: true, fuel: 1.5 , iconShape: 'sign' },
     obsidian:       { name: '黒曜石', cat: 'block', block: OBSIDIAN },
+    enchanting_table: { name: 'エンチャントテーブル', cat: 'block', block: ENCHANT_TABLE },
+    anvil:          { name: '金床', cat: 'block', block: ANVIL },
     gravel:         { name: '砂利', cat: 'block', block: GRAVEL },
     bookshelf:      { name: '本棚', cat: 'block', block: BOOKSHELF, fuel: 1.5 },
     // レッドストーン部品（rsGround: 不透明ブロックの上面にのみ設置）
@@ -230,6 +232,17 @@
     return true;
   }
   // アイテムを拾う。入り切らなかった数を返す（0なら全部入った）
+  // エンチャント等の付加情報を保ったままスロットへ戻す（giveItem は id/n/dur しか運べない）
+  function giveExistingItem(item) {
+    if (!item) return true;
+    for (let i = 0; i < INV.length; i++) {
+      if (!INV[i]) { INV[i] = item; invChanged(); return true; }
+    }
+    if (typeof spawnItemDrop === 'function') {
+      spawnItemDrop(Math.floor(player.pos.x), Math.floor(player.pos.y), Math.floor(player.pos.z), item.id, item.n, item.dur);
+    }
+    return false;
+  }
   function giveItem(id, amount = 1, dur) {
     const d = ITEM_DEFS[id];
     if (!d || amount <= 0) return amount;
@@ -283,6 +296,8 @@
   function damageSelectedTool(amount = 1) {
     const s = selectedItem(), d = s ? ITEM_DEFS[s.id] : null;
     if (!s || !d || !d.durability) return false;
+    // 耐久N: 消費が発生する確率を 1/(N+1) に（C11）
+    if (!enchConsumesDurability(s)) return false;
     s.dur = (Number.isFinite(s.dur) ? s.dur : d.durability) - amount;
     if (s.dur > 0) { invChanged(); return false; }
     INV[selected] = null;

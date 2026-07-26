@@ -32,6 +32,7 @@
     if (src === 'fin') return furnaceState(UI.ctx.key).in;
     if (src === 'ffuel') return furnaceState(UI.ctx.key).fuel;
     if (src === 'fout') return furnaceState(UI.ctx.key).out;
+    if (src === 'ench') return SAVE.enchSlot || null;
     if (src === 'armor') return SAVE.armor;
     const arr = slotArrayFor(src);
     return arr ? arr[idx] || null : null;
@@ -53,6 +54,7 @@
       st.out = item;
       return;
     }
+    if (src === 'ench') { SAVE.enchSlot = item; markSaveDirty(); return; }
     if (src === 'armor') { SAVE.armor = item; markSaveDirty(); return; }
     const arr = slotArrayFor(src);
     if (arr) arr[idx] = item;
@@ -149,6 +151,48 @@
         hint.textContent = '2x2クラフト（丸太→板材、板材→棒/作業台 など）。大きなレシピは作業台で。';
         top.appendChild(hint);
       }
+    } else if (UI.mode === 'enchant') {
+      head.textContent = 'エンチャントテーブル';
+      const shelves = UI.ctx ? UI.ctx.shelves : 0;
+      const item = getSlot('ench', 0);
+      const wrap = document.createElement('div');
+      wrap.className = 'ench-area';
+      wrap.innerHTML = `<div class="ench-col"><div class="furnace-slot-label">道具/防具</div><div class="e-in"></div>
+        <div class="ench-shelves">本棚 ${shelves} / 15</div></div><div class="ench-opts"></div>`;
+      wrap.querySelector('.e-in').appendChild(makeSlotEl('ench', 0));
+      const opts = wrap.querySelector('.ench-opts');
+      // 抽選は「対象アイテムと本棚数」が変わったときだけ引き直す（開くたびに変わると選べない）
+      const sig = `${item ? item.id : '-'}|${hasAnyEnch(item) ? JSON.stringify(item.ench) : ''}|${shelves}`;
+      if (UI.enchSig !== sig) { UI.enchSig = sig; UI.enchOffers = item ? enchantOffers(item, shelves) : []; }
+      if (!item) {
+        opts.innerHTML = '<div class="ench-empty">道具・武器・防具を置くと候補が出ます</div>';
+      } else if (!UI.enchOffers.length) {
+        opts.innerHTML = '<div class="ench-empty">このアイテムには付けられません</div>';
+      } else {
+        for (const o of UI.enchOffers) {
+          const b = document.createElement('button');
+          const can = XP.level >= o.req;
+          b.className = 'ench-opt' + (can ? '' : ' locked');
+          b.innerHTML = `<span class="ench-name">${o.label}</span><span class="ench-req">要求Lv${o.req} / 消費${o.cost}</span>`;
+          b.disabled = !can;
+          b.addEventListener('click', () => {
+            const it = getSlot('ench', 0);
+            if (!it || XP.level < o.req) return;
+            applyEnch(it, o.id, o.level);
+            XP.level -= o.cost;
+            if (XP.level < 0) XP.level = 0;
+            XP.points = 0;
+            updateXpHud();
+            markSaveDirty();
+            UI.enchSig = null;      // 付与後は引き直す
+            thock(760);
+            renderContainer();
+            invChanged();
+          });
+          opts.appendChild(b);
+        }
+      }
+      top.appendChild(wrap);
     } else if (UI.mode === 'furnace') {
       head.textContent = 'かまど';
       const wrap = document.createElement('div');
@@ -382,6 +426,8 @@
       if (s) giveItem(s.id, s.n, s.dur);
       UI.craftCells[i] = null;
     }
+    // エンチャント枠に置いたままのアイテムはインベントリへ戻す（エンチャントは保持したまま）
+    if (SAVE.enchSlot) { giveExistingItem(SAVE.enchSlot); SAVE.enchSlot = null; markSaveDirty(); }
     if (UI.cursor) { giveItem(UI.cursor.id, UI.cursor.n, UI.cursor.dur); UI.cursor = null; }
     UI.mode = null;
     UI.ctx = null;
