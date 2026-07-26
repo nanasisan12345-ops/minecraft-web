@@ -71,12 +71,15 @@
     wheat:        { name: '小麦', cat: 'material' },
     wheat_seeds:  { name: '小麦の種', cat: 'material' },
     bone:         { name: '骨', cat: 'material' },
+    bone_meal:    { name: '骨粉', cat: 'material' },
+    string:       { name: '糸', cat: 'material' },
+    ender_pearl:  { name: 'エンダーパール', cat: 'material' },
     slime_ball:   { name: 'スライム玉', cat: 'material' },
     gunpowder:    { name: '火薬', cat: 'material' },
-    flint:        { name: '火打石', cat: 'material' },
+    flint:        { name: '火打石', cat: 'material' },  // 砂利から10%
     leather:      { name: '革', cat: 'material' },
     paper:        { name: '紙', cat: 'material' },
-    book:         { name: '本', cat: 'material' },  // 入手は砂利(C14)。現状はクラフト素材として先行追加
+    book:         { name: '本', cat: 'material' },
     flint_and_steel: { name: '火打石と打ち金', cat: 'tool', tool: 'igniter', durability: 64, stack: 1 },
     bucket:       { name: 'バケツ', cat: 'material', stack: 1 },
     water_bucket: { name: '水入りバケツ', cat: 'material', stack: 1 },
@@ -93,6 +96,7 @@
     cooked_meat:  { name: '焼いた肉', cat: 'food', food: 8, sat: 12.8, heal: 1 },
     rotten_flesh: { name: '腐った肉', cat: 'food', food: 4, sat: 0.8 },
     golden_apple: { name: '金のリンゴ', cat: 'food', food: 4, sat: 9.6, absorb: 4 },
+    spider_eye:   { name: 'クモの目', cat: 'food', food: 2, sat: 0.8 },
     // --- 道具（スタック1・耐久値つき。tier: 1木 2石 3鉄 4ダイヤ） ---
     wood_pickaxe:    { name: '木のツルハシ', cat: 'tool', tool: 'pickaxe', tier: 1, durability: 60, damage: 2 },
     stone_pickaxe:   { name: '石のツルハシ', cat: 'tool', tool: 'pickaxe', tier: 2, durability: 132, damage: 3 },

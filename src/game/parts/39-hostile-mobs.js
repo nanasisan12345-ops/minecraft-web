@@ -10,8 +10,11 @@
   const MOB_DEFS = {
     zombie: { name: 'ゾンビ', hp: 20, speed: 1.85, damage: 3, attackRange: 1.5, attackCd: 1.25, drops: [['rotten_flesh', 0, 2]] },
     slime: { name: 'スライム', hp: 8, speed: 1.5, damage: 2, attackRange: 1.15, attackCd: 1.0, drops: [['slime_ball', 1, 2]] },
-    skeleton: { name: 'スケルトン', hp: 16, speed: 1.6, damage: 3, attackRange: 17, attackCd: 2.4, drops: [['bone', 1, 2], ['coal', 0, 1]] },
+    skeleton: { name: 'スケルトン', hp: 16, speed: 1.6, damage: 3, attackRange: 17, attackCd: 2.4, drops: [['bone', 1, 2], ['arrow', 0, 2], ['coal', 0, 1]] },
     creeper: { name: 'クリーパー', hp: 20, speed: 1.75, damage: 0, attackRange: 3, attackCd: 0, drops: [['gunpowder', 1, 2]] },
+    // C12: クモ（明所では中立・壁登り） / エンダーマン（見つめると敵対・テレポート）
+    spider: { name: 'クモ', hp: 16, speed: 2.4, damage: 2, attackRange: 1.6, attackCd: 1.0, drops: [['string', 0, 2], ['spider_eye', 0, 1]] },
+    enderman: { name: 'エンダーマン', hp: 40, speed: 2.0, damage: 7, attackRange: 2.0, attackCd: 1.4, drops: [['ender_pearl', 0, 1]] },
   };
 
   /* --- 爆発（クリーパー / TNT 共通） --- */
@@ -129,7 +132,35 @@
     g.userData.baseMats = [body.material, head.material];
     return g;
   }
-  const MOB_MAKERS = { zombie: makeZombie, slime: makeSlime, skeleton: makeSkeleton, creeper: makeCreeper };
+  function makeSpider() {
+    const g = new THREE.Group();
+    mobBox(g, 0.62, 0.34, 0.66, 0x2b2b33, 0, 0.46, 0.1);              // 平たい胴
+    const head = mobBox(g, 0.42, 0.32, 0.36, 0x35353f, 0, 0.5, -0.42);
+    mobBox(head, 0.07, 0.07, 0.02, 0xd0342c, -0.1, 0.07, -0.19);      // 赤い目
+    mobBox(head, 0.07, 0.07, 0.02, 0xd0342c, 0.1, 0.07, -0.19);
+    const legs = [];
+    for (let i = 0; i < 4; i++) {
+      const z = -0.22 + i * 0.18;
+      legs.push(mobBox(g, 0.5, 0.06, 0.06, 0x22222a, -0.42, 0.42, z));
+      legs.push(mobBox(g, 0.5, 0.06, 0.06, 0x22222a, 0.42, 0.42, z));
+    }
+    g.userData.limbs = { spiderLegs: legs };
+    return g;
+  }
+  function makeEnderman() {
+    const g = new THREE.Group();
+    mobBox(g, 0.34, 0.9, 0.24, 0x101014, 0, 1.55, 0);                 // 細長い胴
+    const head = mobBox(g, 0.4, 0.34, 0.4, 0x0b0b0f, 0, 2.2, 0);
+    mobBox(head, 0.12, 0.05, 0.02, 0xc77cff, -0.1, 0.03, -0.21);      // 紫の目
+    mobBox(head, 0.12, 0.05, 0.02, 0xc77cff, 0.1, 0.03, -0.21);
+    const armL = mobBox(g, 0.1, 1.0, 0.1, 0x101014, -0.26, 1.5, 0);
+    const armR = mobBox(g, 0.1, 1.0, 0.1, 0x101014, 0.26, 1.5, 0);
+    const legL = mobBox(g, 0.11, 1.1, 0.11, 0x101014, -0.1, 0.55, 0);
+    const legR = mobBox(g, 0.11, 1.1, 0.11, 0x101014, 0.1, 0.55, 0);
+    g.userData.limbs = { legL, legR, armL, armR };
+    return g;
+  }
+  const MOB_MAKERS = { zombie: makeZombie, slime: makeSlime, skeleton: makeSkeleton, creeper: makeCreeper, spider: makeSpider, enderman: makeEnderman };
 
   /* --- 地形ヘルパー --- */
   // refY 付近で立てる地面の高さを探す（見つからなければ null）
@@ -198,7 +229,7 @@
         if (gy == null || gy >= heightAt(x, z) - 6) continue;
         if (!spawnLightAllows(x, gy + 1, z)) continue;
         const roll = Math.random();
-        const kind = roll < 0.4 ? 'slime' : roll < 0.65 ? 'skeleton' : roll < 0.85 ? 'zombie' : 'creeper';
+        const kind = roll < 0.4 ? 'slime' : roll < 0.65 ? 'skeleton' : roll < 0.85 ? 'zombie' : roll < 0.93 ? 'creeper' : 'spider';
         spawnMobAt(kind, x, gy, z, true);
         counts.cave++; spawned++;
         continue;
@@ -210,7 +241,7 @@
       if (!spawnLightAllows(x, h + 1, z)) continue;
       const swamp = typeof biomeAt === 'function' && biomeAt(x, z).id === 'swamp';
       const roll = Math.random();
-      const kind = swamp && roll < 0.4 ? 'slime' : roll < 0.4 ? 'zombie' : roll < 0.62 ? 'skeleton' : roll < 0.82 ? 'creeper' : 'slime';
+      const kind = swamp && roll < 0.4 ? 'slime' : roll < 0.4 ? 'zombie' : roll < 0.62 ? 'skeleton' : roll < 0.78 ? 'creeper' : roll < 0.9 ? 'spider' : roll < 0.96 ? 'slime' : 'enderman';
       spawnMobAt(kind, x, h, z, false);
       counts.surface++; spawned++;
     }
@@ -371,6 +402,47 @@
       if (gy != null) { m.position.x = nx; m.position.z = nz; m.position.y = Math.max(m.position.y - 8 * dt, gy + 1); }
       return false;
     }
+    // C12 クモ: 光レベル12以上では中立（殴られたら反撃）。u.provoked は damageMobBy が立てる
+    if (u.kind === 'spider' && !u.provoked) {
+      const lit = typeof bakedLightAt === 'function' ? bakedLightAt(m.position.x, m.position.y, m.position.z) : null;
+      const bright = lit ? Math.max(lit.sky * (DAY.light || 0), lit.blk) >= 12 : (DAY.label === '朝' || DAY.label === '昼');
+      if (bright) u.neutral = true; else u.neutral = false;
+    } else if (u.kind === 'spider') {
+      u.neutral = false;
+    }
+    // C12 エンダーマン: プレイヤーの視線が頭部に合っている状態が0.5秒続くと敵対
+    if (u.kind === 'enderman') {
+      if (!u.provoked) {
+        const look = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const to = new THREE.Vector3(m.position.x - camera.position.x, (m.position.y + 2.2) - camera.position.y, m.position.z - camera.position.z);
+        const d2 = to.length();
+        const staring = d2 < 40 && to.normalize().dot(look) > 0.985;
+        u.stareT = staring ? (u.stareT || 0) + dt : 0;
+        if (u.stareT >= 0.5) { u.provoked = true; thock(120); }
+        else u.neutral = true;
+      }
+      if (u.provoked) u.neutral = false;
+      // 水/雨でダメージを受けてランダムテレポート
+      const wet = blockAt(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z)) === WATER
+        || (typeof weatherState !== 'undefined' && weatherState === 'rain' && !hasBlock(Math.floor(m.position.x), Math.floor(m.position.y) + 3, Math.floor(m.position.z)));
+      u.wetT = (u.wetT || 0) + (wet ? dt : -dt);
+      if (wet && u.wetT >= 0.5) { u.wetT = 0; damageMob(m, 1); enderTeleport(m); }
+      // 敵対中は3-5秒ごとにプレイヤーの周囲へ跳ぶ
+      if (u.provoked && dist < 32) {
+        u.tpT = (u.tpT || rnd(3, 5)) - dt;
+        if (u.tpT <= 0) { u.tpT = rnd(3, 5); enderTeleport(m, true); }
+      }
+    }
+    if (u.neutral) {
+      // 中立中はふらふら歩くだけ
+      if (u.wanderT == null || (u.wanderT -= dt) <= 0) { u.wanderT = rnd(1.5, 4); u.wanderDir = Math.random() * Math.PI * 2; }
+      const wd = u.wanderDir || 0;
+      m.rotation.y = wd;
+      const nxN = m.position.x + Math.sin(wd) * def.speed * 0.4 * dt, nzN = m.position.z + Math.cos(wd) * def.speed * 0.4 * dt;
+      const gyN = mobGroundY(Math.floor(nxN), Math.floor(nzN), m.position.y);
+      if (gyN != null && Math.abs(gyN + 1 - m.position.y) < 1.5) { m.position.x = nxN; m.position.z = nzN; m.position.y += ((gyN + 1) - m.position.y) * Math.min(1, dt * 10); }
+      return false;
+    }
     // 追跡AI
     const chaseRange = u.kind === 'skeleton' ? 22 : 24;
     const wantClose = u.kind !== 'skeleton';
@@ -394,6 +466,10 @@
       if (gy != null && Math.abs(gy + 1 - m.position.y) < 1.5) {
         m.position.x = nx; m.position.z = nz;
         m.position.y += ((gy + 1) - m.position.y) * Math.min(1, dt * 10);
+      } else if (u.kind === 'spider' && isSolid(Math.floor(nx), Math.floor(m.position.y), Math.floor(nz))) {
+        // C12 壁登り: 進行方向が壁なら垂直に登る
+        m.position.y += 3 * dt;
+        if (!isSolid(Math.floor(nx), Math.floor(m.position.y), Math.floor(nz))) { m.position.x = nx; m.position.z = nz; }
       }
     }
     // 見た目アニメーション
@@ -401,7 +477,10 @@
       const s = Math.sin(u.phase);
       m.position.y += Math.max(0, s) * 0.4 * dt * 4;
       m.scale.set(1 + s * 0.08, 1 - s * 0.1, 1 + s * 0.08);
-    } else if (u.limbs) {
+    } else if (u.limbs && u.limbs.spiderLegs) {
+      const sw = moveDir != null ? Math.sin(u.phase) * 0.4 : 0;
+      u.limbs.spiderLegs.forEach((leg, i) => { leg.rotation.z = (i % 2 ? sw : -sw) * (i < 4 ? 1 : -1); });
+    } else if (u.limbs && u.limbs.legL) {
       const sw = moveDir != null ? Math.sin(u.phase) * 0.55 : 0;
       u.limbs.legL.rotation.x = sw;
       u.limbs.legR.rotation.x = -sw;
@@ -518,8 +597,34 @@
     PLAYER_BOW.cd = Math.max(0, PLAYER_BOW.cd - dt);
   }
   // 敵MOBへのダメージ共通処理（近接/矢の両方から呼ぶ）
+  // ダメージ源が無い内部用（水ダメージ等）
+  function damageMob(m, damage) {
+    const u = m.userData;
+    u.hp -= damage;
+    u.hurtT = 0.3;
+    if (u.hp <= 0) killMob(m, false);
+  }
+  // C12 エンダーマンのテレポート。nearPlayer ならプレイヤー周囲、でなければランダムに逃げる
+  function enderTeleport(m, nearPlayer = false) {
+    for (let i = 0; i < 12; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = nearPlayer ? rnd(3, 7) : rnd(8, 24);
+      const bx = Math.floor((nearPlayer ? player.pos.x : m.position.x) + Math.sin(a) * r);
+      const bz = Math.floor((nearPlayer ? player.pos.z : m.position.z) + Math.cos(a) * r);
+      const gy = mobGroundY(bx, bz, nearPlayer ? player.pos.y : m.position.y);
+      if (gy == null) continue;
+      burst(m.position.x - 0.5, m.position.y + 1.2, m.position.z - 0.5, 0x9b4fd8);
+      m.position.set(bx + 0.5, gy + 1, bz + 0.5);
+      burst(m.position.x - 0.5, m.position.y + 1.2, m.position.z - 0.5, 0x9b4fd8);
+      thock(520);
+      return true;
+    }
+    return false;
+  }
   function damageMobBy(m, damage, dir, kbPower = 6.5) {
     const u = m.userData;
+    u.provoked = true;      // C12: 中立のクモ/エンダーマンは殴られたら反撃してくる
+    u.neutral = false;
     u.hp -= damage;
     u.hurtT = 0.35;
     if (dir) u.kb = { x: dir.x * kbPower, z: dir.z * kbPower, t: 0.22 };

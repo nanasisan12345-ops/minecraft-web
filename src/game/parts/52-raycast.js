@@ -745,6 +745,20 @@
     if (tg) {
       const [bx, by, bz] = tg.block;
       const hitType = blockAt(bx, by, bz);
+      // C12 骨粉: 小麦は即実り、苗木は45%で木になる
+      if (def && def.id === 'bone_meal' && (hitType === WHEAT_YOUNG || hitType === SAPLING)) {
+        const s2 = selectedItem();
+        if (hitType === WHEAT_YOUNG) {
+          setEdit(key(bx, by, bz), WHEAT_RIPE); setBlock(bx, by, bz, WHEAT_RIPE); requestEditedBlockRebuild(bx, by, bz);
+          saveEditsSoon();
+        } else if (Math.random() < 0.45 && typeof growTree === 'function') {
+          if (growTree(bx, by, bz)) delete SAVE.saplings[key(bx, by, bz)];
+        }
+        burst(bx, by + 0.6, bz, 0x7ce03a);
+        s2.n -= 1; if (s2.n <= 0) INV[selected] = null;
+        invChanged(); thock(520);
+        return;
+      }
       if (def && def.tool === 'hoe' && tillableBlock(hitType)) { tillSoil(bx, by, bz); return; }
       if (hitType === FARMLAND) {
         const above = blockAt(bx, by + 1, bz);

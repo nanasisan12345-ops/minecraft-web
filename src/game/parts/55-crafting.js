@@ -7,6 +7,7 @@
     { out: 'flint_and_steel', n: 1, pattern: ['I ', ' F'], keys: { I: 'iron_ingot', F: 'flint' } },
     // C14: 紙/本/本棚（本棚は C11 のエンチャント強化に使う）
     { out: 'paper', n: 3, pattern: ['WWW'], keys: { W: 'wheat' } },
+    { out: 'bone_meal', n: 3, pattern: ['B'], keys: { B: 'bone' } },
     { out: 'book', n: 1, pattern: ['PP', 'PL'], keys: { P: 'paper', L: 'leather' } },
     { out: 'bookshelf', n: 1, pattern: ['PPP', 'BBB', 'PPP'], keys: { P: 'planks', B: 'book' } },
     // C11: エンチャントテーブル(本1+ダイヤ2+黒曜石4) / 金床(鉄ブロック3+鉄4)
