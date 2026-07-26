@@ -39,7 +39,20 @@
   function setSlot(src, idx, item) {
     if (src === 'fin') { furnaceState(UI.ctx.key).in = item; return; }
     if (src === 'ffuel') { furnaceState(UI.ctx.key).fuel = item; return; }
-    if (src === 'fout') { furnaceState(UI.ctx.key).out = item; return; }
+    if (src === 'fout') {
+      // かまどの出力を取り出したら、その個数ぶんの精錬XPを渡す（本家と同じタイミング）
+      const st = furnaceState(UI.ctx.key);
+      const before = st.out ? st.out.n : 0, after = item ? item.n : 0;
+      const taken = Math.max(0, before - after);
+      if (taken > 0 && (st.xp || 0) > 0 && typeof spawnXpFraction === 'function') {
+        const per = st.xp / Math.max(1, before);
+        const give = per * taken;
+        st.xp = Math.max(0, st.xp - give);
+        spawnXpFraction(Math.floor(player.pos.x), Math.floor(player.pos.y), Math.floor(player.pos.z), give);
+      }
+      st.out = item;
+      return;
+    }
     if (src === 'armor') { SAVE.armor = item; markSaveDirty(); return; }
     const arr = slotArrayFor(src);
     if (arr) arr[idx] = item;

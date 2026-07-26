@@ -186,6 +186,7 @@
     updateHostileMobs(dt);
     updatePlayerAttack(dt);
     updateItemDrops(dt);
+    updateXpOrbs(dt);
     updateFurnaces(dt);
     updateFurnaceBars();
     updateLiquids(dt);
@@ -220,6 +221,11 @@
     inv: () => INV,
     save: () => SAVE,
     survival: SURVIVAL,
+    // C10 XP検証用
+    xp: () => ({ level: XP.level, points: +XP.points.toFixed(2), toNext: xpToNext(XP.level), orbs: XP_ORBS.length }),
+    giveXp: (n) => { addXpPoints(n); return { level: XP.level, points: +XP.points.toFixed(2), toNext: xpToNext(XP.level) }; },
+    dropXp: (n) => { spawnXpOrb(Math.floor(player.pos.x), Math.floor(player.pos.y), Math.floor(player.pos.z), n); return XP_ORBS.length; },
+    stepXp: (n = 60, dt = 1 / 60) => { for (let i = 0; i < n; i++) updateXpOrbs(dt); return { orbs: XP_ORBS.length, level: XP.level, points: +XP.points.toFixed(2) }; },
     // C13 調理と満腹度の検証用: 食べる→hunger/saturation/absorb の遷移を数値で見る
     eat: (id) => {
       const d = ITEM_DEFS[id];

@@ -396,7 +396,7 @@
   }
   for (let i = 0; i < 4; i++) { BLOCK_HARDNESS.set(LADDER + i, 0.4); BLOCK_HARDNESS.set(SIGN + i, 1.0); }
   BLOCK_HARDNESS.set(GLASS_PANE, 0.3);
-  BLOCK_HARDNESS.set(OBSIDIAN, 45); // 非常に硬い（ダイヤツルハシ推奨）
+  BLOCK_HARDNESS.set(OBSIDIAN, 50); // 本家準拠。ダイヤツルハシで約9.4秒
   // レッドストーン
   BLOCK_HARDNESS.set(REDSTONE_ORE, 3.4);
   BLOCK_HARDNESS.set(REDSTONE_WIRE, 0.05);
@@ -408,8 +408,15 @@
   BLOCK_HARDNESS.set(WOOD_PLATE_OFF, 0.5); BLOCK_HARDNESS.set(WOOD_PLATE_ON, 0.5);
   BLOCK_HARDNESS.set(REDSTONE_LAMP_OFF, 0.8); BLOCK_HARDNESS.set(REDSTONE_LAMP_ON, 0.8);
   // 掘ってもドロップしない（必要ツールレベル未満）判定。tier: 1木 2石 3鉄 4ダイヤ
+  // 採掘で出るXP（本家準拠）。鉄/金鉱石は採掘では0で、精錬時に入る
+  const ORE_XP = {
+    [COAL_ORE]: [1, 2],
+    [DIAMOND_ORE]: [3, 7],
+    [REDSTONE_ORE]: [1, 5],
+  };
   function requiredToolTier(type) {
     if ([IRON_ORE, IRON_BLOCK].includes(type)) return 2;            // 鉄鉱石/鉄ブロック: 石ツルハシ以上
+    if (type === OBSIDIAN) return 4;                                // 黒曜石: ダイヤツルハシ必須
     if ([GOLD_ORE, DIAMOND_ORE, GOLD_BLOCK, DIAMOND_BLOCK, REDSTONE_ORE].includes(type)) return 3; // 金/ダイヤ/RS鉱石・ブロック: 鉄ツルハシ以上
     if (blockPreferredTool(type) === 'pickaxe') return 1;           // 石系: 何かしらのツルハシが必要
     return 0;
@@ -515,6 +522,11 @@
     }
     // ドロップ（必要ツールレベルを満たさない鉱石/石はドロップしない）。実体として地面に落ちる
     if (needTier === 0 || hasProperTool) {
+      // 採掘XP。プレイヤーが設置したブロックからは出さない（設置→再採掘の無限XP防止）
+      const xpRange = ORE_XP[t];
+      if (xpRange && edits.get(id) !== t && typeof spawnXpOrb === 'function') {
+        spawnXpOrb(x, y, z, xpRange[0] + Math.floor(Math.random() * (xpRange[1] - xpRange[0] + 1)));
+      }
       for (const [itemId, n] of blockDrops(t)) spawnItemDrop(x, y, z, itemId, n);
     } else if (typeof setDebugToast === 'function' && needTier >= 2) {
       setDebugToast(`${TYPES[t].name} には${needTier >= 3 ? '鉄' : '石'}のツルハシ以上が必要`, 1.6);

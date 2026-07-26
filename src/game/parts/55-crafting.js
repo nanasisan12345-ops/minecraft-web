@@ -4,6 +4,7 @@
    * 左右反転も一致とみなす（斧などの利き手違い）。 */
   const RECIPES = [
     { out: 'planks', n: 4, pattern: ['L'], keys: { L: 'log' } },
+    { out: 'flint_and_steel', n: 1, pattern: ['I ', ' F'], keys: { I: 'iron_ingot', F: 'flint' } },
     // 金のリンゴ: 金インゴット8でリンゴを囲む（本家準拠）
     { out: 'golden_apple', n: 1, pattern: ['GGG', 'GAG', 'GGG'], keys: { G: 'gold_ingot', A: 'apple' } },
     { out: 'stick', n: 4, pattern: ['P', 'P'], keys: { P: 'planks' } },
@@ -132,6 +133,8 @@
   }
 
   /* --- かまど --- */
+  // 精錬1個あたりのXP（本家準拠）。端数は spawnXpFraction が内部で蓄積する
+  const SMELT_XP = { iron_ingot: 0.7, gold_ingot: 1.0, cooked_meat: 0.35, stone: 0.1, glass: 0.1, coal: 0.1 };
   const SMELT_TIME = 10; // 1アイテムの精錬秒数
   const SMELT_RESULT = {
     raw_iron: 'iron_ingot',
@@ -192,6 +195,7 @@
             st.in.n -= 1;
             if (st.in.n <= 0) st.in = null;
             if (st.out) st.out.n += 1; else st.out = mkItem(outId, 1);
+            st.xp = (st.xp || 0) + (SMELT_XP[outId] || 0); // 取り出し時にまとめて渡す
             changed = true;
             if (typeof progressEvent === 'function') progressEvent('smelt', outId);
           }

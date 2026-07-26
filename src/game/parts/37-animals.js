@@ -110,6 +110,8 @@
       if (!near) continue;
       u.love = 0; pu.love = 0;
       u.breedCooldown = BREED_COOLDOWN; pu.breedCooldown = BREED_COOLDOWN;
+      // 繁殖成立でXP（本家は1-7）
+      if (typeof spawnXpOrb === 'function') spawnXpOrb(Math.floor(a.position.x), Math.floor(a.position.y), Math.floor(a.position.z), 1 + Math.floor(Math.random() * 7));
       const mx = (a.position.x + partner.position.x) / 2, mz = (a.position.z + partner.position.z) / 2;
       const gy = heightAt(Math.floor(mx), Math.floor(mz)) + 1;
       spawnBaby(u.kind, mx, gy, mz);

@@ -50,6 +50,7 @@
     SAVE.time = DAY.time;
     SAVE.selected = selected;
     if (typeof collectDropsForSave === 'function') collectDropsForSave();
+    if (typeof collectXpForSave === 'function') collectXpForSave();
   }
 
   function respawnPoint() {

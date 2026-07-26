@@ -69,6 +69,8 @@
     bone:         { name: '骨', cat: 'material' },
     slime_ball:   { name: 'スライム玉', cat: 'material' },
     gunpowder:    { name: '火薬', cat: 'material' },
+    flint:        { name: '火打石', cat: 'material' },  // 入手は砂利(C14)。現状はクラフト素材として先行追加
+    flint_and_steel: { name: '火打石と打ち金', cat: 'tool', tool: 'igniter', durability: 64, stack: 1 },
     bucket:       { name: 'バケツ', cat: 'material', stack: 1 },
     water_bucket: { name: '水入りバケツ', cat: 'material', stack: 1 },
     lava_bucket:  { name: '溶岩入りバケツ', cat: 'material', stack: 1 },

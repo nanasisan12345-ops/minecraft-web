@@ -315,6 +315,9 @@
     // ドロップと討伐数はプレイヤーが倒したときだけ（朝の日光で燃え尽きた分は対象外）
     if (byPlayer) {
       dropMobLoot(m);
+      // 討伐XP（本家準拠: ゾンビ/スケルトン/クリーパー=5、スライム=2）
+      const xp = m.userData.kind === 'slime' ? 2 : 5;
+      if (typeof spawnXpOrb === 'function') spawnXpOrb(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z), xp);
       SAVE.stats.kills = (SAVE.stats.kills || 0) + 1;
       markSaveDirty();
       if (typeof progressEvent === 'function') progressEvent('kill', m.userData.kind);
