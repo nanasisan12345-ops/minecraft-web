@@ -571,6 +571,7 @@
     breakDetachedLadders(x, y, z); // 背面(壁)を失ったはしごを剥がしてアイテム化
     if (typeof rsOnBlockChanged === 'function') { rsOnBlockChanged(x, y, z, -1); breakUnsupportedRsBlocks(x, y, z); }
     if (typeof liquidOnBlockRemoved === 'function') liquidOnBlockRemoved(x, y, z); // 隣が海/湖/溶岩なら流れ込む
+    if (typeof fallingOnBlockRemoved === 'function') fallingOnBlockRemoved(x, y, z); // 真上の砂/砂利が落ちてくる
   }
   // (bx,by,bz) を足場にしていたRS部品（ワイヤ/トーチ/レバー/ボタン/感圧板）を剥がしてアイテム化
   function breakUnsupportedRsBlocks(bx, by, bz) {
@@ -804,5 +805,6 @@
     setEdit(key(x, y, z), type); saveEditsSoon(); setBlock(x, y, z, type); requestEditedBlockRebuild(x, y, z, type); thock(260);
     if (typeof displaceLiquidAt === 'function') displaceLiquidAt(x, y, z); // 液体を塞いだら下流を枯らす
     if (typeof rsOnBlockChanged === 'function') rsOnBlockChanged(x, y, z, type); // RS部品の登録/回路の再評価
+    if (typeof tryFallBlockAt === 'function') tryFallBlockAt(x, y, z); // 砂/砂利を宙に置いたら落ちる
     if (typeof progressEvent === 'function') progressEvent('place', ITEM_FOR_BLOCK[type]);
   }

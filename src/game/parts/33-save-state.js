@@ -21,6 +21,7 @@
     signs: {},           // 看板テキスト "x,y,z" -> [1〜4行の文字列]
     liquids: {},         // プレイヤーが置いた液体の源のみ "x,y,z" -> WATER|LAVA（流水はロード時に再シム）
     natFlood: {},        // 掘って浸水の起点になった自然の水/溶岩セル "x,y,z" -> WATER|LAVA
+    falling: [],         // 落下中の砂/砂利 [{x,y,z,t,vy}]（着地したら edits へ戻る）
     trades: {},          // 取引ID -> 回数
     progress: [],        // 達成済み進捗ID
     stats: { kills: 0, nights: 0 },

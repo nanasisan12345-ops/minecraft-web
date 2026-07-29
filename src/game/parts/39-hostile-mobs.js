@@ -55,6 +55,8 @@
       for (const [x, y, z] of touched) requestEditedBlockRebuild(x, y, z);
       // 爆破跡が海/湖/溶岩に面していたら流れ込む（本家準拠）
       if (typeof liquidOnBlockRemoved === 'function') for (const [x, y, z] of touched) liquidOnBlockRemoved(x, y, z);
+      // 支えを失った砂/砂利は落ちる
+      if (typeof fallingOnBlockRemoved === 'function') for (const [x, y, z] of touched) fallingOnBlockRemoved(x, y, z);
     }
     // 派手なパーティクル
     for (let k = 0; k < 26; k++) burst(cx + rnd(-power, power), cy + rnd(-1, power), cz + rnd(-power, power), k % 2 ? 0xff8a26 : 0x555555);

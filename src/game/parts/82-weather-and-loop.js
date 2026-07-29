@@ -224,6 +224,7 @@
     updateHostileMobs(dt);
     updatePlayerAttack(dt);
     updateItemDrops(dt);
+    updateFallingBlocks(dt);
     updateXpOrbs(dt);
     updateFurnaces(dt);
     updateFurnaceBars();
@@ -253,6 +254,7 @@
   }
   regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z)); // 初期生成
   loadSavedDrops(); // 前回の落ちものを復元
+  loadSavedFallingBlocks(); // 落下中だった砂/砂利を復元
   animate();
   window.__mcReady = true;
   // C9 検証用: 水中判定・酸素・視界・採掘減速をまとめて返す
@@ -421,6 +423,7 @@
       setEdit(key(x, y, z), -1); saveEditsSoon(); setBlock(x, y, z, null); requestEditedBlockRebuild(x, y, z, t);
       if (typeof rsOnBlockChanged === 'function') rsOnBlockChanged(x, y, z, -1);
       if (typeof liquidOnBlockRemoved === 'function') liquidOnBlockRemoved(x, y, z);
+      if (typeof fallingOnBlockRemoved === 'function') fallingOnBlockRemoved(x, y, z);
       return { x, y, z, was: t != null ? TYPES[t] && TYPES[t].name : null };
     },
     // ライトエンジン確認: 現在地の空の見え方＋近くの発光ブロック＋直近チャンクビルド時間。
@@ -554,6 +557,18 @@
       regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z));
       return { pos: player.pos.toArray().map(n => +n.toFixed(1)), block: blockAt(Math.floor(x), Math.floor(y), Math.floor(z)) };
     },
+    // 落下ブロックのテスト: 落下中の砂/砂利の一覧
+    falling: () => fallingBlockStats(),
+    // 落下ブロックのテスト: 足元近くに砂/砂利の柱を宙に作って落とす
+    fallTest: (h = 4, t = SAND) => {
+      const x = Math.floor(player.pos.x) + 2, z = Math.floor(player.pos.z);
+      const base = Math.floor(player.pos.y) + 3;
+      for (let i = 0; i < h; i++) { setEdit(key(x, base + i, z), t); setBlock(x, base + i, z, t); requestEditedBlockRebuild(x, base + i, z, t); }
+      const started = tryFallBlockAt(x, base, z);
+      return { x, y: base, z, 積んだ数: h, 落下開始: started, ...fallingBlockStats() };
+    },
+    // 落下ブロックのテスト: rAF停止時に落下を手動で進める
+    stepFalling: (n = 60, dt = 1 / 60) => { for (let i = 0; i < n; i++) updateFallingBlocks(dt); return fallingBlockStats(); },
     // 水の見た目テスト: マテリアル設定と uniform の現在値
     waterLook: () => {
       const lm = TYPES[WATER]._litMats, mm = Array.isArray(lm) ? lm[0] : lm;

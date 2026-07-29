@@ -56,6 +56,7 @@
     SAVE.time = DAY.time;
     SAVE.selected = selected;
     if (typeof collectDropsForSave === 'function') collectDropsForSave();
+    if (typeof collectFallingForSave === 'function') collectFallingForSave();
     if (typeof collectXpForSave === 'function') collectXpForSave();
   }
 
