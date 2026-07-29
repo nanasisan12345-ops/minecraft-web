@@ -71,16 +71,14 @@
     g.gain.exponentialRampToValueAtTime(0.0006, t + 0.16);
     o.connect(lp).connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.18);
   }
-  // 近くの液体の量（47-liquids.js の走査結果）で環境音の音量を決める。水中はこもらせる
+  // 近くの溶岩の量（47-liquids.js の走査結果）で環境音の音量を決める。水中はこもらせる
+  // ※水のせせらぎ音はユーザー要望により鳴らさない
   function updateLiquidAudio(dt, underwater = false) {
-    if (!actx || !ENV.ready || !ENV.waterGain) return;
+    if (!actx || !ENV.ready || !ENV.lavaGain) return;
     const amb = (typeof liquidAmbience === 'function') ? liquidAmbience() : { water: 0, lava: 0 };
     const now = actx.currentTime;
     const outdoor = started && !(typeof RAVE !== 'undefined' && RAVE.on);
-    const muffle = underwater ? 0.55 : 1;
-    const w = outdoor ? Math.min(0.055, amb.water * 0.0022) * muffle : 0;
-    const l = outdoor ? Math.min(0.05, amb.lava * 0.0035) : 0;
-    ENV.waterGain.gain.setTargetAtTime(Math.max(0.0001, w), now, 0.5);
+    const l = outdoor ? Math.min(0.05, amb.lava * 0.0035) * (underwater ? 0.55 : 1) : 0;
     ENV.lavaGain.gain.setTargetAtTime(Math.max(0.0001, l), now, 0.5);
   }
 
@@ -98,7 +96,7 @@
 
   const ENV = {
     ready: false, master: null, rainGain: null, musicGain: null, delay: null, delayFb: null, nextNote: 0, nextNature: 0, nextWind: 0, scale: [0, 2, 4, 7, 9],
-    waterGain: null, lavaGain: null,   // 近くの水/溶岩の環境音（量に応じて鳴る）
+    lavaGain: null,   // 近くの溶岩の環境音（量に応じて鳴る）。水は無音
     el: null, src: null, mp3Gain: null, mp3Tried: false, mp3Ok: false, mp3Urls: [], mp3ByTheme: {}, mp3Index: 0, mp3Theme: '', mp3NextAt: 0, mp3Max: 12,
   };
   const AMBIENT_THEMES = [
@@ -128,16 +126,13 @@
     const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 850;
     const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200;
     src.connect(hp).connect(lp).connect(rainGain); src.start();
-    // 水のせせらぎ（帯域を絞ったノイズ）と溶岩のゴボゴボ（超低域のノイズ）。音量は近くの液体量で決まる
-    const waterGain = actx.createGain(); waterGain.gain.value = 0.0001; waterGain.connect(master);
-    const wSrc = actx.createBufferSource(); wSrc.buffer = envNoiseBuffer(3.1); wSrc.loop = true;
-    const wBp = actx.createBiquadFilter(); wBp.type = 'bandpass'; wBp.frequency.value = 900; wBp.Q.value = 0.7;
-    wSrc.connect(wBp).connect(waterGain); wSrc.start();
+    // 溶岩のゴボゴボ（超低域のノイズ）。音量は近くの溶岩量で決まる
+    // ※水のせせらぎ音はユーザー要望により無し（水辺は無音）
     const lavaGain = actx.createGain(); lavaGain.gain.value = 0.0001; lavaGain.connect(master);
     const lSrc = actx.createBufferSource(); lSrc.buffer = envNoiseBuffer(3.7); lSrc.loop = true;
     const lLp = actx.createBiquadFilter(); lLp.type = 'lowpass'; lLp.frequency.value = 190;
     lSrc.connect(lLp).connect(lavaGain); lSrc.start();
-    ENV.waterGain = waterGain; ENV.lavaGain = lavaGain;
+    ENV.lavaGain = lavaGain;
     ENV.ready = true; ENV.master = master; ENV.musicGain = musicGain; ENV.mp3Gain = mp3Gain; ENV.rainGain = rainGain; ENV.delay = delay; ENV.delayFb = delayFb; ENV.nextNote = actx.currentTime + rnd(2, 5); ENV.nextNature = actx.currentTime + rnd(4, 12); ENV.nextWind = actx.currentTime + rnd(8, 20);
     tryStartAmbientMp3();
   }

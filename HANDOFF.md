@@ -10,6 +10,16 @@
 
 - **計画書の進捗: C1 / C2 / C4 / C5 / C6 / C7 / C8 / C9 / C10 / C11 / C12 / C13 / C15 / C19 が完了（14本）。C14 は一部のみ。残り: C3(中止)・C14残り(羊毛/氷)・C16・C17・C18・S1〜S4。次は手順書15(C16)=ネザー。**
 
+- **2026-07-26: 水面のリアル化 3点（計画書外・ユーザー要望）＋せせらぎ音の削除。マテリアルとテクスチャだけの変更で、メッシュ生成・セーブ・ワーカーは無変更（`MESH_WORKER_VERSION` 据え置き）。**
+  - **さざ波（法線マップ）**: `20-textures.js` で**水専用の元絵**（3つの sin を重ねた波の干渉、32x32のグレースケール）を `makeTex` で描き、`normalFromCanvas(..., 1.6)` で法線化して `TX.water.userData.normalMap` に入れた。**水テクスチャ本体（ノイズ＋横線）から起こすとザラつくだけなので専用の元絵にした。** `mkMat` が `userData.normalMap` を拾ってマテリアルに付ける既存の仕組みに乗っている。
+  - **うねりと空の映り込み**: `24-instanced-meshes.js` に **`applyWaterShader`** を追加し、`litChunkMats` が水のときだけこれを使う（`ty === TYPES[WATER]` で判定）。ライト合成の式は共通シェーダーと同一。追加分は ①頂点: `normal.y > 0.5` の面だけ `sin(position.x*1.6 + t*1.7)*0.030 + sin(position.z*2.1 + t*1.3)*0.024` で上下（**頂点はワールド絶対座標なのでチャンクをまたいで波が連続する**）②フラグメント: フレネル `pow(1 - dot(viewDir, normal), 3) * 0.42` で空色を混ぜる。**空色に skylight を掛けているので洞窟の水は空を映さない。** `customProgramCacheKey` を `'mcChunkWater'` に分けないと共通シェーダーのプログラムが再利用されてしまう点に注意。
+  - **上面だけを揺らすので側面と最大0.06ずれる**（半透明で depthWrite なしのため継ぎ目は見えない想定）。振幅を上げるとここが破綻する。
+  - uniform（`WATER_SHADER.time` / `.sky`）と法線マップの `offset` は `animateLiquidLook` が毎フレーム更新。**法線だけ本体テクスチャと違う向き・速さ（-0.013, -0.019）で流す**ので、模様は流れず反射だけが揺らぐ。空色は `scene.fog.color`（＝そのときの天候と時間帯の空）。
+  - **せせらぎ音を削除（ユーザー要望「水に近づくと波の音が鳴るけど、それは無しで」）**: `44-sound-effects.js` の `ENV.waterGain` とバンドパスノイズ源を丸ごと撤去。**溶岩のゴボゴボとパチッは残す**（水中では 0.55 倍にこもる処理は溶岩側へ移した）。`liquidAmbience()` の水の走査自体は水しぶきパーティクルが使うので残っている。
+  - **新 `__mcDbg` フック**: `waterLook()`（法線マップ有無・normalScale・cacheKey・各offset・うねり位相・映り込む空色）・**`renderOnce()`（rAF停止時に1フレームだけ描画して `glError` を返す＝シェーダー注入の検証用）**。
+  - 実測: `renderOnce()` で **glError 0・346 draw calls・98150 三角形**、生成プログラム6本（水用が別プログラムとして増えた）。水マテリアルは `法線マップ:true / normalScale:[0.32,0.32] / cacheKey:'mcChunkWater' / opacity 0.72 / shininess 90`。`waterGain` はコード上0件（grep）。`npm.cmd run check` 成功・console error/warn 0（シェーダーのコンパイルエラーが出れば three が console に出すので、これが注入成功の証拠）。
+  - **未確認: 見た目そのもの**（プレビューが compositing しないためスクリーンショット不可）。**次回起動時に、水面のさざ波・うねり・浅い角度での空の映り込みを目視し、強すぎ/弱すぎなら `applyWaterShader` の 0.030/0.024（うねり）・0.42（フレネル）・`normalScale 0.32` を調整すること。**
+
 - **2026-07-26: 水と溶岩の表現を本家に寄せた（計画書外・ユーザー要望「見た目と音」）。メッシュ生成には触っていないので `MESH_WORKER_VERSION` は据え置き。**
   - **溶岩が動くようになった**: それまで `TX.lava.offset` を誰も更新しておらず**完全に静止**していた。`82` に `animateLiquidLook(dt, nowMs)` を追加し、`offset.y -= dt*0.006`（水の 0.03/s の1/5＝本家の溶岩は非常に遅い）＋ `offset.x` を sin でわずかに揺らして「うねり」を出し、**発光を 0.78〜1.00 で脈動**させる。脈動は `litChunkMats(TYPES[LAVA])` の**クローン側だけ**に当てる（`TYPES.mats` 本体は手持ち/ドロップと共有なので触らない。24-instanced-meshes.js の注記どおり）。
   - **新プール `FX_POOL`（42-particles.js、64粒）**: 破壊用の `pPool` とは別。混ぜると滝のそばで採掘したときに破片が出なくなる。`spawnFx(x,y,z,color,vel,life,scale,grav,fade)` は**ひと粒ずつ重力を指定できる**（煙は負の重力でゆっくり上昇）。更新は `updateFxParticles(dt)`（既存の pPool 更新ロジックには触っていない）。

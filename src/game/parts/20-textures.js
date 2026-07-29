@@ -655,5 +655,17 @@
   TX.lava.wrapS = TX.lava.wrapT = THREE.RepeatWrapping;
   TX.cactus.userData.normalMap = normalFromCanvas(TX.cactus.image, 2.2);
   TX.water.wrapS = TX.water.wrapT = THREE.RepeatWrapping;
+  // 水面のさざ波: 波の干渉を描いたグレースケールから法線マップを起こす。
+  // 水テクスチャ本体（ノイズ＋横線）から起こすとザラつくだけなので専用の元絵を使い、
+  // 本体とは別の速度で offset を流して反射だけを揺らす（82-weather-and-loop.js）。
+  TX.water.userData.normalMap = normalFromCanvas(makeTex((g, S) => {
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const v = Math.sin((x / S) * Math.PI * 4) * 0.5
+        + Math.sin((y / S) * Math.PI * 6 + x * 0.35) * 0.32
+        + Math.sin(((x + y) / S) * Math.PI * 3) * 0.28;
+      const c = Math.max(0, Math.min(255, Math.round(128 + v * 58)));
+      g.fillStyle = `rgb(${c},${c},${c})`; g.fillRect(x, y, 1, 1);
+    }
+  }).image, 1.6);
   for (const k of ['dirt', 'grassTop', 'grassSide', 'stone', 'snow', 'bark', 'logTop', 'leaves', 'sand', 'planks', 'doorBottom', 'doorTop', 'doorBottomM', 'doorTopM', 'doorEdge', 'trapdoor', 'brick', 'coalOre', 'ironOre', 'goldOre', 'diamondOre', 'crafting', 'furnace', 'furnaceSide', 'furnaceTop', 'furnaceFront', 'dripstone', 'stoneBrick', 'mossyBrick', 'chest', 'chestTop', 'craftingTop', 'torch', 'gravel', 'bookshelf', 'enchantTable', 'enchantTableTop', 'anvil', 'villageSign', 'tatami', 'shoji', 'noren', 'paperLantern', 'cobble', 'bedTop', 'bedSide', 'bedHeadTop', 'bedFootTop', 'bedSideHead', 'bedSideFoot', 'farmland', 'furnaceLit', 'tntSide', 'tntTop', 'ironBlock', 'diamondBlock', 'coalBlock', 'bedrock', 'deepslate', 'redstoneOre', 'redstoneLamp', 'redstoneLampOn'])
     TX[k].userData.normalMap = normalFromCanvas(TX[k].image, 2.2);

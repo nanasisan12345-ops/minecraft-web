@@ -37,9 +37,38 @@
     m.customProgramCacheKey = () => 'mcChunkLight';
     return m;
   }
+  // 水だけの追加表現: 水面のうねり（頂点）と空の映り込み（フレネル）。
+  // ライト合成はチャンク共通と同じ式を使う（水も焼き込みライトに従う必要があるため）。
+  // uniform は 82-weather-and-loop.js が毎フレーム更新する。
+  const WATER_SHADER = { time: { value: 0 }, sky: { value: new THREE.Color(0x9fc6f0) } };
+  function applyWaterShader(m) {
+    m.onBeforeCompile = (shader) => {
+      shader.uniforms.uMcDay = CHUNK_LIGHT_UNIFORM;
+      shader.uniforms.uMcTime = WATER_SHADER.time;
+      shader.uniforms.uMcSky = WATER_SHADER.sky;
+      shader.vertexShader = 'attribute vec2 mcLight;\nvarying vec2 vMcLight;\nuniform float uMcTime;\n' +
+        shader.vertexShader.replace('#include <begin_vertex>',
+          '#include <begin_vertex>\n\tvMcLight = mcLight;\n' +
+          // 上面だけを小さく上下させる。側面と最大0.06ずれるが、半透明なので継ぎ目は見えない
+          '\tif (normal.y > 0.5) transformed.y += sin(position.x * 1.6 + uMcTime * 1.7) * 0.030\n' +
+          '\t\t+ sin(position.z * 2.1 + uMcTime * 1.3) * 0.024;');
+      shader.fragmentShader = 'varying vec2 vMcLight;\nuniform float uMcDay;\nuniform vec3 uMcSky;\n' +
+        shader.fragmentShader.replace('#include <opaque_fragment>',
+          'vec3 mcBlockLit = diffuseColor.rgb * vec3(1.0, 0.85, 0.62) * vMcLight.y;\n' +
+          '\toutgoingLight = max((outgoingLight - totalEmissiveRadiance) * (vMcLight.x * uMcDay), mcBlockLit) + totalEmissiveRadiance;\n' +
+          // 浅い角度ほど空を映す。skylight を掛けるので洞窟の水は映り込まない
+          '\tfloat mcFres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 3.0);\n' +
+          '\toutgoingLight = mix(outgoingLight, uMcSky * vMcLight.x, mcFres * 0.42);\n' +
+          '\t#include <opaque_fragment>');
+    };
+    m.customProgramCacheKey = () => 'mcChunkWater';
+    if (m.normalScale) m.normalScale.set(0.32, 0.32); // 岩肌と同じ強さだと水面がザラつく
+    return m;
+  }
   function litChunkMats(ty) {
     if (!ty._litMats) {
-      const lit = (m) => applyChunkLightShader(m.clone());
+      const isWater = ty === TYPES[WATER];
+      const lit = (m) => (isWater ? applyWaterShader(m.clone()) : applyChunkLightShader(m.clone()));
       ty._litMats = Array.isArray(ty.mats) ? ty.mats.map(lit) : lit(ty.mats);
     }
     return ty._litMats;

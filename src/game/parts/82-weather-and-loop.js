@@ -137,6 +137,12 @@
     TX.lava.offset.x = Math.sin(nowMs * 0.00035) * 0.02;  // 横にわずかに揺らいで「うねり」を出す
     const pulse = 0.78 + 0.22 * (0.5 + 0.5 * Math.sin(nowMs * 0.0021));
     for (const m of lavaChunkMats) m.emissiveIntensity = pulse;
+    // 水面のさざ波: 法線だけを本体テクスチャと違う向き・速さで流すと、模様は流れず反射だけが揺らぐ
+    const wnm = TX.water.userData && TX.water.userData.normalMap;
+    if (wnm) { wnm.offset.x -= dt * 0.013; wnm.offset.y -= dt * 0.019; }
+    // うねりの位相と、映り込ませる空の色（霧色＝そのときの空に合わせる）
+    WATER_SHADER.time.value = nowMs * 0.001;
+    WATER_SHADER.sky.value.copy(scene.fog.color);
   }
 
   function animate() {
@@ -547,6 +553,28 @@
       player.pos.set(x + 0.5, y, z + 0.5); player.vel.set(0, 0, 0); player.onGround = false;
       regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z));
       return { pos: player.pos.toArray().map(n => +n.toFixed(1)), block: blockAt(Math.floor(x), Math.floor(y), Math.floor(z)) };
+    },
+    // 水の見た目テスト: マテリアル設定と uniform の現在値
+    waterLook: () => {
+      const lm = TYPES[WATER]._litMats, mm = Array.isArray(lm) ? lm[0] : lm;
+      const nm = TX.water.userData && TX.water.userData.normalMap;
+      return {
+        法線マップ: !!(mm && mm.normalMap),
+        normalScale: mm && mm.normalScale ? mm.normalScale.toArray() : null,
+        cacheKey: mm && mm.customProgramCacheKey ? mm.customProgramCacheKey() : null,
+        法線offset: nm ? nm.offset.toArray().map(n => +n.toFixed(4)) : null,
+        本体offset: [+TX.water.offset.x.toFixed(4), +TX.water.offset.y.toFixed(4)],
+        うねり位相: +WATER_SHADER.time.value.toFixed(2),
+        空の色: '#' + WATER_SHADER.sky.value.getHexString(),
+        opacity: mm ? mm.opacity : null, shininess: mm ? mm.shininess : null,
+      };
+    },
+    // rAF停止時に1フレームだけ描画して WebGL エラーを見る（シェーダー注入の検証用）
+    renderOnce: () => {
+      const gl = renderer.getContext();
+      while (gl.getError() !== gl.NO_ERROR) { /* 直前のエラーを流す */ }
+      renderer.render(scene, camera);
+      return { glError: gl.getError(), programs: renderer.info.programs ? renderer.info.programs.length : null, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles };
     },
     // C9 テスト: 水中判定・酸素・青い霧・採掘減速の現在値
     waterState: () => waterStateInfo(),
