@@ -557,6 +557,51 @@
       regenWindow(Math.floor(player.pos.x), Math.floor(player.pos.z));
       return { pos: player.pos.toArray().map(n => +n.toFixed(1)), block: blockAt(Math.floor(x), Math.floor(y), Math.floor(z)) };
     },
+    // 性能の切り分け: 影・水の法線マップを個別に切って描画時間を比べる
+    gfx: (opt = {}) => {
+      if ('shadow' in opt) renderer.shadowMap.enabled = !!opt.shadow;
+      if ('water' in opt) {
+        const lm = TYPES[WATER]._litMats;
+        for (const m of (Array.isArray(lm) ? lm : [lm])) {
+          if (!m) continue;
+          m.normalMap = opt.water ? (TX.water.userData && TX.water.userData.normalMap) || null : null;
+          m.needsUpdate = true;
+        }
+      }
+      if ('pixelRatio' in opt) renderer.setPixelRatio(opt.pixelRatio);
+      const t0 = performance.now();
+      for (let i = 0; i < 20; i++) renderer.render(scene, camera);
+      return {
+        描画ms: +((performance.now() - t0) / 20).toFixed(2),
+        影: renderer.shadowMap.enabled, pixelRatio: renderer.getPixelRatio(),
+        calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
+      };
+    },
+    // 性能計測: 1フレーム分の処理を項目ごとに実測する（ms/回。大きいものから潰す）
+    perf: (n = 20) => {
+      const dt = 1 / 60, out = {};
+      const m = (name, fn) => { const t0 = performance.now(); for (let i = 0; i < n; i++) fn(); out[name] = +((performance.now() - t0) / n).toFixed(3); };
+      m('描画', () => renderer.render(scene, camera));
+      m('レイキャスト', () => pickTarget());
+      m('カメラ', () => updateCameraView(dt, null));
+      m('天候', () => updateWeather(dt));
+      m('動物', () => updateAnimals(dt));
+      m('敵モブ', () => updateHostileMobs(dt));
+      m('ドロップ', () => updateItemDrops(dt));
+      m('落下ブロック', () => updateFallingBlocks(dt));
+      m('XPオーブ', () => updateXpOrbs(dt));
+      m('液体シム', () => updateLiquids(dt));
+      if (typeof updateLiquidFx === 'function') m('液体FX', () => updateLiquidFx(dt));
+      if (typeof updateFxParticles === 'function') m('FX粒子', () => updateFxParticles(dt));
+      m('レッドストーン', () => updateRedstone(dt));
+      m('作物', () => updateCrops(dt));
+      m('松明ライト', () => updateTorchLights(dt));
+      m('生存', () => updateSurvival(dt, false));
+      const info = renderer.info;
+      out.合計 = +Object.values(out).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0).toFixed(3);
+      out.描画情報 = { calls: info.render.calls, triangles: info.render.triangles, programs: info.programs.length, geometries: info.memory.geometries, textures: info.memory.textures };
+      return out;
+    },
     // 落下ブロックのテスト: 落下中の砂/砂利の一覧
     falling: () => fallingBlockStats(),
     // 落下ブロックのテスト: 足元近くに砂/砂利の柱を宙に作って落とす

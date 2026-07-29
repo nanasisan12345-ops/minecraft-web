@@ -2397,7 +2397,8 @@
     }
     const job = worldJob;
     if (!job) return;
-    const end = performance.now() + WORLD_JOB_MS;
+    // ゲーム開始後は1フレームに使う時間を絞る（生成は遅くなるが移動中のカクつきを防ぐ）
+    const end = performance.now() + (started ? 2.5 : WORLD_JOB_MS);
 
     if (job.phase === 'terrain') {
       if (processRanges(job.terrainRanges, job.scan, end, generateTerrainColumn)) {

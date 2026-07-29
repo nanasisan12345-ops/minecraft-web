@@ -53,7 +53,8 @@
     const job = plantJob;
     if (!job) return;
     const { pm, q, sv, pv, eu } = _plantTmp, cnt = job.cnt;
-    const end = performance.now() + PLANT_JOB_MS;
+    // ゲーム開始後は1フレームに使う時間を絞る（32/34 のジョブ予算と足して60fpsに収める）
+    const end = performance.now() + (started ? 1.4 : PLANT_JOB_MS);
     while (true) {
       for (let n = 0; n < PLANT_BATCH; n++) {
         const x = job.x, z = job.z;

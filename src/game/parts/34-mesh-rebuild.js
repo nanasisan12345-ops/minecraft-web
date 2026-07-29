@@ -14,7 +14,7 @@
     return false;
   }
 
-  const REBUILD_JOB_MS = 2.2;
+  const REBUILD_JOB_MS = 1.6;   // 1フレームでチャンク再構築に使う上限（描画3.5ms＋メッシュ適用2.2msと足して60fpsに収める）
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
   const MESH_WORKER_VERSION = 26; // 14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高。17: RS鉱石+RS部品モデル。18: ドア32IDバリアント+面別マテリアル。19-20: モデルブロックの面別UV。21: ベッド2ブロック化。22: 松明の形状。23: 壁掛け松明+モデル回転。24: 砂利の地形生成。25: 掘り跡に流れ込んだ液体を描く。26: 液体の源を満杯で描く
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
@@ -644,7 +644,9 @@
   // プレイ中は控えめにしてカクつきを抑える。
   function drainMeshApplyQueue() {
     if (!meshApplyQueue.length) return;
-    const budget = started ? 3.5 : 10;
+    // 開始後は1フレームに使う時間を抑えてカクつきを防ぐ。開始前（プリロード中）は逆に多めに
+    // 進めて、ゲームが始まった時点で残りのチャンク適用をできるだけ減らしておく。
+    const budget = started ? 2.2 : 12;
     const end = performance.now() + budget;
     let dirty = false;
     while (meshApplyQueue.length && performance.now() < end) {
