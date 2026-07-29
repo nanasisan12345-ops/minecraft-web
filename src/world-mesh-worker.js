@@ -924,7 +924,11 @@ function addModelToState(state, x, y, z, model) {
 // シム管理下の液体セル: レベルに応じて上面を (8-lv)/9 に下げて描く（上に同液体が乗る滝の柱は満杯）
 function addLiquidBlockToState(state, x, y, z, t, lv) {
   const above = blockAtStack(x, y + 1, z);
-  const topH = (above === t) ? 1 : Math.max(1 / 9, (8 - lv) / 9);
+  // 水は常に満杯で描く。自然の海/川/湖は暗黙ブロック＝満杯なので、掘り跡へ流れ込んだ
+  // 水だけを (8-lv)/9 にすると、水辺じゅうが階段状の板になって見た目が破綻し、
+  // 半透明の重ね描画が増えて重くもなる。溶岩は不透明で量も少ないので段差を残す。
+  // （メイン側 34-mesh-rebuild.js と完全に同じ式にすること）
+  const topH = (above === t || t === WATER) ? 1 : Math.max(1 / 9, (8 - lv) / 9);
   let added = false;
   for (let f = 0; f < FACE_DEFS.length; f++) {
     if (f === 3 && y === CHUNK_Y_MIN) continue;

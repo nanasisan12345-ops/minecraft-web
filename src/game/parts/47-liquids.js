@@ -52,11 +52,14 @@
     if (l) return l.t === T ? l.lv : null;
     return blockAt(x, y, z) === T ? 0 : null;
   }
-  // 無限水源の判定用: シム管理下の水源(lv0)だけを数える。自然地形の海/川/湖(暗黙の水)は
-  // 数えない（数えると岸辺沿いに源化が連鎖してマップ全域が氾濫する）。
+  // 無限水源の判定用。シム源(lv0)に加えて、自然地形の海/川/湖も源として数える。
+  // 数えないと、水面と同じ高さに掘った穴が流水(lv>0)のまま残り、可変水面高で階段状に
+  // 描かれて水辺がガタガタになる（本家は隣接する水源2つで水源化して平らになる）。
+  // 拡散先は空気セルだけで、海面以下の空気は地形生成では作られないため連鎖は掘り跡に限られる。
   function waterSourceAt(x, y, z) {
     const l = getLiquid(x, y, z);
-    return l ? (l.t === WATER && l.lv === 0) : false;
+    if (l) return l.t === WATER && l.lv === 0;
+    return blockAt(x, y, z) === WATER;
   }
 
   function setLiquidCell(x, y, z, type, level) {

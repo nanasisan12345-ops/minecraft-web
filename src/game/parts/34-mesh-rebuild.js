@@ -16,7 +16,7 @@
 
   const REBUILD_JOB_MS = 2.2;
   let rebuildJob = null, rebuildSeq = 0, pendingChunkKeys = new Set();
-  const MESH_WORKER_VERSION = 25; // 14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高。17: RS鉱石+RS部品モデル。18: ドア32IDバリアント+面別マテリアル。19-20: モデルブロックの面別UV。21: ベッド2ブロック化。22: 松明の形状。23: 壁掛け松明+モデル回転。24: 砂利の地形生成。25: 掘り跡に流れ込んだ液体を描く
+  const MESH_WORKER_VERSION = 26; // 14: packed.light。15: はしご/板ガラス/看板。16: 液体の可変水面高。17: RS鉱石+RS部品モデル。18: ドア32IDバリアント+面別マテリアル。19-20: モデルブロックの面別UV。21: ベッド2ブロック化。22: 松明の形状。23: 壁掛け松明+モデル回転。24: 砂利の地形生成。25: 掘り跡に流れ込んだ液体を描く。26: 液体の源を満杯で描く
   // 1本のワーカーで49チャンクを直列に組むと遅いので、CPUコア数に応じた
   // ワーカープールで並列に組む。各ワーカーの onmessage は共有の inflight を id で引く。
   const MESH_WORKER_COUNT = (() => {
@@ -204,7 +204,11 @@
     const lq = (typeof getLiquid === 'function') ? getLiquid(x, y, z) : null;
     if (lq) {
       const above = blockAt(x, y + 1, z);
-      const topH = (above === t) ? 1 : Math.max(1 / 9, (8 - lq.lv) / 9);
+      // 水は常に満杯で描く。自然の海/川/湖は暗黙ブロック＝満杯なので、掘り跡へ流れ込んだ
+      // 水だけを (8-lv)/9 にすると、水辺じゅうが階段状の板になって見た目が破綻し、
+      // 半透明の重ね描画が増えて重くもなる。溶岩は不透明で量も少ないので段差を残す。
+      // （ワーカー側 world-mesh-worker.js と完全に同じ式にすること）
+      const topH = (above === t || t === WATER) ? 1 : Math.max(1 / 9, (8 - lq.lv) / 9);
       let addedL = false;
       for (let f = 0; f < FACE_DEFS.length; f++) {
         if (f === 3 && y === CHUNK_Y_MIN) continue;
